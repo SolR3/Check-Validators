@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 # TODO
+#     - Turn it into a table
 #     - Clean up printout at the end
 #     - Ask about running local subtensor
 
@@ -15,7 +16,14 @@ import numpy
 import threading
 import time
 
-MAX_VALIDATOR = 50
+
+# TODO - Make this better.
+# Can't use this in the actual data gathering as the
+# user may specify the --local-subtensor arg instead.
+MAX_SUBNET =  bittensor.subtensor().get_total_subnets() - 1
+
+TOTAL_EMISSION = 295.5 # TODO - Need some way to verify this
+MIN_STAKE_THRESHOLD = 5000 # TODO - Need some way to verify this
 DEFAULT_VTRUST_THRESHOLD = 0.2
 DEFAULT_UPDATED_THRESHOLD = 3
 
@@ -23,12 +31,12 @@ DEFAULT_UPDATED_THRESHOLD = 3
 def _parse_args():
     class SubnetsAction(argparse.Action):       
         def __call__(self, parser, namespace, values, option_string=None):
-            bad_values = [v for v in values if v < 1 or v > MAX_VALIDATOR]
+            bad_values = [v for v in values if v < 1 or v > MAX_SUBNET]
             if bad_values:
                 raise argparse.ArgumentError(
                     argument=self,
                     message=f"Subnet values are not between 1 and "
-                            f"{MAX_VALIDATOR}: {bad_values}")
+                            f"{MAX_SUBNET}: {bad_values}")
             setattr(namespace, self.dest, values)
     
     class ThreadsAction(argparse.Action):       
@@ -77,8 +85,8 @@ def _parse_args():
         type=float,
         default=DEFAULT_VTRUST_THRESHOLD,
         action = VtrustAction,
-        help="The VTrust threshold. Float value betweeon (0-1]. If "
-             "Rizzo VTrust < (avg VTrust - threshold) then it is bad. "
+        help="The vTrust threshold. Float value betweeon (0-1]. If "
+             "Rizzo vTrust < (avg vTrust - threshold) then it is bad. "
             f"The default value is {DEFAULT_VTRUST_THRESHOLD}.")
 
     parser.add_argument(
@@ -101,7 +109,7 @@ def _parse_args():
     parser.add_argument(
         "-v", "--verbose",
         action="store_true",
-        help="When specified, the VTrust and Updated values for all subnets "
+        help="When specified, the vTrust and Updated values for all subnets "
              "are printed out. When not specified, only the bad subnets are "
              "printed out.")
 
@@ -117,6 +125,10 @@ def _parse_args():
 class SubnetData:
     ValidatorData = namedtuple(
     "ValidatorData", [
+        "subnet_emission",
+        "num_validators",
+        "rizzo_stake_rank",
+        "rizzo_emission",
         "rizzo_vtrust",
         "max_vtrust",
         "avg_vtrust",
@@ -129,11 +141,11 @@ class SubnetData:
     # constants
     # _rizzo_hotkey = "5CXRfP2ekFhe62r7q3vppRajJmGhTi7vwvb2yr79jveZ282w"
     _rizzo_hotkey = "5F2CsUDVbRbVMXTh9fAzF9GacjVX7UapvRxidrxe7z8BYckQ"
-    _min_stake = 10000
     _red = "91"
     _green = "92"
 
-    def __init__(self, network):
+    def __init__(self, netuids, network):
+        self._netuids = netuids
         self._network = network
 
         # Create locks
@@ -147,7 +159,31 @@ class SubnetData:
         # Get subtensor for obtaining the updated values.
         self._subtensor = bittensor.subtensor(network=network)
 
-    def get_validator_data(self, netuid, init_new_subtensor):
+    def get_subnet_data(self, threads):
+        print("\nGathering data")
+        max_attempts = 5
+        netuids = self._netuids
+        for attempt in range(1, max_attempts+1):
+            print(f"\nAttempt {attempt} of {max_attempts}")
+            if threads:
+                with ThreadPoolExecutor(max_workers=threads) as executor:
+                    executor.map(self._get_validator_data,
+                        netuids, [True for _ in range(len(netuids))])
+            else:
+                for netuid in netuids:
+                    self._get_validator_data(netuid, False)
+
+            # Get netuids missing data
+            netuids = list(set(netuids).difference(
+                        set(self._validator_data)).difference(
+                            set([int(n) for n in self._missing_validators])))
+            if netuids:
+                print("\nFailed to gather data for subnets: "
+                      f"{', '.join([str(n) for n in netuids])}.")
+            else:
+                break
+
+    def _get_validator_data(self, netuid, init_new_subtensor):
         start_time = time.time()
         print(f"\nObtaining data for subnet {netuid}\n")
         
@@ -161,7 +197,10 @@ class SubnetData:
         # Get metagraph for the subnet.
         metagraph = bittensor.metagraph(netuid=netuid, network=self._network)
     
-        # Get vtrust and updated values for Rizzo.
+        # Get emission percentage for the subnet.
+        subnet_emission = numpy.sum(metagraph.E) / TOTAL_EMISSION * 100
+
+        # Get UID for Rizzo.
         try:
             rizzo_uid = metagraph.hotkeys.index(self._rizzo_hotkey)
         except ValueError:
@@ -171,20 +210,29 @@ class SubnetData:
                 self._missing_validators.append(str(netuid))
             return
         
+        # Get Rizzo validator values
+        rizzo_emission = metagraph.E[rizzo_uid]
         rizzo_vtrust = metagraph.Tv[rizzo_uid]
         rizzo_updated = subtensor.blocks_since_last_update(
             netuid=netuid, uid=rizzo_uid)
 
-        # Get vtrust and updated values for all other validators
-        # that have a valid stake amount.
+        # Get all validators that have a valid stake amount.
         valid_uids = [i for (i, s) in enumerate(metagraph.S)
-                      if i != rizzo_uid and s > self._min_stake]
+                      if i != rizzo_uid and s > MIN_STAKE_THRESHOLD]
+        num_validators = len(valid_uids) + 1
 
+        # Get stake-wise ranking for Rizzo
+        rizzo_stake = metagraph.S[rizzo_uid]
+        rizzo_stake_rank = (
+            len(metagraph.S) - sorted(metagraph.S).index(rizzo_stake))
+
+        # Get min/max/average vTrust values.
         vtrusts = [metagraph.Tv[uid] for uid in valid_uids]
         max_vtrust = numpy.max(vtrusts)
         avg_vtrust = numpy.average(vtrusts)
         min_vtrust = numpy.min(vtrusts)
 
+        # Get min/max/average Updated values.
         updateds = []
         for uid in valid_uids:
             updateds.append(subtensor.blocks_since_last_update(
@@ -196,6 +244,10 @@ class SubnetData:
         # Store the data.
         with self._validator_data_lock:
             self._validator_data[netuid] = self.ValidatorData(
+                subnet_emission=subnet_emission,
+                num_validators=num_validators,
+                rizzo_stake_rank=rizzo_stake_rank,
+                rizzo_emission=rizzo_emission,
                 rizzo_vtrust=rizzo_vtrust,
                 max_vtrust=max_vtrust,
                 avg_vtrust=avg_vtrust,
@@ -211,7 +263,8 @@ class SubnetData:
 
     # TODO - Clean this up
     def print_validator_data(self, vtrust_threshold, updated_threshold,
-                             verbose, colored):
+                             verbose, colored, sort_subnets):
+        t = "    "
 
         def pretty_text(text, is_bad):
             if colored:
@@ -222,11 +275,24 @@ class SubnetData:
         def pretty_print(text, is_bad):
             print(pretty_text(text, is_bad))
 
+        def sort_key(netuid):
+            return (self._validator_data[netuid].subnet_emission
+                    if netuid in self._validator_data
+                    else netuid)
+
+        missing_data = []
+        bad_subnets = bool(self._missing_validators)
+
         # Loop through all subnets and print out
         # their vtrust and updated data.
-        bad_subnets = bool(self._missing_validators)
-        t = "    "
-        for netuid in sorted(self._validator_data):
+        netuids = (sorted(self._netuids, key=sort_key)
+                   if sort_subnets else self._netuids)
+        for netuid in netuids:
+            if netuid not in self._validator_data:
+                if str(netuid) not in self._missing_validators:
+                    missing_data.append(str(netuid))
+                continue
+
             validator_data = self._validator_data[netuid]
             bad_vtrust = (
                 (validator_data.avg_vtrust -
@@ -242,43 +308,48 @@ class SubnetData:
             
             if verbose or bad_vtrust or bad_updated:
                 pretty_print(f"\nSubnet {netuid}:", bad_vtrust or bad_updated)
+                print(f"Subnet emission = {validator_data.subnet_emission:.2f}%")
+                print("Rizzo Stake rank: "
+                     f"{validator_data.rizzo_stake_rank}/"
+                     f"{validator_data.num_validators}")
+                print(f"Rizzo emission = {validator_data.rizzo_emission:.5f}")
             if verbose or bad_vtrust:
                 print("====================")
                 if bad_vtrust and not colored:
                     print("BAD VTRUST VALUE!")
-                printout_dict = {
-                    validator_data.rizzo_vtrust:
-                        pretty_text(
-                            f"{t}Rizzo VTrust = "
-                            f"{validator_data.rizzo_vtrust:.5f}",
-                            bad_vtrust),
-                    validator_data.max_vtrust:
-                        f"{t}Max VTrust   = {validator_data.max_vtrust:.5f}",
-                    validator_data.avg_vtrust:
-                        f"{t}Avg VTrust   = {validator_data.avg_vtrust:.5f}",
-                    validator_data.min_vtrust:
-                        f"{t}Min VTrust   = {validator_data.min_vtrust:.5f}"}
-                for value in reversed(sorted(printout_dict)):
-                    printout_line = printout_dict[value]
+                printout_list = (
+                    (validator_data.rizzo_vtrust, 
+                     pretty_text(
+                        f"{t}Rizzo vTrust = "
+                        f"{validator_data.rizzo_vtrust:.5f}",
+                        bad_vtrust)),
+                    (validator_data.max_vtrust,
+                     f"{t}Max vTrust   = {validator_data.max_vtrust:.5f}"),
+                    (validator_data.avg_vtrust,
+                     f"{t}Avg vTrust   = {validator_data.avg_vtrust:.5f}"),
+                    (validator_data.min_vtrust,
+                     f"{t}Min vTrust   = {validator_data.min_vtrust:.5f}"))
+                for _, printout_line in \
+                        reversed(sorted(printout_list, key=lambda i: i[0])):
                     print(printout_line)
             if verbose or bad_updated:
                 print("====================")
                 if bad_updated and not colored:
                     print("BAD UPDATED VALUE!")
-                printout_dict = {
-                    validator_data.rizzo_updated:
-                        pretty_text(
-                            f"{t}Rizzo Updated = "
-                            f"{validator_data.rizzo_updated}",
-                            bad_updated),
-                    validator_data.min_updated:
-                        f"{t}Min Updated   = {validator_data.min_updated}",
-                    validator_data.avg_updated:
-                        f"{t}Avg Updated   = {validator_data.avg_updated}",
-                    validator_data.max_updated:
-                        f"{t}Max Updated   = {validator_data.max_updated}"}
-                for value in sorted(printout_dict):
-                    printout_line = printout_dict[value]
+                printout_list = (
+                    (validator_data.rizzo_updated,
+                     pretty_text(
+                        f"{t}Rizzo Updated = "
+                        f"{validator_data.rizzo_updated}",
+                        bad_updated)),
+                    (validator_data.min_updated,
+                     f"{t}Min Updated   = {validator_data.min_updated}"),
+                    (validator_data.avg_updated,
+                     f"{t}Avg Updated   = {validator_data.avg_updated}"),
+                    (validator_data.max_updated,
+                     f"{t}Max Updated   = {validator_data.max_updated}"))
+                for _, printout_line in \
+                        sorted(printout_list, key=lambda i: i[0]):
                     print(printout_line)
 
         if self._missing_validators:
@@ -287,6 +358,13 @@ class SubnetData:
                          True)
             print("====================")
             pretty_print(f"{t}{", ".join(self._missing_validators)}", True)
+        
+        if missing_data:
+            pretty_print("\nFailed to obtain data from the following subnets."
+                         "\n(Try running these separately)",
+                         True)
+            print("====================")
+            pretty_print(f"{t}{", ".join(sorted(missing_data))}", True)
         
         if not bad_subnets:
             pretty_print("\nALL SUBNETS ARE GOOD!", False)
@@ -308,25 +386,22 @@ def main():
     if options.subnets:
         options.verbose = True
 
-    network = "local" if options.local_subtensor else "finney"
-    subnet_data = SubnetData(network)
-
     start_time = time.time()
-    netuids = options.subnets or range(1, MAX_VALIDATOR + 1)
-    if options.threads:
-        with ThreadPoolExecutor(max_workers=options.threads) as executor:
-            executor.map(subnet_data.get_validator_data,
-                         netuids, [True for _ in range(len(netuids))])
-    else:
-        for netuid in netuids:
-            subnet_data.get_validator_data(netuid, False)
+
+    network = "local" if options.local_subtensor else "finney"
+    netuids = options.subnets or range(1, MAX_SUBNET + 1)
+    subnet_data = SubnetData(netuids, network)
+    subnet_data.get_subnet_data(options.threads)
+
     total_time = time.time() - start_time
 
+    sort_subnets = not bool(options.subnets)
     subnet_data.print_validator_data(
         options.vtrust_threshold,
         options.updated_threshold,
         options.verbose,
-        options.colored)
+        options.colored,
+        sort_subnets)
     print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
 
 if __name__ == "__main__":
