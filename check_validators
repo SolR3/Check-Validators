@@ -95,7 +95,7 @@ def _parse_args():
         default=DEFAULT_UPDATED_THRESHOLD,
         action = UpdatedAction,
         help="The Updated value threshold. Float value > 1. If "
-             "Rizzo Updated > (avg Updated * threshold) then it is bad. "
+             "Rizzo Updated > (subnet tempo * threshold) then it is bad. "
             f"The default value is {DEFAULT_UPDATED_THRESHOLD}.")
 
     parser.add_argument(
@@ -126,6 +126,7 @@ class SubnetData:
     ValidatorData = namedtuple(
     "ValidatorData", [
         "subnet_emission",
+        "subnet_tempo",
         "num_validators",
         "rizzo_stake_rank",
         "rizzo_emission",
@@ -200,6 +201,9 @@ class SubnetData:
         # Get emission percentage for the subnet.
         subnet_emission = numpy.sum(metagraph.E) / TOTAL_EMISSION * 100
 
+        # Get subnet tempo (used for determining bad Updated values)
+        subnet_tempo = subtensor.get_subnet_hyperparameters(netuid).tempo
+
         # Get UID for Rizzo.
         try:
             rizzo_uid = metagraph.hotkeys.index(self._rizzo_hotkey)
@@ -245,6 +249,7 @@ class SubnetData:
         with self._validator_data_lock:
             self._validator_data[netuid] = self.ValidatorData(
                 subnet_emission=subnet_emission,
+                subnet_tempo=subnet_tempo,
                 num_validators=num_validators,
                 rizzo_stake_rank=rizzo_stake_rank,
                 rizzo_emission=rizzo_emission,
@@ -300,7 +305,7 @@ class SubnetData:
                     vtrust_threshold)
             bad_updated = (
                 (validator_data.rizzo_updated /
-                 validator_data.avg_updated) >
+                 validator_data.subnet_tempo) >
                     updated_threshold)
             
             if bad_vtrust or bad_updated:
