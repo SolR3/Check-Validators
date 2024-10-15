@@ -23,7 +23,8 @@ import time
 # TODO - Make this better.
 # Can't use this in the actual data gathering as the
 # user may specify the --local-subtensor arg instead.
-MAX_SUBNET =  bittensor.subtensor().get_total_subnets() - 1
+# Throw away subnet 0.
+SUBNET_IDS =  bittensor.subtensor().get_subnets()[1:]
 
 TOTAL_EMISSION = 295.5 # TODO - Need some way to verify this
 MIN_STAKE_THRESHOLD = 5000 # TODO - Need some way to verify this
@@ -34,12 +35,14 @@ DEFAULT_UPDATED_THRESHOLD = 3
 def _parse_args():
     class SubnetsAction(argparse.Action):       
         def __call__(self, parser, namespace, values, option_string=None):
-            bad_values = [v for v in values if v < 1 or v > MAX_SUBNET]
+            min_subnet = SUBNET_IDS[0]
+            max_subnet = SUBNET_IDS[-1]
+            bad_values = [v for v in values if v < min_subnet or v > max_subnet]
             if bad_values:
                 raise argparse.ArgumentError(
                     argument=self,
-                    message=f"Subnet values are not between 1 and "
-                            f"{MAX_SUBNET}: {bad_values}")
+                    message=f"Subnet values are not between {min_subnet} "
+                            f"and {max_subnet}: {bad_values}")
             setattr(namespace, self.dest, values)
     
     class ThreadsAction(argparse.Action):       
@@ -505,7 +508,7 @@ def main():
     start_time = time.time()
 
     network = "local" if options.local_subtensor else "finney"
-    netuids = options.subnets or range(1, MAX_SUBNET + 1)
+    netuids = options.subnets or SUBNET_IDS
     subnet_data = SubnetData(netuids, network)
     subnet_data.get_subnet_data(options.threads)
 
