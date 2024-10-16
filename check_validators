@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 
 # TODO
-#     - Turn it into a table
-#     - Clean up printout at the end
+#     - Turn RichPrinter into abstract base class
 #     - Ask about running local subtensor
 
 # bittensor import
@@ -274,7 +273,7 @@ class SubnetData:
               f"{int(total_time)} seconds.")
 
     def print_validator_data(self, vtrust_threshold, updated_threshold,
-                             verbose, sort_subnets, printer):
+                             verbose, subnets_specified, printer):
         def sort_key(netuid):
             if netuid in self._validator_data:
                 sort_key = self._validator_data[netuid].subnet_emission
@@ -283,8 +282,11 @@ class SubnetData:
                 return sort_key
             return netuid
         
+        total_emission = 0.0
         missing_data = []
         bad_validators = bool(self._missing_validators)
+        sort_subnets = not subnets_specified
+        print_total_emission = not subnets_specified
 
         # Loop through all subnets and print out
         # their vtrust and updated data.
@@ -297,6 +299,9 @@ class SubnetData:
                 continue
 
             validator_data = self._validator_data[netuid]
+
+            total_emission += validator_data.rizzo_emission
+
             bad_vtrust = (
                 (validator_data.avg_vtrust -
                  validator_data.rizzo_vtrust) >
@@ -314,7 +319,8 @@ class SubnetData:
 
         # Print extra stuff
         printer.add_extra_printout(
-            self._missing_validators, missing_data, bad_validators)
+            self._missing_validators, missing_data, bad_validators,
+            total_emission if print_total_emission else None)
         
         # Print everything
         printer.print_everything()
@@ -337,7 +343,12 @@ class RichPrinter:
             return f"color({self._green})"
     
     def add_extra_printout(self, missing_validators,
-            missing_data, bad_validators):
+            missing_data, bad_validators, total_emission):
+        
+        if total_emission is not None:
+            self._extra_printout.append(
+                Text(f"\nTotal Emission = {total_emission:.5f}"))
+
         if missing_validators:
             self._extra_printout.append(
                  Text("\nRizzo validator is not running "
@@ -519,12 +530,12 @@ def main():
     else:
         printer = ListPrinter()
 
-    sort_subnets = not bool(options.subnets)
+    subnets_specified = bool(options.subnets)
     subnet_data.print_validator_data(
         options.vtrust_threshold,
         options.updated_threshold,
         options.verbose,
-        sort_subnets,
+        subnets_specified,
         printer)
     print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
 
