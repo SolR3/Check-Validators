@@ -210,7 +210,7 @@ class SubnetData:
                             else self._subtensor
 
         # Get metagraph for the subnet.
-        metagraph = bittensor.metagraph(netuid=netuid, network=self._network)
+        metagraph = subtensor.metagraph(netuid=netuid)
     
         # Get emission percentage for the subnet.
         subnet_emission = numpy.sum(metagraph.E) / TOTAL_EMISSION * 100
