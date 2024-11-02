@@ -378,7 +378,7 @@ class RichPrinter:
                  Text("\nRizzo validator is not running "
                       "on the following subnets:"
                       "\n===================="
-                     f"\n{self._tab}{", ".join(missing_validators)}",
+                     f"\n{self._tab}{', '.join(missing_validators)}",
                       style=self._get_style(True)))
 
         if missing_data:
@@ -386,7 +386,7 @@ class RichPrinter:
                  Text("\nFailed to obtain data from the following subnets."
                       "\n(Try running these separately)"
                       "\n===================="
-                     f"\n{self._tab}{", ".join(sorted(missing_data))}",
+                     f"\n{self._tab}{', '.join(sorted(missing_data))}",
                       style=self._get_style(True)))
 
         if not bad_validators:
