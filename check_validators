@@ -19,23 +19,31 @@ import threading
 import time
 
 
-# TODO - Make this better.
-# Can't use this in the actual data gathering as the
-# user may specify the --local-subtensor arg instead.
-# Throw away subnet 0.
-SUBNET_IDS =  bittensor.subtensor().get_subnets()[1:]
-
 TOTAL_EMISSION = 295.5 # TODO - Need some way to verify this
 MIN_STAKE_THRESHOLD = 5000 # TODO - Need some way to verify this
 DEFAULT_VTRUST_THRESHOLD = 0.2
 DEFAULT_UPDATED_THRESHOLD = 3
 
 
+# TODO - Make this better.
+# Can't use this in the actual data gathering as the
+# user may specify the --local-subtensor arg instead.
+# Throw away subnet 0.
+_SUBNET_IDS = None
+def _get_subnets(network="ws://subtensor-cali.rizzo.network:9944"):
+    global _SUBNET_IDS
+
+    if not _SUBNET_IDS:
+        _SUBNET_IDS = bittensor.subtensor(
+            network=network).get_subnets()[1:]
+    return _SUBNET_IDS
+
+
 def _parse_args():
     class SubnetsAction(argparse.Action):       
         def __call__(self, parser, namespace, values, option_string=None):
-            min_subnet = SUBNET_IDS[0]
-            max_subnet = SUBNET_IDS[-1]
+            min_subnet = _get_subnets()[0]
+            max_subnet = _get_subnets()[-1]
             bad_values = [v for v in values if v < min_subnet or v > max_subnet]
             if bad_values:
                 raise argparse.ArgumentError(
@@ -73,7 +81,6 @@ def _parse_args():
 
     parser.add_argument(
         "-l", "--local-subtensor",
-        action="store_true",
         help="When specified, use a local running subtensor. When not "
              "specified, use the 'finney' network subtensor.")
 
@@ -545,8 +552,8 @@ def main():
 
     start_time = time.time()
 
-    network = "local" if options.local_subtensor else "finney"
-    netuids = options.subnets or SUBNET_IDS
+    network = options.local_subtensor if options.local_subtensor else "finney"
+    netuids = options.subnets or _get_subnets(network)
     subnet_data = SubnetData(netuids, network, options.all_updated_values)
     subnet_data.get_subnet_data(options.threads)
 
