@@ -133,13 +133,6 @@ def _parse_args():
              "are printed out. When not specified, only the bad subnets are "
              "printed out.")
 
-    parser.add_argument(
-        "-n", "--no-table",
-        action="store_false",
-        dest="table",
-        help="When specified, prints all validators out one by one. When not "
-             "specified, the validator data is printed in table form.")
-
     return parser.parse_args()
 
 
@@ -171,12 +164,10 @@ class SubnetData:
         self._get_all_updated_values = get_all_updated_values
 
         # Create locks
-        self._missing_validators_lock = threading.Lock()
         self._validator_data_lock = threading.Lock()
 
         # Initialize data
         self._validator_data = {}
-        self._missing_validators = []
 
         # Get subtensor for obtaining the updated values.
         self._subtensor = bittensor.subtensor(network=network)
@@ -196,9 +187,7 @@ class SubnetData:
                     self._get_validator_data(netuid, False)
 
             # Get netuids missing data
-            netuids = list(set(netuids).difference(
-                        set(self._validator_data)).difference(
-                            set([int(n) for n in self._missing_validators])))
+            netuids = list(set(netuids).difference(set(self._validator_data)))
             if netuids:
                 print("\nFailed to gather data for subnets: "
                       f"{', '.join([str(n) for n in netuids])}.")
@@ -231,8 +220,22 @@ class SubnetData:
         except ValueError:
             print("\nWARNING: Rizzo validator not running on subnet "
                  f"{netuid}")
-            with self._missing_validators_lock:
-                self._missing_validators.append(str(netuid))
+            with self._validator_data_lock:
+                self._validator_data[netuid] = self.ValidatorData(
+                    netuid=netuid,
+                    subnet_emission=subnet_emission,
+                    subnet_tempo=None,
+                    num_validators=None,
+                    rizzo_stake_rank=None,
+                    rizzo_emission=None,
+                    rizzo_vtrust=None,
+                    max_vtrust=None,
+                    avg_vtrust=None,
+                    min_vtrust=None,
+                    rizzo_updated=None,
+                    min_updated=None,
+                    avg_updated=None,
+                    max_updated=None,)
             return
         
         # Get Rizzo validator values
@@ -294,20 +297,17 @@ class SubnetData:
               f"{int(total_time)} seconds.")
 
     def print_validator_data(self, vtrust_threshold, updated_threshold,
-                             verbose, subnets_specified, printer_class):
-        printer = printer_class(self._get_all_updated_values)
+                             verbose, subnets_specified):
+        printer = TablePrinter(self._get_all_updated_values)
 
         def sort_key(netuid):
-            if netuid in self._validator_data:
-                sort_key = self._validator_data[netuid].subnet_emission
-                if printer.reverse_sort:
-                    sort_key *= -1
-                return sort_key
-            return netuid
-        
+            sort_key = self._validator_data[netuid].subnet_emission
+            if printer.reverse_sort:
+                sort_key *= -1
+            return sort_key
+
         total_emission = 0.0
         missing_data = []
-        bad_validators = bool(self._missing_validators)
         sort_subnets = not subnets_specified
         print_total_emission = not subnets_specified
 
@@ -317,24 +317,24 @@ class SubnetData:
                    if sort_subnets else self._netuids)
         for netuid in netuids:
             if netuid not in self._validator_data:
-                if str(netuid) not in self._missing_validators:
-                    missing_data.append(str(netuid))
+                missing_data.append(str(netuid))
                 continue
 
             validator_data = self._validator_data[netuid]
 
-            total_emission += validator_data.rizzo_emission
+            if validator_data.rizzo_emission is not None:
+                total_emission += validator_data.rizzo_emission
 
-            bad_vtrust = (
+            bad_vtrust = validator_data.rizzo_vtrust is None or (
                 (validator_data.avg_vtrust -
                  validator_data.rizzo_vtrust) >
                     vtrust_threshold)
-            bad_updated = (
+            bad_updated = validator_data.rizzo_updated is None or (
                 (validator_data.rizzo_updated /
                  validator_data.subnet_tempo) >
                     updated_threshold)
-            
-            bad_validators |= bad_vtrust | bad_updated
+
+            bad_validators = bad_vtrust | bad_updated
 
             if verbose or bad_vtrust or bad_updated:
                 printer.update_printout(
@@ -342,14 +342,14 @@ class SubnetData:
 
         # Print extra stuff
         printer.add_extra_printout(
-            self._missing_validators, missing_data, bad_validators,
+            missing_data, bad_validators,
             total_emission if print_total_emission else None)
         
         # Print everything
         printer.print_everything()
 
 
-# TODO - Turn into abstract base class
+# TODO - Fold this into TablePrinter
 class RichPrinter:
     _red = "9"
     _green = "10"
@@ -366,20 +366,22 @@ class RichPrinter:
         else:
             return f"color({self._green})"
     
-    def add_extra_printout(self, missing_validators,
-            missing_data, bad_validators, total_emission):
+    def _get_float_value(self, value):
+        if value is None:
+            return "---"
+        return f"{value:.5f}"
+        
+    def _get_int_value(self, value):
+        if value is None:
+            return "---"
+        return str(value)
+    
+    def add_extra_printout(self, missing_data,
+                           bad_validators, total_emission):
         
         if total_emission is not None:
             self._extra_printout.append(
                 Text(f"\nTotal Emission = {total_emission:.5f}"))
-
-        if missing_validators:
-            self._extra_printout.append(
-                 Text("\nRizzo validator is not running "
-                      "on the following subnets:"
-                      "\n===================="
-                     f"\n{self._tab}{', '.join(missing_validators)}",
-                      style=self._get_style(True)))
 
         if missing_data:
             self._extra_printout.append(
@@ -439,98 +441,25 @@ class TablePrinter(RichPrinter):
             Text(f"{validator_data.subnet_emission:.2f}%"),
             Text(f"{validator_data.rizzo_stake_rank}/"
                  f"{validator_data.num_validators}"),
-            Text(f"{validator_data.rizzo_emission:.5f}"),
-            Text(f"{validator_data.rizzo_vtrust:.5f}",
+            Text(self._get_float_value(validator_data.rizzo_emission)),
+            Text(self._get_float_value(validator_data.rizzo_vtrust),
                  style=self._get_style(bad_vtrust)),
-            Text(f"{validator_data.max_vtrust:.5f}"),
-            Text(f"{validator_data.avg_vtrust:.5f}"),
-            Text(f"{validator_data.min_vtrust:.5f}"),
-            Text(f"{validator_data.rizzo_updated}",
+            Text(self._get_float_value(validator_data.max_vtrust)),
+            Text(self._get_float_value(validator_data.avg_vtrust)),
+            Text(self._get_float_value(validator_data.min_vtrust)),
+            Text(self._get_int_value(validator_data.rizzo_updated),
                  style=self._get_style(bad_updated)),
         ]
         if self._print_all_updated_values:
             columns.extend([
-                Text(f"{validator_data.min_updated}"),
-                Text(f"{validator_data.avg_updated}"),
-                Text(f"{validator_data.max_updated}"),
+                Text(self._get_int_value(validator_data.min_updated)),
+                Text(self._get_int_value(validator_data.avg_updated)),
+                Text(self._get_int_value(validator_data.max_updated)),
             ])
         self._table.add_row(*columns)
 
     def print_everything(self):
         self._console.print(self._table)
-        super().print_everything()
-
-
-class ListPrinter(RichPrinter):
-    reverse_sort = False
-
-    def __init__(self, print_all_updated_values):
-        super().__init__(print_all_updated_values)
-        self._main_printout = [Text("Rizzo Validators")]
-    
-    def update_printout(self, validator_data, bad_vtrust, bad_updated):
-        self._main_printout.append(Text("\nSubnet "
-            f"{validator_data.netuid}",
-            style=self._get_style(bad_vtrust or bad_updated)))
-
-        self._main_printout.append(Text("Subnet emission = "
-            f"{validator_data.subnet_emission:.2f}%"))
-
-        self._main_printout.append(Text("Rizzo Stake rank: "
-                f"{validator_data.rizzo_stake_rank}/"
-                f"{validator_data.num_validators}"))
-
-        self._main_printout.append(Text("Rizzo emission = "
-            f"{validator_data.rizzo_emission:.5f}"))
-
-        self._main_printout.append(Text("===================="))
-
-        printout_list = (
-            (validator_data.rizzo_vtrust, 
-                Text(f"{self._tab}Rizzo vTrust = "
-                     f"{validator_data.rizzo_vtrust:.5f}",
-                     style=self._get_style(bad_vtrust))),
-            (validator_data.max_vtrust,
-                Text(f"{self._tab}Max vTrust   = "
-                     f"{validator_data.max_vtrust:.5f}")),
-            (validator_data.avg_vtrust,
-                Text(f"{self._tab}Avg vTrust   = "
-                     f"{validator_data.avg_vtrust:.5f}")),
-            (validator_data.min_vtrust,
-                Text(f"{self._tab}Min vTrust   = "
-                     f"{validator_data.min_vtrust:.5f}"))
-        )
-        for _, printout_line in \
-                reversed(sorted(printout_list, key=lambda i: i[0])):
-            self._main_printout.append(printout_line)
-
-        self._main_printout.append(Text("===================="))
-        
-        printout_list = [
-            (validator_data.rizzo_updated,
-                Text(f"{self._tab}Rizzo Updated = "
-                     f"{validator_data.rizzo_updated}",
-                     style=self._get_style(bad_updated)))
-        ]
-        if self._print_all_updated_values:
-            printout_list.extend([
-                (validator_data.min_updated,
-                    Text(f"{self._tab}Min Updated   = "
-                        f"{validator_data.min_updated}")),
-                (validator_data.avg_updated,
-                    Text(f"{self._tab}Avg Updated   = "
-                        f"{validator_data.avg_updated}")),
-                (validator_data.max_updated,
-                    Text(f"{self._tab}Max Updated   = "
-                        f"{validator_data.max_updated}"))
-            ])
-        for _, printout_line in \
-                sorted(printout_list, key=lambda i: i[0]):
-            self._main_printout.append(printout_line)
-
-    def print_everything(self):
-        for text in self._main_printout:
-            self._console.print(text)
         super().print_everything()
 
 
@@ -559,18 +488,12 @@ def main():
 
     total_time = time.time() - start_time
 
-    if options.table:
-        printer_class = TablePrinter
-    else:
-        printer_class = ListPrinter
-
     subnets_specified = bool(options.subnets)
     subnet_data.print_validator_data(
         options.vtrust_threshold,
         options.updated_threshold,
         options.verbose,
-        subnets_specified,
-        printer_class)
+        subnets_specified)
     print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
 
 if __name__ == "__main__":
