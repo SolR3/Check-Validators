@@ -11,10 +11,12 @@ import bittensor
 import argparse
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
+import os
 import numpy
 from rich.live import Live
 from rich.table import Table
 from rich.text import Text
+import sys
 import threading
 import time
 
@@ -80,11 +82,18 @@ def _parse_args():
         action = ThreadsAction,
         help="Gather the subnet metagraph data using the specified number of "
              "threads. When not specified, multithreading is not used.")
-    
-    parser.add_argument(
+
+    args_group = parser.add_mutually_exclusive_group()
+    args_group.add_argument(
         "-d", "--debug",
         action="store_true",
         help="When specified, debug data gathering debug output is printed.")
+
+    args_group.add_argument(
+        "-s", "--screen",
+        action="store_true",
+        help="When specified, screen=True is passed to the rich.live.Live "
+             "context manager.")
 
     return parser.parse_args()
 
@@ -379,12 +388,17 @@ def format_time(total_time):
 def main():
     options = _parse_args()
     subnet_data = SubnetData(options)
-    with Live(
-            subnet_data.get_table(),
-            auto_refresh=False,
-            screen=not options.debug) as live:
-        while True:
-            live.update(subnet_data.get_table(), refresh=True)
+    try:
+        with Live(
+                subnet_data.get_table(),
+                auto_refresh=False,
+                screen=options.screen) as live:
+            while True:
+                live.update(subnet_data.get_table(), refresh=True)
+    except KeyboardInterrupt:
+        sys.stdout = open(os.devnull, 'w')
+        sys.stderr = open(os.devnull, 'w')
+        os.kill(os.getpid())
 
 
 if __name__ == "__main__":
