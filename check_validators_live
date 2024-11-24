@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 
-# TODO
-#     - Turn RichPrinter into abstract base class
-#     - Ask about running local subtensor
-
 # bittensor import
 import bittensor
 

@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 
-# TODO
-#     - Turn RichPrinter into abstract base class
-#     - Ask about running local subtensor
-
 # bittensor import
 import bittensor
 
@@ -435,12 +431,18 @@ class TablePrinter(RichPrinter):
                 "Max U", justify="center", no_wrap=True)
 
     def update_printout(self, validator_data, bad_vtrust, bad_updated):
+        if validator_data.rizzo_stake_rank is None:
+            rizzo_stake_rank = "---"
+        else:
+            rizzo_stake_rank = (
+                f"{validator_data.rizzo_stake_rank}/"
+                    f"{validator_data.num_validators}")
+
         columns = [
             Text(f"{validator_data.netuid}",
                  style=self._get_style(bad_vtrust or bad_updated)),
             Text(f"{validator_data.subnet_emission:.2f}%"),
-            Text(f"{validator_data.rizzo_stake_rank}/"
-                 f"{validator_data.num_validators}"),
+            Text(rizzo_stake_rank),
             Text(self._get_float_value(validator_data.rizzo_emission)),
             Text(self._get_float_value(validator_data.rizzo_vtrust),
                  style=self._get_style(bad_vtrust)),
