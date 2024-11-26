@@ -292,8 +292,10 @@ class SubnetData:
         print(f"\nSubnet {netuid} data gathered in "
               f"{int(total_time)} seconds.")
 
-    def print_validator_data(self, vtrust_threshold, updated_threshold,
-                             verbose, subnets_specified):
+    def print_validator_data(
+            self, vtrust_error_threshold, updated_error_threshold,
+            verbose, subnets_specified):
+        updated_warning_threshold = (updated_error_threshold - 1)/2 + 1
         printer = TablePrinter(self._get_all_updated_values)
 
         def sort_key(netuid):
@@ -321,20 +323,31 @@ class SubnetData:
             if validator_data.rizzo_emission is not None:
                 total_emission += validator_data.rizzo_emission
 
-            bad_vtrust = validator_data.rizzo_vtrust is None or (
-                (validator_data.avg_vtrust -
-                 validator_data.rizzo_vtrust) >
-                    vtrust_threshold)
-            bad_updated = validator_data.rizzo_updated is None or (
-                (validator_data.rizzo_updated /
-                 validator_data.subnet_tempo) >
-                    updated_threshold)
+            if (validator_data.rizzo_vtrust is None
+                    or (validator_data.avg_vtrust
+                        - validator_data.rizzo_vtrust)
+                        > vtrust_error_threshold):
+                vtrust_status = 2
+            else:
+                vtrust_status = 0
 
-            bad_validators = bad_vtrust | bad_updated
+            if (validator_data.rizzo_updated is None
+                    or (validator_data.rizzo_updated
+                        / validator_data.subnet_tempo)
+                        > updated_error_threshold):
+                updated_status = 2
+            elif ((validator_data.rizzo_updated
+                    / validator_data.subnet_tempo)
+                        > updated_warning_threshold):
+                updated_status = 1
+            else:
+                updated_status = 0
 
-            if verbose or bad_vtrust or bad_updated:
+            bad_validators = (vtrust_status == 2) | (updated_status == 2)
+
+            if verbose or vtrust_status or updated_status:
                 printer.update_printout(
-                    validator_data, bad_vtrust, bad_updated)
+                    validator_data, vtrust_status, updated_status)
 
         # Print extra stuff
         printer.add_extra_printout(
@@ -349,6 +362,7 @@ class SubnetData:
 class RichPrinter:
     _red = "9"
     _green = "10"
+    _yellow = "11"
     _tab = "    "
 
     def __init__(self, print_all_updated_values):
@@ -356,9 +370,11 @@ class RichPrinter:
         self._extra_printout = []
         self._print_all_updated_values = print_all_updated_values
 
-    def _get_style(self, is_bad):
-        if is_bad:
+    def _get_style(self, status):
+        if status == 2:
             return f"color({self._red})"
+        elif status == 1:
+                return f"color({self._yellow})"
         else:
             return f"color({self._green})"
     
@@ -430,7 +446,7 @@ class TablePrinter(RichPrinter):
             self._table.add_column(
                 "Max U", justify="center", no_wrap=True)
 
-    def update_printout(self, validator_data, bad_vtrust, bad_updated):
+    def update_printout(self, validator_data, vtrust_status, updated_status):
         if validator_data.rizzo_stake_rank is None:
             rizzo_stake_rank = "---"
         else:
@@ -440,17 +456,17 @@ class TablePrinter(RichPrinter):
 
         columns = [
             Text(f"{validator_data.netuid}",
-                 style=self._get_style(bad_vtrust or bad_updated)),
+                 style=self._get_style(max(vtrust_status, updated_status))),
             Text(f"{validator_data.subnet_emission:.2f}%"),
             Text(rizzo_stake_rank),
             Text(self._get_float_value(validator_data.rizzo_emission)),
             Text(self._get_float_value(validator_data.rizzo_vtrust),
-                 style=self._get_style(bad_vtrust)),
+                 style=self._get_style(vtrust_status)),
             Text(self._get_float_value(validator_data.max_vtrust)),
             Text(self._get_float_value(validator_data.avg_vtrust)),
             Text(self._get_float_value(validator_data.min_vtrust)),
             Text(self._get_int_value(validator_data.rizzo_updated),
-                 style=self._get_style(bad_updated)),
+                 style=self._get_style(updated_status)),
         ]
         if self._print_all_updated_values:
             columns.extend([

@@ -116,8 +116,10 @@ class SubnetData:
     _rizzo_hotkey = "5F2CsUDVbRbVMXTh9fAzF9GacjVX7UapvRxidrxe7z8BYckQ"
 
     def __init__(self, options):
-        self._vtrust_threshold = options.vtrust_threshold,
-        self._updated_threshold = options.updated_threshold
+        self._vtrust_error_threshold = options.vtrust_threshold,
+        self._updated_error_threshold = options.updated_threshold
+        self._updated_warning_threshold = (options.updated_threshold - 1)/2 + 1
+
         self._threads = options.threads
         self._debug = options.debug
 
@@ -269,17 +271,28 @@ class SubnetData:
         for netuid in netuids:
             validator_data = self._validator_data[netuid]
 
-            bad_vtrust = validator_data.rizzo_vtrust is None or (
-                (validator_data.avg_vtrust -
-                 validator_data.rizzo_vtrust) >
-                    self._vtrust_threshold)
-            bad_updated = validator_data.rizzo_updated is None or (
-                (validator_data.rizzo_updated /
-                 validator_data.subnet_tempo) >
-                    self._updated_threshold)
+            if (validator_data.rizzo_vtrust is None
+                    or (validator_data.avg_vtrust
+                        - validator_data.rizzo_vtrust)
+                        > self._vtrust_error_threshold):
+                vtrust_status = 2
+            else:
+                vtrust_status = 0
+
+            if (validator_data.rizzo_updated is None
+                    or (validator_data.rizzo_updated
+                        / validator_data.subnet_tempo)
+                        > self._updated_error_threshold):
+                updated_status = 2
+            elif ((validator_data.rizzo_updated
+                    / validator_data.subnet_tempo)
+                        > self._updated_warning_threshold):
+                updated_status = 1
+            else:
+                updated_status = 0
             
             table_creator.add_row(
-                validator_data, bad_vtrust, bad_updated)
+                validator_data, vtrust_status, updated_status)
         
         return table_creator.table
     
@@ -291,6 +304,7 @@ class SubnetData:
 class TableCreator:
     _red = "9"
     _green = "10"
+    _yellow = "11"
 
     def __init__(self, total_time_formatted):
         datetime = time.ctime()
@@ -322,10 +336,12 @@ class TableCreator:
         self._table.add_column(
             "Max U", justify="center", no_wrap=True)
 
-    def add_row(self, validator_data, bad_vtrust, bad_updated):
-        def _get_style(is_bad):
-            if is_bad:
+    def add_row(self, validator_data, vtrust_status, updated_status):
+        def _get_style(status):
+            if status == 2:
                 return f"color({self._red})"
+            elif status == 1:
+                return f"color({self._yellow})"
             else:
                 return f"color({self._green})"
         
@@ -348,17 +364,17 @@ class TableCreator:
 
         columns = [
             Text(f"{validator_data.netuid}",
-                 style=_get_style(bad_vtrust or bad_updated)),
+                 style=_get_style(max(vtrust_status, updated_status))),
             Text(f"{validator_data.subnet_emission:.2f}%"),
             Text(rizzo_stake_rank),
             Text(_get_float_value(validator_data.rizzo_emission)),
             Text(_get_float_value(validator_data.rizzo_vtrust),
-                 style=_get_style(bad_vtrust)),
+                 style=_get_style(vtrust_status)),
             Text(_get_float_value(validator_data.max_vtrust)),
             Text(_get_float_value(validator_data.avg_vtrust)),
             Text(_get_float_value(validator_data.min_vtrust)),
             Text(_get_int_value(validator_data.rizzo_updated),
-                 style=_get_style(bad_updated)),
+                 style=_get_style(updated_status)),
             Text(_get_int_value(validator_data.min_updated)),
             Text(_get_int_value(validator_data.avg_updated)),
             Text(_get_int_value(validator_data.max_updated)),
