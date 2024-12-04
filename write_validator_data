@@ -1,0 +1,100 @@
+#!/usr/bin/env python
+
+# bittensor import
+import bittensor
+
+# standard imports
+import argparse
+import json
+import os
+import sys
+import time
+
+# Import local subnet_data module
+sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
+from subnet_data import SubnetData
+
+
+def _parse_args():    
+    class ThreadsAction(argparse.Action):       
+        def __call__(self, parser, namespace, values, option_string=None):
+            if values < 0:
+                raise argparse.ArgumentError(
+                    argument=self,
+                    message=f"Thread value ({values}) must be >= 0.")
+            setattr(namespace, self.dest, values)
+
+    parser = argparse.ArgumentParser()
+
+    # TODO - Add a json checker action
+    parser.add_argument(
+        "-j", "--json-file",
+        required=True,
+        help="The json file to write.")
+
+    parser.add_argument(
+        "-l", "--local-subtensor",
+        help="When specified, use a local running subtensor. When not "
+             "specified, use the 'finney' network subtensor.")
+
+    parser.add_argument(
+        "-t", "--threads",
+        type=int,
+        default=0,
+        action = ThreadsAction,
+        help="Gather the subnet metagraph data using the specified number of "
+             "threads. When not specified, multithreading is not used.")
+
+    return parser.parse_args()
+
+
+class SubnetDataWriter:
+    def __init__(self, network, threads, json_file):
+        self._network = network
+        self._threads = threads
+        self._final_json_file = json_file
+        self._temp_json_file = json_file + ".tmp"
+
+    def write_data(self):
+        print("Gathering subnet data.")
+        start_time = time.time()
+
+        self._netuids = bittensor.subtensor(network=self._network).get_subnets()[1:]
+        data_dict = SubnetData(
+            self._netuids, self._network, self._threads, True
+        ).to_dict()
+
+        print(f"\nWriting data to file: {self._temp_json_file}")
+        with open(self._temp_json_file, "w") as fd:
+            json.dump(data_dict, fd, indent=4)
+
+        print(f"\nMoving {self._temp_json_file} to {self._final_json_file}")
+        if os.path.exists(self._final_json_file):
+            os.unlink(self._final_json_file)
+        os.rename(self._temp_json_file, self._final_json_file)
+
+        total_time = time.time() - start_time
+        print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
+
+
+def format_time(total_time):
+    m = total_time/60
+    minutes = int(m)
+    seconds = round((m - minutes)*60)
+    
+    runtime_text = f"{minutes} minutes, " if minutes else ""
+    runtime_text += f"{seconds} seconds"
+    
+    return runtime_text
+
+
+def main():
+    options = _parse_args()
+    network = options.local_subtensor if options.local_subtensor else "finney"
+    
+    subnet_data_writer = SubnetDataWriter(network, options.threads, options.json_file)
+    while True:
+        subnet_data_writer.write_data()
+
+if __name__ == "__main__":
+    main()

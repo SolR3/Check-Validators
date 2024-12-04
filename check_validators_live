@@ -5,20 +5,18 @@ import bittensor
 
 # standard imports
 import argparse
-from collections import namedtuple
-from concurrent.futures import ThreadPoolExecutor
 import os
-import numpy
 from rich.live import Live
 from rich.table import Table
 from rich.text import Text
 import sys
-import threading
 import time
 
+# Import local subnet_data module
+sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
+from subnet_data import SubnetData
 
-TOTAL_EMISSION = 295.5 # TODO - Need some way to verify this
-MIN_STAKE_THRESHOLD = 5000 # TODO - Need some way to verify this
+
 DEFAULT_VTRUST_THRESHOLD = 0.2
 DEFAULT_UPDATED_THRESHOLD = 3
 
@@ -94,26 +92,7 @@ def _parse_args():
     return parser.parse_args()
 
 
-class SubnetData:
-    ValidatorData = namedtuple(
-    "ValidatorData", [
-        "netuid",
-        "subnet_emission",
-        "subnet_tempo",
-        "num_validators",
-        "rizzo_stake_rank",
-        "rizzo_emission",
-        "rizzo_vtrust",
-        "max_vtrust",
-        "avg_vtrust",
-        "min_vtrust",
-        "rizzo_updated",
-        "min_updated",
-        "avg_updated",
-        "max_updated",])
-
-    # constants
-    _rizzo_hotkey = "5F2CsUDVbRbVMXTh9fAzF9GacjVX7UapvRxidrxe7z8BYckQ"
+class SubnetDataPrinter:
 
     def __init__(self, options):
         self._vtrust_error_threshold = options.vtrust_threshold,
@@ -123,141 +102,19 @@ class SubnetData:
         self._threads = options.threads
         self._debug = options.debug
 
-        self._validator_data_lock = threading.Lock()
-
         # Get subtensor and list of netuids.
-        self._subtensor = bittensor.subtensor(network=LOCAL_NETWORK)
-        self._netuids = self._subtensor.get_subnets()[1:]
+        self._netuids = bittensor.subtensor(network=LOCAL_NETWORK).get_subnets()[1:]
 
     def get_table(self):
         start_time = time.time()
-        self._get_subnet_data()
+        self._validator_data = SubnetData(
+            self._netuids, LOCAL_NETWORK, self._threads, self._debug
+        ).validator_data
         total_time = time.time() - start_time
         total_time_formatted = format_time(round(total_time))
         self._print_debug("\nSubnet data gathering took "
                          f"{total_time_formatted}.\n")
         return self._create_table_from_data(total_time_formatted)
-
-    def _get_subnet_data(self):
-        self._print_debug("\nGathering data")
-        self._validator_data = {}
-
-        max_attempts = 5
-        netuids = self._netuids
-        for attempt in range(1, max_attempts+1):
-            self._print_debug(f"\nAttempt {attempt} of {max_attempts}")
-            if self._threads:
-                with ThreadPoolExecutor(max_workers=self._threads) as executor:
-                    executor.map(self._get_validator_data,
-                        netuids, [True for _ in range(len(netuids))])
-            else:
-                for netuid in netuids:
-                    self._get_validator_data(netuid, False)
-
-            # Get netuids missing data
-            netuids = list(set(netuids).difference(set(self._validator_data)))
-            if netuids:
-                self._print_debug("\nFailed to gather data for subnets: "
-                                 f"{', '.join([str(n) for n in netuids])}.")
-            else:
-                break
-
-    def _get_validator_data(self, netuid, init_new_subtensor):
-        start_time = time.time()
-        self._print_debug(f"\nObtaining data for subnet {netuid}\n")
-
-        # When threading, re-get subtensor for obtaining the updated values.
-        # The subtensor object can't seem to handle multiple threads calling
-        # the blocks_since_last_update() method at the same time.
-        subtensor = bittensor.subtensor(network=LOCAL_NETWORK) \
-                        if init_new_subtensor \
-                            else self._subtensor
-
-        # Get metagraph for the subnet.
-        metagraph = subtensor.metagraph(netuid=netuid)
-    
-        # Get emission percentage for the subnet.
-        subnet_emission = numpy.sum(metagraph.E) / TOTAL_EMISSION * 100
-
-        # Get subnet tempo (used for determining bad Updated values)
-        subnet_tempo = subtensor.get_subnet_hyperparameters(netuid).tempo
-
-        # Get UID for Rizzo.
-        try:
-            rizzo_uid = metagraph.hotkeys.index(self._rizzo_hotkey)
-        except ValueError:
-            self._print_debug("\nWARNING: Rizzo validator not running on subnet "
-                 f"{netuid}")
-            with self._validator_data_lock:
-                self._validator_data[netuid] = self.ValidatorData(
-                    netuid=netuid,
-                    subnet_emission=subnet_emission,
-                    subnet_tempo=None,
-                    num_validators=None,
-                    rizzo_stake_rank=None,
-                    rizzo_emission=None,
-                    rizzo_vtrust=None,
-                    max_vtrust=None,
-                    avg_vtrust=None,
-                    min_vtrust=None,
-                    rizzo_updated=None,
-                    min_updated=None,
-                    avg_updated=None,
-                    max_updated=None,)
-            return
-        
-        # Get Rizzo validator values
-        rizzo_emission = metagraph.E[rizzo_uid]
-        rizzo_vtrust = metagraph.Tv[rizzo_uid]
-        rizzo_updated = subtensor.blocks_since_last_update(
-            netuid=netuid, uid=rizzo_uid)
-
-        # Get all validators that have a valid stake amount.
-        valid_uids = [i for (i, s) in enumerate(metagraph.S)
-                      if i != rizzo_uid and s > MIN_STAKE_THRESHOLD]
-        num_validators = len(valid_uids) + 1
-
-        # Get stake-wise ranking for Rizzo
-        rizzo_stake = metagraph.S[rizzo_uid]
-        rizzo_stake_rank = (
-            len(metagraph.S) - sorted(metagraph.S).index(rizzo_stake))
-
-        # Get min/max/average vTrust values.
-        vtrusts = [metagraph.Tv[uid] for uid in valid_uids]
-        max_vtrust = numpy.max(vtrusts)
-        avg_vtrust = numpy.average(vtrusts)
-        min_vtrust = numpy.min(vtrusts)
-
-        # Get min/max/average Updated values.
-        updateds = []
-        for uid in valid_uids:
-            updateds.append(subtensor.blocks_since_last_update(
-                netuid=netuid, uid=uid))
-        min_updated = numpy.min(updateds)
-        avg_updated = int(numpy.round(numpy.average(updateds)))
-        max_updated = numpy.max(updateds)
-
-        # Store the data.
-        with self._validator_data_lock:
-            self._validator_data[netuid] = self.ValidatorData(
-                netuid=netuid,
-                subnet_emission=subnet_emission,
-                subnet_tempo=subnet_tempo,
-                num_validators=num_validators,
-                rizzo_stake_rank=rizzo_stake_rank,
-                rizzo_emission=rizzo_emission,
-                rizzo_vtrust=rizzo_vtrust,
-                max_vtrust=max_vtrust,
-                avg_vtrust=avg_vtrust,
-                min_vtrust=min_vtrust,
-                rizzo_updated=rizzo_updated,
-                min_updated=min_updated,
-                avg_updated=avg_updated,
-                max_updated=max_updated,)
-        
-        total_time = time.time() - start_time
-        self._print_debug(f"\nSubnet {netuid} data gathered in "
-                         f"{int(total_time)} seconds.")
 
     def _create_table_from_data(self, total_time_formatted):
         table_creator = TableCreator(total_time_formatted)
@@ -399,7 +256,7 @@ def format_time(total_time):
 
 def main():
     options = _parse_args()
-    subnet_data = SubnetData(options)
+    subnet_data = SubnetDataPrinter(options)
     try:
         with Live(
                 subnet_data.get_table(),
