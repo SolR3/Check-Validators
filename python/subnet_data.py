@@ -1,10 +1,12 @@
 # bittensor import
 import bittensor
 
-# standard imports
+# standart imports
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
+import json
 import numpy
+import paramiko
 import threading
 import time
 
@@ -13,7 +15,7 @@ TOTAL_EMISSION = 295.5 # TODO - Need some way to verify this
 MIN_STAKE_THRESHOLD = 5000 # TODO - Need some way to verify this
 
 
-class SubnetData:
+class SubnetDataBase:
     ValidatorData = namedtuple(
     "ValidatorData", [
         "netuid",
@@ -31,20 +33,9 @@ class SubnetData:
         "avg_updated",
         "max_updated",])
 
-    # constants
-    _rizzo_hotkey = "5F2CsUDVbRbVMXTh9fAzF9GacjVX7UapvRxidrxe7z8BYckQ"
-
-    def __init__(self, netuids, network, threads, debug):
-        self._netuids = netuids
-        self._network = network
-        self._threads = threads
+    def __init__(self, debug):
         self._debug = debug
-
-        self._validator_data_lock = threading.Lock()
         self._validator_data = {}
-
-        # Get subtensor and list of netuids.
-        self._subtensor = bittensor.subtensor(network=self._network)
 
         # Gather the data for all given subnets
         self._get_subnet_data()
@@ -52,7 +43,27 @@ class SubnetData:
     @property
     def validator_data(self):
         return self._validator_data
-    
+
+    def _print_debug(self, message):
+        if self._debug:
+            print(message)
+
+
+class SubnetData(SubnetDataBase):
+    _rizzo_hotkey = "5F2CsUDVbRbVMXTh9fAzF9GacjVX7UapvRxidrxe7z8BYckQ"
+
+    def __init__(self, netuids, network, threads, debug):
+        self._netuids = netuids
+        self._network = network
+        self._threads = threads
+
+        self._validator_data_lock = threading.Lock()
+
+        # Get subtensor and list of netuids.
+        self._subtensor = bittensor.subtensor(network=self._network)
+
+        super(SubnetData, self).__init__(debug)
+
     def to_dict(self):
         def serializable(value):
             if isinstance(value, numpy.float32):
@@ -188,6 +199,47 @@ class SubnetData:
         self._print_debug(f"\nSubnet {netuid} data gathered in "
                          f"{int(total_time)} seconds.")
 
-    def _print_debug(self, message):
-        if self._debug:
-            print(message)
+
+class SubnetDataFromJson(SubnetDataBase):
+    def __init__(self, json_file, host, port, username, password, debug):
+        self._json_file = json_file
+        self._host = host
+        self._port = port
+        self._username = username
+        self._password = password
+
+        super(SubnetDataFromJson, self).__init__(debug)
+
+    def _get_subnet_data(self):
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(
+            self._host,
+            port=self._port,
+            username=self._username,
+            password=self._password)
+
+        stdin, stdout, stderr = client.exec_command(f"cat {self._json_file}")
+        json_str = stdout.read().decode()
+
+        stdin.close()
+        stdout.close()
+        stderr.close()
+        client.close()
+        subnets_data = json.loads(json_str)
+        for subnet in subnets_data.values():
+            self._validator_data[subnet["netuid"]] = self.ValidatorData(
+                netuid=subnet["netuid"],
+                subnet_emission=subnet["subnet_emission"],
+                subnet_tempo=subnet["subnet_tempo"],
+                num_validators=subnet["num_validators"],
+                rizzo_stake_rank=subnet["rizzo_stake_rank"],
+                rizzo_emission=subnet["rizzo_emission"],
+                rizzo_vtrust=subnet["rizzo_vtrust"],
+                max_vtrust=subnet["max_vtrust"],
+                avg_vtrust=subnet["avg_vtrust"],
+                min_vtrust=subnet["min_vtrust"],
+                rizzo_updated=subnet["rizzo_updated"],
+                min_updated=subnet["min_updated"],
+                avg_updated=subnet["avg_updated"],
+                max_updated=subnet["max_updated"],)
