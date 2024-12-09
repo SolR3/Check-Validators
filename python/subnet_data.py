@@ -201,11 +201,12 @@ class SubnetData(SubnetDataBase):
 
 
 class SubnetDataFromJson(SubnetDataBase):
-    def __init__(self, json_file, host, port, username, password, debug):
+    def __init__(self, json_file, host, port, username, ssh_key_path, password, debug):
         self._json_file = json_file
         self._host = host
         self._port = port
         self._username = username
+        self._ssh_key_path = ssh_key_path
         self._password = password
 
         super(SubnetDataFromJson, self).__init__(debug)
@@ -213,11 +214,17 @@ class SubnetDataFromJson(SubnetDataBase):
     def _get_subnet_data(self):
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        if self._ssh_key_path:
+            ssh_key = paramiko.RSAKey.from_private_key_file(self._ssh_key_path)
+            auth_arg = {"pkey": ssh_key}
+        else:
+            auth_arg = {"password": self._password}
         client.connect(
             self._host,
             port=self._port,
             username=self._username,
-            password=self._password)
+            **auth_arg)
 
         stdin, stdout, stderr = client.exec_command(f"cat {self._json_file}")
         json_str = stdout.read().decode()

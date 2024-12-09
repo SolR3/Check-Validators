@@ -40,22 +40,32 @@ def _parse_args():
 
     parser.add_argument(
         "--json-file",
+        required=True,
         help="The json filepath to read on the ssh host machine.")
 
     parser.add_argument(
         "--host",
+        required=True,
         help="The ssh host address.")
     
     parser.add_argument(
         "--port",
         type=int,
+        required=True,
         help="The ssh port of the host address.")
     
     parser.add_argument(
         "--user",
-        help="The user name to ssh as.")
+        required=True,
+        help="The ssh user name to authenticate with.")
     
-    parser.add_argument(
+    auth_group = parser.add_mutually_exclusive_group(required=True)
+
+    auth_group.add_argument(
+        "--ssh-key",
+        help="The ssh key to use for authenticating.")
+
+    auth_group.add_argument(
         "--password",
         help="The password of the user to ssh as.")
 
@@ -81,9 +91,9 @@ def _parse_args():
 
 
 class SubnetDataPrinter:
-    def __init__(self, json_file, host, port, username, password):
+    def __init__(self, json_file, host, port, username, ssh_key, password):
         self._validator_data = SubnetDataFromJson(
-            json_file, host, port, username, password, True
+            json_file, host, port, username, ssh_key, password, True
         ).validator_data
 
     def print_validator_data(
@@ -244,7 +254,7 @@ def main():
 
     subnet_data_printer = SubnetDataPrinter(
         options.json_file, options.host, options.port,
-        options.user, options.password)
+        options.user, options.ssh_key, options.password)
 
     subnet_data_printer.print_validator_data(
         options.vtrust_threshold,
