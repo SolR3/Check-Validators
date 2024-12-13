@@ -20,7 +20,7 @@ from subnet_data import SubnetData
 DEFAULT_VTRUST_THRESHOLD = 0.2
 DEFAULT_UPDATED_THRESHOLD = 3
 
-LOCAL_NETWORK = "ws://subtensor-cali.rizzo.network:9944"
+LOCAL_NETWORK = "ws://subtensor-la.rizzo.network:9944"
 
 
 def _parse_args():
