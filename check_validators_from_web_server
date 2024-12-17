@@ -97,16 +97,13 @@ class SubnetDataPrinter:
         printer = TablePrinter()
 
         def sort_key(netuid):
-            sort_key = self._validator_data[netuid].subnet_emission
-            if printer.reverse_sort:
-                sort_key *= -1
-            return sort_key
+            return -1 * self._validator_data[netuid].subnet_emission
 
         total_emission = 0.0
 
         # Loop through all subnets and print out
         # their vtrust and updated data.
-        for netuid in self._validator_data:
+        for netuid in sorted(self._validator_data, key=sort_key):
             validator_data = self._validator_data[netuid]
 
             if validator_data.rizzo_emission is not None:
@@ -181,7 +178,6 @@ class RichPrinter:
 
 
 class TablePrinter(RichPrinter):
-    reverse_sort = True
 
     def __init__(self,):
         super().__init__()
