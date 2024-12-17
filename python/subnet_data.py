@@ -6,7 +6,6 @@ from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
 import json
 import numpy
-import paramiko
 import threading
 import time
 
@@ -212,6 +211,8 @@ class SubnetDataFromJson(SubnetDataBase):
         super(SubnetDataFromJson, self).__init__(debug)
 
     def _get_subnet_data(self):
+        import paramiko
+
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
