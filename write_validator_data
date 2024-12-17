@@ -45,6 +45,12 @@ def _parse_args():
         help="Gather the subnet metagraph data using the specified number of "
              "threads. When not specified, multithreading is not used.")
 
+    parser.add_argument(
+        "-w", "--wait-time",
+        type=float,
+        default=5,
+        help="The number of minutes to wait between validator data gathering.")
+
     return parser.parse_args()
 
 
@@ -82,19 +88,25 @@ def format_time(total_time):
     minutes = int(m)
     seconds = round((m - minutes)*60)
     
-    runtime_text = f"{minutes} minutes, " if minutes else ""
-    runtime_text += f"{seconds} seconds"
-    
+    runtime_text = [f"{minutes} minutes"] if minutes else []
+    if seconds:
+        runtime_text += [f"{seconds} seconds"]
+    runtime_text = ", ".join(runtime_text)
+
     return runtime_text
 
 
 def main():
     options = _parse_args()
     network = options.local_subtensor if options.local_subtensor else "finney"
-    
+    wait_seconds = round(options.wait_time * 60)
+    wait_time_formatted = format_time(wait_seconds)
+
     subnet_data_writer = SubnetDataWriter(network, options.threads, options.json_file)
     while True:
         subnet_data_writer.write_data()
+        print(f"Waiting {wait_time_formatted}.")
+        time.sleep(wait_seconds)
 
 if __name__ == "__main__":
     main()
