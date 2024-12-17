@@ -198,6 +198,46 @@ class SubnetData(SubnetDataBase):
         self._print_debug(f"\nSubnet {netuid} data gathered in "
                          f"{int(total_time)} seconds.")
 
+class SubnetDataFromWebServer(SubnetDataBase):
+    def __init__(self, json_file, public_ip, port, username, password, debug):
+        self._json_file = json_file
+        self._public_ip = public_ip
+        self._port = port
+        self._username = username
+        self._password = password
+
+        super(SubnetDataFromWebServer, self).__init__(debug)
+
+    def _get_subnet_data(self):
+        import requests
+
+        url = f"http://{self._public_ip}:{self._port}/{self._json_file}"
+        self._print_debug(f"Obtaining validator json data from: {url}")
+        response = requests.get(url, auth=(self._username, self._password))
+        if response.status_code != 200:
+            self._print_debug("\nERROR: Failed to obtain validator json data."
+                              f"\nstatus code: {response.status_code}"
+                              f"\nreason: {response.reason}")
+            return
+        
+        subnets_data = response.json()
+        for subnet in subnets_data.values():
+            self._validator_data[subnet["netuid"]] = self.ValidatorData(
+                netuid=subnet["netuid"],
+                subnet_emission=subnet["subnet_emission"],
+                subnet_tempo=subnet["subnet_tempo"],
+                num_validators=subnet["num_validators"],
+                rizzo_stake_rank=subnet["rizzo_stake_rank"],
+                rizzo_emission=subnet["rizzo_emission"],
+                rizzo_vtrust=subnet["rizzo_vtrust"],
+                max_vtrust=subnet["max_vtrust"],
+                avg_vtrust=subnet["avg_vtrust"],
+                min_vtrust=subnet["min_vtrust"],
+                rizzo_updated=subnet["rizzo_updated"],
+                min_updated=subnet["min_updated"],
+                avg_updated=subnet["avg_updated"],
+                max_updated=subnet["max_updated"],)
+
 
 class SubnetDataFromJson(SubnetDataBase):
     def __init__(self, json_file, host, port, username, ssh_key_path, password, debug):
