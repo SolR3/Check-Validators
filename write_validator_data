@@ -46,10 +46,10 @@ def _parse_args():
              "threads. When not specified, multithreading is not used.")
 
     parser.add_argument(
-        "-w", "--wait-time",
+        "-i", "--interval",
         type=float,
         default=5,
-        help="The number of minutes to wait between validator data gathering.")
+        help="The number of minutes between validator data gathering.")
 
     return parser.parse_args()
 
@@ -99,14 +99,18 @@ def format_time(total_time):
 def main():
     options = _parse_args()
     network = options.local_subtensor if options.local_subtensor else "finney"
-    wait_seconds = round(options.wait_time * 60)
-    wait_time_formatted = format_time(wait_seconds)
+    interval_seconds = round(options.interval * 60)
 
     subnet_data_writer = SubnetDataWriter(network, options.threads, options.json_file)
     while True:
+        start_time = time.time()
         subnet_data_writer.write_data()
-        print(f"Waiting {wait_time_formatted}.")
-        time.sleep(wait_seconds)
+        total_seconds = round(time.time() - start_time)
+        wait_seconds = interval_seconds - total_seconds
+        if wait_seconds > 0:
+            wait_time_formatted = format_time(wait_seconds)
+            print(f"Waiting {wait_time_formatted}.")
+            time.sleep(wait_seconds)
 
 if __name__ == "__main__":
     main()
