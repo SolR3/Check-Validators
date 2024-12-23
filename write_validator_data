@@ -15,8 +15,8 @@ sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 from subnet_data import SubnetData
 
 
-def _parse_args():    
-    class ThreadsAction(argparse.Action):       
+def _parse_args():
+    class ThreadsAction(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
             if values < 0:
                 raise argparse.ArgumentError(
@@ -87,7 +87,7 @@ def format_time(total_time):
     m = total_time/60
     minutes = int(m)
     seconds = round((m - minutes)*60)
-    
+
     runtime_text = [f"{minutes} minutes"] if minutes else []
     if seconds:
         runtime_text += [f"{seconds} seconds"]
