@@ -2,7 +2,6 @@
 import bittensor
 
 # standart imports
-from bs4 import BeautifulSoup
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
 import json
@@ -209,6 +208,7 @@ class SubnetDataFromWebServer(SubnetDataBase):
         super(SubnetDataFromWebServer, self).__init__(debug)
 
     def _get_subnet_data(self):
+        from bs4 import BeautifulSoup
         import requests
 
         subnets_data = {}
