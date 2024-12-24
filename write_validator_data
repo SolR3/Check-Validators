@@ -46,6 +46,11 @@ def _parse_args():
              "threads. When not specified, multithreading is not used.")
 
     parser.add_argument(
+        "-o", "--run-once",
+        action="store_true",
+        help="When specified, the data gathering and json write happnes only once.")
+
+    parser.add_argument(
         "-i", "--interval",
         type=float,
         default=5,
@@ -65,9 +70,9 @@ class SubnetDataWriter:
         print("Gathering subnet data.")
         start_time = time.time()
 
-        self._netuids = bittensor.subtensor(network=self._network).get_subnets()[1:]
+        netuids = bittensor.subtensor(network=self._network).get_subnets()[1:]
         data_dict = SubnetData(
-            self._netuids, self._network, self._threads, True
+            netuids, self._network, self._threads, True
         ).to_dict()
 
         print(f"\nWriting data to file: {self._temp_json_file}")
@@ -105,6 +110,9 @@ def main():
     while True:
         start_time = time.time()
         subnet_data_writer.write_data()
+        if options.run_once:
+            break
+
         total_seconds = round(time.time() - start_time)
         wait_seconds = interval_seconds - total_seconds
         if wait_seconds > 0:
