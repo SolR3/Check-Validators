@@ -2,6 +2,7 @@
 import bittensor
 
 # standart imports
+from bs4 import BeautifulSoup
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
 import json
@@ -199,8 +200,7 @@ class SubnetData(SubnetDataBase):
                          f"{int(total_time)} seconds.")
 
 class SubnetDataFromWebServer(SubnetDataBase):
-    def __init__(self, json_file, public_ip, port, username, password, debug):
-        self._json_file = json_file
+    def __init__(self, public_ip, port, username, password, debug):
         self._public_ip = public_ip
         self._port = port
         self._username = username
@@ -211,16 +211,33 @@ class SubnetDataFromWebServer(SubnetDataBase):
     def _get_subnet_data(self):
         import requests
 
-        url = f"http://{self._public_ip}:{self._port}/{self._json_file}"
-        self._print_debug(f"Obtaining validator json data from: {url}")
-        response = requests.get(url, auth=(self._username, self._password))
+        subnets_data = {}
+
+        main_url = f"http://{self._public_ip}:{self._port}"
+        self._print_debug(f"Obtaining validator json data from: {main_url}")
+        response = requests.get(main_url, auth=(self._username, self._password))
         if response.status_code != 200:
             self._print_debug("\nERROR: Failed to obtain validator json data."
+                              f"\nurl: {main_url}"
                               f"\nstatus code: {response.status_code}"
                               f"\nreason: {response.reason}")
             return
-        
-        subnets_data = response.json()
+
+        html_content = BeautifulSoup(response.content.decode(), features="html.parser")
+        for li_tag in html_content.findAll("li"):
+            json_file = li_tag.find("a").get("href")
+            json_url = f"http://{self._public_ip}:{self._port}/{json_file}"
+            self._print_debug(f"Updating validator json data with: {json_url}")
+            response = requests.get(json_url, auth=(self._username, self._password))
+            if response.status_code != 200:
+                self._print_debug("\nERROR: Failed to obtain validator json data."
+                                  f"\nurl: {json_url}"
+                                  f"\nstatus code: {response.status_code}"
+                                  f"\nreason: {response.reason}")
+                return
+            
+            subnets_data.update(response.json())
+
         for subnet in subnets_data.values():
             self._validator_data[subnet["netuid"]] = self.ValidatorData(
                 netuid=subnet["netuid"],

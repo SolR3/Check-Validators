@@ -39,11 +39,6 @@ def _parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--json-file",
-        required=True,
-        help="The json filepath on the web server.")
-
-    parser.add_argument(
         "--public-IP",
         required=True,
         dest="public_ip",
@@ -86,9 +81,9 @@ def _parse_args():
 
 
 class SubnetDataPrinter:
-    def __init__(self, json_file, public_ip, port, username, password):
+    def __init__(self, public_ip, port, username, password):
         self._validator_data = SubnetDataFromWebServer(
-            json_file, public_ip, port, username, password, True
+            public_ip, port, username, password, True
         ).validator_data
 
     def print_validator_data(
@@ -244,7 +239,7 @@ def main():
     options = _parse_args()
 
     subnet_data_printer = SubnetDataPrinter(
-        options.json_file, options.public_ip, options.port,
+        options.public_ip, options.port,
         options.user, options.password)
 
     subnet_data_printer.print_validator_data(
