@@ -78,11 +78,10 @@ class SubnetDataWriter:
         self._threads = threads
         self._json_folder = json_folder
 
-    def write_data(self, netuid_start=None, netuid_end=None):
+    def write_data(self, all_subnets, netuid_start=None, netuid_end=None):
         print("Gathering subnet data.")
         start_time = time.time()
 
-        all_subnets = bittensor.subtensor(network=self._network).get_subnets()
         if netuid_start is not None:
             if netuid_end is not None:
                 netuids = all_subnets[netuid_start:netuid_end+1]
@@ -128,32 +127,36 @@ def format_time(total_time):
     return runtime_text
 
 
-def write_json_file(subnet_data_writer=None,
+def write_json_file(all_subnets, sleep_time=0, subnet_data_writer=None,
                     network=None, threads=None, json_folder=None,
                     netuid_start=None, netuid_end=None):
+    if sleep_time:
+        time.sleep(sleep_time)
     if not subnet_data_writer:
         subnet_data_writer = SubnetDataWriter(
             network, threads, json_folder)
-    subnet_data_writer.write_data(netuid_start, netuid_end)
+    subnet_data_writer.write_data(all_subnets, netuid_start, netuid_end)
 
 
-def get_multiprocess_args(network, num_processes, threads, json_folder):
-    num_subnets = len(bittensor.subtensor(network=network).get_subnets()) - 1
+def get_multiprocess_args(all_subnets, network, num_processes, threads, json_folder):
+    num_subnets = len(all_subnets) - 1
     chunk_size = int(numpy.ceil(num_subnets / num_processes))
     process_args = []
     netuid_start = 1
+    sleep_time = 0
     while True:
         netuid_end = netuid_start + chunk_size - 1
         if netuid_end >= num_subnets:
             process_args.append(
-                (None, network, threads, json_folder,
+                (all_subnets, sleep_time, None, network, threads, json_folder,
                     netuid_start, None))
             break
         else:
             process_args.append(
-                (None, network, threads, json_folder,
+                (all_subnets, sleep_time, None, network, threads, json_folder,
                     netuid_start, netuid_end))
             netuid_start = netuid_end + 1
+            sleep_time += 1
 
     return process_args
 
@@ -174,10 +177,11 @@ def main():
     
     while True:
         start_time = time.time()
+        all_subnets = bittensor.subtensor(network=network).get_subnets()
         if options.processes:
             tempdir = tempfile.mkdtemp(prefix="write_vali_data_")
             process_args = get_multiprocess_args(
-                network, options.processes, options.threads, tempdir)
+                all_subnets, network, options.processes, options.threads, tempdir)
 
             with multiprocessing.Pool(processes=options.processes) as pool:
                 pool.starmap(write_json_file, process_args)
@@ -195,7 +199,7 @@ def main():
             os.rmdir(tempdir)
 
         else:
-            write_json_file(subnet_data_writer=subnet_data_writer)
+            write_json_file(all_subnets, subnet_data_writer=subnet_data_writer)
 
         if options.run_once:
             break
