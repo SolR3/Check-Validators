@@ -110,14 +110,6 @@ def _parse_args():
             f"The default value is {DEFAULT_UPDATED_THRESHOLD}.")
 
     parser.add_argument(
-        "-u", "--rizzo-updated-only",
-        action="store_false",
-        dest="all_updated_values",
-        help="When specified, only display the Rizzo Updated values and skip "
-             "the min/max/avg Updated values of the rest of the validators. "
-             "This will speed up the data gathering.")
-
-    parser.add_argument(
         "-t", "--threads",
         type=int,
         default=0,
@@ -125,22 +117,14 @@ def _parse_args():
         help="Gather the subnet metagraph data using the specified number of "
              "threads. When not specified, multithreading is not used.")
 
-    parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="When specified, the vTrust and Updated values for all subnets "
-             "are printed out. When not specified, only the bad subnets are "
-             "printed out.")
-
     return parser.parse_args()
 
 
 class SubnetDataPrinter:
-    def __init__(self, netuids, network, threads, get_all_updated_values):
+    def __init__(self, netuids, network, threads):
         self._netuids = netuids
         self._network = network
         self._threads = threads
-        self._get_all_updated_values = get_all_updated_values
 
         self._validator_data = SubnetData(
             self._netuids, self._network, self._threads, True
@@ -148,9 +132,9 @@ class SubnetDataPrinter:
 
     def print_validator_data(
             self, vtrust_error_threshold, updated_error_threshold,
-            verbose, subnets_specified):
+            subnets_specified):
         updated_warning_threshold = (updated_error_threshold - 1)/2 + 1
-        printer = TablePrinter(self._get_all_updated_values)
+        printer = TablePrinter()
 
         def sort_key(netuid):
             sort_key = self._validator_data[netuid].subnet_emission
@@ -199,9 +183,8 @@ class SubnetDataPrinter:
 
             bad_validators = (vtrust_status == 2) | (updated_status == 2)
 
-            if verbose or vtrust_status or updated_status:
-                printer.update_printout(
-                    validator_data, vtrust_status, updated_status)
+            printer.update_printout(
+                validator_data, vtrust_status, updated_status)
 
         # Print extra stuff
         printer.add_extra_printout(
@@ -219,10 +202,9 @@ class RichPrinter:
     _yellow = "11"
     _tab = "    "
 
-    def __init__(self, print_all_updated_values):
+    def __init__(self):
         self._console = Console()
         self._extra_printout = []
-        self._print_all_updated_values = print_all_updated_values
 
     def _get_style(self, status):
         if status == 2:
@@ -270,8 +252,8 @@ class RichPrinter:
 class TablePrinter(RichPrinter):
     reverse_sort = True
 
-    def __init__(self, print_all_updated_values):
-        super().__init__(print_all_updated_values)
+    def __init__(self):
+        super().__init__()
 
         self._table = Table(title="Rizzo Validators")
         self._table.add_column(
@@ -292,13 +274,12 @@ class TablePrinter(RichPrinter):
             "Min vT", justify="center", no_wrap=True)
         self._table.add_column(
             "Rizzo U", justify="center", no_wrap=True)
-        if self._print_all_updated_values:
-            self._table.add_column(
-                "Min U", justify="center", no_wrap=True)
-            self._table.add_column(
-                "Avg U", justify="center", no_wrap=True)
-            self._table.add_column(
-                "Max U", justify="center", no_wrap=True)
+        self._table.add_column(
+            "Min U", justify="center", no_wrap=True)
+        self._table.add_column(
+            "Avg U", justify="center", no_wrap=True)
+        self._table.add_column(
+            "Max U", justify="center", no_wrap=True)
 
     def update_printout(self, validator_data, vtrust_status, updated_status):
         if validator_data.rizzo_stake_rank is None:
@@ -321,13 +302,10 @@ class TablePrinter(RichPrinter):
             Text(self._get_float_value(validator_data.min_vtrust)),
             Text(self._get_int_value(validator_data.rizzo_updated),
                  style=self._get_style(updated_status)),
-        ]
-        if self._print_all_updated_values:
-            columns.extend([
-                Text(self._get_int_value(validator_data.min_updated)),
-                Text(self._get_int_value(validator_data.avg_updated)),
-                Text(self._get_int_value(validator_data.max_updated)),
-            ])
+            Text(self._get_int_value(validator_data.min_updated)),
+            Text(self._get_int_value(validator_data.avg_updated)),
+            Text(self._get_int_value(validator_data.max_updated)),
+            ]
         self._table.add_row(*columns)
 
     def print_everything(self):
@@ -348,22 +326,19 @@ def format_time(total_time):
 
 def main():
     options = _parse_args()
-    if options.subnets:
-        options.verbose = True
 
     network = LOCAL_NETWORK if options.local_subtensor else "finney"
     netuids = options.subnets or _get_subnets(network)
     
     start_time = time.time()
     subnet_data_printer = SubnetDataPrinter(
-        netuids, network, options.threads, options.all_updated_values)
+        netuids, network, options.threads)
     total_time = time.time() - start_time
 
     subnets_specified = bool(options.subnets)
     subnet_data_printer.print_validator_data(
         options.vtrust_threshold,
         options.updated_threshold,
-        options.verbose,
         subnets_specified)
     print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
 
