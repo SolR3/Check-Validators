@@ -181,14 +181,12 @@ class SubnetDataPrinter:
             else:
                 updated_status = 0
 
-            bad_validators = (vtrust_status == 2) | (updated_status == 2)
-
             printer.update_printout(
                 validator_data, vtrust_status, updated_status)
 
         # Print extra stuff
         printer.add_extra_printout(
-            missing_data, bad_validators,
+            missing_data,
             total_emission if print_total_emission else None)
         
         # Print everything
@@ -224,8 +222,7 @@ class RichPrinter:
             return "---"
         return str(value)
     
-    def add_extra_printout(self, missing_data,
-                           bad_validators, total_emission):
+    def add_extra_printout(self, missing_data, total_emission):
         
         if total_emission is not None:
             self._extra_printout.append(
@@ -238,11 +235,6 @@ class RichPrinter:
                       "\n===================="
                      f"\n{self._tab}{', '.join(sorted(missing_data))}",
                       style=self._get_style(True)))
-
-        if not bad_validators:
-            self._extra_printout.append(
-                Text("\nALL SUBNETS ARE GOOD!",
-                     style=self._get_style(False)))
 
     def print_everything(self):
         for text in self._extra_printout:
