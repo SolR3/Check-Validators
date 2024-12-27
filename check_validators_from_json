@@ -111,7 +111,7 @@ class SubnetDataPrinter:
 
         # Loop through all subnets and print out
         # their vtrust and updated data.
-        for netuid in self._validator_data:
+        for netuid in sorted(self._validator_data, key=sort_key):
             validator_data = self._validator_data[netuid]
 
             if validator_data.rizzo_emission is not None:

@@ -123,11 +123,9 @@ def _parse_args():
 class SubnetDataPrinter:
     def __init__(self, netuids, network, threads):
         self._netuids = netuids
-        self._network = network
-        self._threads = threads
 
         self._validator_data = SubnetData(
-            self._netuids, self._network, self._threads, True
+            self._netuids, network, threads, True
         ).validator_data
 
     def print_validator_data(

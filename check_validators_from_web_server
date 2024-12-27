@@ -92,7 +92,10 @@ class SubnetDataPrinter:
         printer = TablePrinter()
 
         def sort_key(netuid):
-            return -1 * self._validator_data[netuid].subnet_emission
+            sort_key = self._validator_data[netuid].subnet_emission
+            if printer.reverse_sort:
+                sort_key *= -1
+            return sort_key
 
         total_emission = 0.0
 
@@ -173,6 +176,7 @@ class RichPrinter:
 
 
 class TablePrinter(RichPrinter):
+    reverse_sort = True
 
     def __init__(self,):
         super().__init__()
