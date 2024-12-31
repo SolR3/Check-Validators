@@ -6,8 +6,11 @@ from rich.console import Console
 
 class SubnetDataPrinter:
     def __init__(self, subnet_data_class, *args):
-        self._netuids = args["netuids"] if "netuids" in args else None
+        self._netuids = None
         self._validator_data = subnet_data_class(*args).validator_data
+
+    def set_netuids(self, netuids):
+        self._netuids = netuids
 
     def print_validator_data(
             self, vtrust_error_threshold, updated_error_threshold,

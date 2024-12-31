@@ -137,6 +137,7 @@ def main():
     subnet_data_printer = SubnetDataPrinter(
         SubnetData,
         netuids, network, options.threads, True)
+    subnet_data_printer.set_netuids(netuids)
     total_time = time.time() - start_time
 
     sort_subnets = not bool(options.subnets)
