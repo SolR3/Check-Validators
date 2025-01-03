@@ -117,7 +117,7 @@ class RichPrinter:
                       "\n(Try running these separately)"
                       "\n===================="
                      f"\n{self._tab}{', '.join(sorted(missing_data))}",
-                      style=self._get_style(True)))
+                      style=self._get_style(2)))
 
     def print_everything(self):
         for text in self._extra_printout:
@@ -135,10 +135,10 @@ class TablePrinter(RichPrinter):
             "Subnet", justify="center", no_wrap=True)
         self._table.add_column(
             "Subnet E", justify="center", no_wrap=True)
-        self._table.add_column(
-            "Rizzo Rank", justify="center", no_wrap=True)
-        self._table.add_column(
-            "Rizzo E", justify="center", no_wrap=True)
+        # self._table.add_column(
+        #     "Rizzo Rank", justify="center", no_wrap=True)
+        # self._table.add_column(
+        #     "Rizzo E", justify="center", no_wrap=True)
         self._table.add_column(
             "Rizzo vT", justify="center", no_wrap=True)
         self._table.add_column(
@@ -157,19 +157,19 @@ class TablePrinter(RichPrinter):
             "Max U", justify="center", no_wrap=True)
 
     def update_printout(self, validator_data, vtrust_status, updated_status):
-        if validator_data.rizzo_stake_rank is None:
-            rizzo_stake_rank = "---"
-        else:
-            rizzo_stake_rank = (
-                f"{validator_data.rizzo_stake_rank}/"
-                    f"{validator_data.num_validators}")
+        # if validator_data.rizzo_stake_rank is None:
+        #     rizzo_stake_rank = "---"
+        # else:
+        #     rizzo_stake_rank = (
+        #         f"{validator_data.rizzo_stake_rank}/"
+        #             f"{validator_data.num_validators}")
 
         columns = [
             Text(f"{validator_data.netuid}",
                  style=self._get_style(max(vtrust_status, updated_status))),
             Text(f"{validator_data.subnet_emission:.2f}%"),
-            Text(rizzo_stake_rank),
-            Text(self._get_float_value(validator_data.rizzo_emission)),
+            # Text(rizzo_stake_rank),
+            # Text(self._get_float_value(validator_data.rizzo_emission)),
             Text(self._get_float_value(validator_data.rizzo_vtrust),
                  style=self._get_style(vtrust_status)),
             Text(self._get_float_value(validator_data.max_vtrust)),
@@ -180,7 +180,7 @@ class TablePrinter(RichPrinter):
             Text(self._get_int_value(validator_data.min_updated)),
             Text(self._get_int_value(validator_data.avg_updated)),
             Text(self._get_int_value(validator_data.max_updated)),
-            ]
+        ]
         self._table.add_row(*columns)
 
     def print_everything(self):

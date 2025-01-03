@@ -11,7 +11,8 @@ import time
 
 
 TOTAL_EMISSION = 295.5 # TODO - Need some way to verify this
-MIN_STAKE_THRESHOLD = 5000 # TODO - Need some way to verify this
+MIN_STAKE_THRESHOLD = 4000 # TODO - Need some way to verify this
+                           # This is the value used by the taoyield site
 
 
 class SubnetDataBase:
@@ -162,7 +163,8 @@ class SubnetData(SubnetDataBase):
             len(metagraph.S) - sorted(metagraph.S).index(rizzo_stake))
 
         # Get min/max/average vTrust values.
-        vtrusts = [metagraph.Tv[uid] for uid in valid_uids]
+        # vtrusts = [metagraph.Tv[uid] for uid in valid_uids]
+        vtrusts = metagraph.Tv[valid_uids]
         max_vtrust = numpy.max(vtrusts)
         avg_vtrust = numpy.average(vtrusts)
         min_vtrust = numpy.min(vtrusts)

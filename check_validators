@@ -56,11 +56,11 @@ def _parse_args():
     
     class VtrustAction(argparse.Action):       
         def __call__(self, parser, namespace, values, option_string=None):
-            if values <= 0 or values > 1:
+            if values < 0 or values > 1:
                 raise argparse.ArgumentError(
                     argument=self,
                     message=f"Vtrust threshold ({values}) must be in the "
-                             "range (0-1].")
+                             "range [0-1].")
             setattr(namespace, self.dest, values)
     
     class UpdatedAction(argparse.Action):       
@@ -92,7 +92,7 @@ def _parse_args():
         type=float,
         default=DEFAULT_VTRUST_THRESHOLD,
         action = VtrustAction,
-        help="The vTrust threshold. Float value betweeon (0-1]. If "
+        help="The vTrust threshold. Float value betweeon [0-1]. If "
              "Rizzo vTrust < (avg vTrust - threshold) then it is bad. "
             f"The default value is {DEFAULT_VTRUST_THRESHOLD}.")
 
