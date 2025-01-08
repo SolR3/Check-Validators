@@ -132,7 +132,7 @@ def main():
 
     network = LOCAL_NETWORK if options.local_subtensor else "finney"
     netuids = options.subnets or _get_subnets(network)
-    
+
     start_time = time.time()
     subnet_data_printer = SubnetDataPrinter(
         SubnetData,
