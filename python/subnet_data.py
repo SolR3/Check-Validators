@@ -120,7 +120,8 @@ class SubnetData(SubnetDataBase):
         subnet_emission = numpy.sum(metagraph.E) / TOTAL_EMISSION * 100
 
         # Get subnet tempo (used for determining bad Updated values)
-        subnet_tempo = subtensor.get_subnet_hyperparameters(netuid).tempo
+        # subnet_tempo = subtensor.get_subnet_hyperparameters(netuid).tempo
+        subnet_tempo = 360
 
         # Get UID for Rizzo.
         try:
