@@ -18,6 +18,10 @@ sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 from subnet_data import SubnetData
 
 
+LOCAL_TIMEZONE = "MST7MDT"
+TIMESTAMP_FILE_NAME = "timestamp.json"
+
+
 def _parse_args():
     class ThreadsAction(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
@@ -71,7 +75,7 @@ def _parse_args():
 
 
 class SubnetDataWriter:
-    _json_file_name = "validator_data.json"
+    json_file_name = "validator_data.json"
 
     def __init__(self, network, threads, json_folder):
         self._network = network
@@ -89,12 +93,12 @@ class SubnetDataWriter:
             else:
                 netuids = all_subnets[netuid_start:]
                 netuid_range = f"{netuid_start}-"
-            json_base, json_ext = os.path.splitext(self._json_file_name)
+            json_base, json_ext = os.path.splitext(self.json_file_name)
             json_file_name = f"{json_base}.{netuid_range}{json_ext}"
             final_json_file = os.path.join(self._json_folder, json_file_name)
         else:
             netuids = all_subnets[1:]
-            final_json_file = os.path.join(self._json_folder, self._json_file_name)
+            final_json_file = os.path.join(self._json_folder, self.json_file_name)
 
         data_dict = SubnetData(
             netuids, self._network, self._threads, True
@@ -136,6 +140,29 @@ def write_json_file(all_subnets, sleep_time=0, subnet_data_writer=None,
         subnet_data_writer = SubnetDataWriter(
             network, threads, json_folder)
     subnet_data_writer.write_data(all_subnets, netuid_start, netuid_end)
+
+
+def write_timestamp(json_folder):
+    os.environ["TZ"] = LOCAL_TIMEZONE
+    time.tzset()
+
+    max_file_time = 0
+    json_base, json_ext = os.path.splitext(SubnetDataWriter.json_file_name)
+    for _file in os.listdir(json_folder):
+        file_base, file_ext = os.path.splitext(_file)
+        if not file_base.startswith(json_base) or file_ext != json_ext:
+            continue
+
+        json_file = os.path.join(json_folder, _file)
+        file_time = os.path.getmtime(json_file)
+        if file_time > max_file_time:
+            max_file_time = file_time
+    
+    timestamp = time.ctime(max_file_time)
+    timestamp_file = os.path.join(json_folder, TIMESTAMP_FILE_NAME)
+    print(f"\nWriting timestamp file: {timestamp_file}")
+    with open(timestamp_file, "w") as fd:
+            json.dump(timestamp, fd)
 
 
 def get_multiprocess_args(all_subnets, network, num_processes, threads, json_folder):
@@ -200,6 +227,8 @@ def main():
 
         else:
             write_json_file(all_subnets, subnet_data_writer=subnet_data_writer)
+
+        write_timestamp(options.json_folder)
 
         if options.run_once:
             break
