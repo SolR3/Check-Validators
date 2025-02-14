@@ -10,7 +10,6 @@ import threading
 import time
 
 
-TOTAL_EMISSION = 295.5 # TODO - Need some way to verify this
 MIN_STAKE_THRESHOLD = 4000 # TODO - Need some way to verify this
                            # This is the value used by the taoyield site
 
@@ -117,7 +116,7 @@ class SubnetData(SubnetDataBase):
         metagraph = subtensor.metagraph(netuid=netuid)
     
         # Get emission percentage for the subnet.
-        subnet_emission = numpy.sum(metagraph.E) / TOTAL_EMISSION * 100
+        subnet_emission = metagraph.emissions.tao_in_emission * 100
 
         # Get subnet tempo (used for determining bad Updated values)
         # subnet_tempo = subtensor.get_subnet_hyperparameters(netuid).tempo
