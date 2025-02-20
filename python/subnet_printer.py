@@ -140,6 +140,8 @@ class TablePrinter(RichPrinter):
         # self._table.add_column(
         #     "Rizzo E", justify="center", no_wrap=True)
         self._table.add_column(
+            "# Valis", justify="center", no_wrap=True)
+        self._table.add_column(
             "Rizzo vT", justify="center", no_wrap=True)
         self._table.add_column(
             "Max vT", justify="center", no_wrap=True)
@@ -170,6 +172,7 @@ class TablePrinter(RichPrinter):
             Text(f"{validator_data.subnet_emission:.2f}%"),
             # Text(rizzo_stake_rank),
             # Text(self._get_float_value(validator_data.rizzo_emission)),
+            Text(self._get_int_value(validator_data.num_validators)),
             Text(self._get_float_value(validator_data.rizzo_vtrust),
                  style=self._get_style(vtrust_status)),
             Text(self._get_float_value(validator_data.max_vtrust)),
