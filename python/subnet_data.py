@@ -126,57 +126,56 @@ class SubnetData(SubnetDataBase):
         try:
             rizzo_uid = metagraph.hotkeys.index(self._rizzo_hotkey)
         except ValueError:
+            rizzo_uid = None
             self._print_debug("\nWARNING: Rizzo validator not running on subnet "
                  f"{netuid}")
-            with self._validator_data_lock:
-                self._validator_data[netuid] = self.ValidatorData(
-                    netuid=netuid,
-                    subnet_emission=subnet_emission,
-                    subnet_tempo=None,
-                    num_validators=None,
-                    rizzo_stake_rank=None,
-                    rizzo_emission=None,
-                    rizzo_vtrust=None,
-                    max_vtrust=None,
-                    avg_vtrust=None,
-                    min_vtrust=None,
-                    rizzo_updated=None,
-                    min_updated=None,
-                    avg_updated=None,
-                    max_updated=None,)
-            return
-        
+
         # Get Rizzo validator values
-        rizzo_emission = metagraph.E[rizzo_uid]
-        rizzo_vtrust = metagraph.Tv[rizzo_uid]
-        rizzo_updated = subtensor.blocks_since_last_update(
-            netuid=netuid, uid=rizzo_uid)
+        if rizzo_uid is None:
+            rizzo_emission = None
+            rizzo_vtrust = None
+            rizzo_updated = None
+            rizzo_stake_rank = None
+        else:
+            rizzo_emission = metagraph.E[rizzo_uid]
+            rizzo_vtrust = metagraph.Tv[rizzo_uid]
+            rizzo_updated = subtensor.blocks_since_last_update(
+                netuid=netuid, uid=rizzo_uid)
+
+            rizzo_stake = metagraph.S[rizzo_uid]
+            rizzo_stake_rank = (
+                len(metagraph.S) - sorted(metagraph.S).index(rizzo_stake))
 
         # Get all validators that have a valid stake amount.
         valid_uids = [i for (i, s) in enumerate(metagraph.S)
                       if i != rizzo_uid and s > MIN_STAKE_THRESHOLD]
-        num_validators = len(valid_uids) + 1
+        num_validators = len(valid_uids)
+        if rizzo_uid is not None:
+            num_validators += 1
 
-        # Get stake-wise ranking for Rizzo
-        rizzo_stake = metagraph.S[rizzo_uid]
-        rizzo_stake_rank = (
-            len(metagraph.S) - sorted(metagraph.S).index(rizzo_stake))
+        if not valid_uids:
+            max_vtrust = None
+            avg_vtrust = None
+            min_vtrust = None
+            min_updated = None
+            avg_updated = None
+            max_updated = None
+        else:
+            # Get min/max/average vTrust values.
+            # vtrusts = [metagraph.Tv[uid] for uid in valid_uids]
+            vtrusts = metagraph.Tv[valid_uids]
+            max_vtrust = numpy.max(vtrusts)
+            avg_vtrust = numpy.average(vtrusts)
+            min_vtrust = numpy.min(vtrusts)
 
-        # Get min/max/average vTrust values.
-        # vtrusts = [metagraph.Tv[uid] for uid in valid_uids]
-        vtrusts = metagraph.Tv[valid_uids]
-        max_vtrust = numpy.max(vtrusts)
-        avg_vtrust = numpy.average(vtrusts)
-        min_vtrust = numpy.min(vtrusts)
-
-        # Get min/max/average Updated values.
-        updateds = []
-        for uid in valid_uids:
-            updateds.append(subtensor.blocks_since_last_update(
-                netuid=netuid, uid=uid))
-        min_updated = numpy.min(updateds)
-        avg_updated = int(numpy.round(numpy.average(updateds)))
-        max_updated = numpy.max(updateds)
+            # Get min/max/average Updated values.
+            updateds = []
+            for uid in valid_uids:
+                updateds.append(subtensor.blocks_since_last_update(
+                    netuid=netuid, uid=uid))
+            min_updated = numpy.min(updateds)
+            avg_updated = int(numpy.round(numpy.average(updateds)))
+            max_updated = numpy.max(updateds)
 
         # Store the data.
         with self._validator_data_lock:
