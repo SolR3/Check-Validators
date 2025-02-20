@@ -41,8 +41,8 @@ def _parse_args():
 
     parser.add_argument(
         "-l", "--local-subtensor",
-        help="When specified, use a local running subtensor. When not "
-             "specified, use the 'finney' network subtensor.")
+        help="Use the specified local subtensor (i.e. la, cali, titan, etc.). "
+        "When not specified, use the 'finney' network subtensor.")
 
     parser.add_argument(
         "-p", "--processes",
@@ -193,7 +193,11 @@ def main():
     # This is all very shoddy
     # 
     options = _parse_args()
-    network = options.local_subtensor if options.local_subtensor else "finney"
+    network = (
+        f"ws://subtensor-{options.local_subtensor}.rizzo.network:9944"
+        if options.local_subtensor
+        else "finney"
+    )
     interval_seconds = round(options.interval * 60)
 
     os.makedirs(options.json_folder, exist_ok=True)
