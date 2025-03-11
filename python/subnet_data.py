@@ -12,6 +12,8 @@ import time
 
 MIN_STAKE_THRESHOLD = 4000 # TODO - Need some way to verify this
                            # This is the value used by the taoyield site
+MIN_VTRUST_THRESHOLD = 0.01
+MAX_U_THRESHOLD = 100800 # 2 weeks
 
 
 class SubnetDataBase:
@@ -146,9 +148,15 @@ class SubnetData(SubnetDataBase):
             rizzo_stake_rank = (
                 len(metagraph.S) - sorted(metagraph.S).index(rizzo_stake))
 
-        # Get all validators that have a valid stake amount.
-        valid_uids = [i for (i, s) in enumerate(metagraph.S)
-                      if i != rizzo_uid and s > MIN_STAKE_THRESHOLD]
+        # Get all validators that have proper VT
+        no_rizzo_min_vt_uids = [i for (i, vt) in enumerate(metagraph.Tv)
+                                   if (i != rizzo_uid) & (vt > MIN_VTRUST_THRESHOLD)]
+
+        # Get all validators that have valid stake amount and U
+        valid_uids = [i for i in no_rizzo_min_vt_uids
+                      if (metagraph.S[i] > MIN_STAKE_THRESHOLD)
+                      & (subtensor.blocks_since_last_update(netuid=netuid, uid=i) < MAX_U_THRESHOLD)]
+        
         num_validators = len(valid_uids)
         if rizzo_uid is not None:
             num_validators += 1
