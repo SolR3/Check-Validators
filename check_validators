@@ -16,7 +16,7 @@ from subnet_printer import SubnetDataPrinter
 from subnet_constants import DEFAULT_VTRUST_THRESHOLD, DEFAULT_UPDATED_THRESHOLD
 
 
-LOCAL_NETWORK = "ws://subtensor-candyland.rizzo.network:9944"
+LOCAL_NETWORK = "ws://subtensor-moonbase.rizzo.network:9944"
 
 # TODO - Make this better.
 # Can't use this in the actual data gathering as the
