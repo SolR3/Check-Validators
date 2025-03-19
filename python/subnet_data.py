@@ -22,7 +22,8 @@ class SubnetDataBase:
         "netuid",
         "subnet_emission",
         "subnet_tempo",
-        "num_validators",
+        "num_total_validators",
+        "num_valid_validators",
         "rizzo_stake_rank",
         "rizzo_emission",
         "rizzo_vtrust",
@@ -148,18 +149,28 @@ class SubnetData(SubnetDataBase):
             rizzo_stake_rank = (
                 len(metagraph.S) - sorted(metagraph.S).index(rizzo_stake))
 
-        # Get all validators that have proper VT
-        no_rizzo_min_vt_uids = [i for (i, vt) in enumerate(metagraph.Tv)
-                                   if (i != rizzo_uid) & (vt > MIN_VTRUST_THRESHOLD)]
+        # Get all validator uids that have valid stake amount
+        all_uids = [
+            i for (i, s) in enumerate(metagraph.S)
+            if i != rizzo_uid and s > MIN_STAKE_THRESHOLD
+        ]
+        num_total_validators = len(all_uids)
 
-        # Get all validators that have valid stake amount and U
-        valid_uids = [i for i in no_rizzo_min_vt_uids
-                      if (metagraph.S[i] > MIN_STAKE_THRESHOLD)
-                      & (subtensor.blocks_since_last_update(netuid=netuid, uid=i) < MAX_U_THRESHOLD)]
-        
-        num_validators = len(valid_uids)
+        # Get all validators that have proper VT and U
+        valid_uids = [
+            i for i in all_uids
+            if (metagraph.Tv[i] > MIN_VTRUST_THRESHOLD)
+            & (subtensor.blocks_since_last_update(netuid=netuid, uid=i) < MAX_U_THRESHOLD)
+        ]
+        num_valid_validators = len(valid_uids)
+
         if rizzo_uid is not None:
-            num_validators += 1
+            num_total_validators += 1
+            if (
+                rizzo_vtrust is not None and rizzo_vtrust > MIN_VTRUST_THRESHOLD
+                and rizzo_updated is not None and rizzo_updated < MAX_U_THRESHOLD
+            ):
+                num_valid_validators += 1
 
         if not valid_uids:
             max_vtrust = None
@@ -191,7 +202,8 @@ class SubnetData(SubnetDataBase):
                 netuid=netuid,
                 subnet_emission=subnet_emission,
                 subnet_tempo=subnet_tempo,
-                num_validators=num_validators,
+                num_total_validators=num_total_validators,
+                num_valid_validators=num_valid_validators,
                 rizzo_stake_rank=rizzo_stake_rank,
                 rizzo_emission=rizzo_emission,
                 rizzo_vtrust=rizzo_vtrust,
@@ -252,7 +264,8 @@ class SubnetDataFromWebServer(SubnetDataBase):
                 netuid=subnet["netuid"],
                 subnet_emission=subnet["subnet_emission"],
                 subnet_tempo=subnet["subnet_tempo"],
-                num_validators=subnet["num_validators"],
+                num_total_validators=subnet["num_total_validators"],
+                num_valid_validators=subnet["num_valid_validators"],
                 rizzo_stake_rank=subnet["rizzo_stake_rank"],
                 rizzo_emission=subnet["rizzo_emission"],
                 rizzo_vtrust=subnet["rizzo_vtrust"],
@@ -306,7 +319,8 @@ class SubnetDataFromJson(SubnetDataBase):
                 netuid=subnet["netuid"],
                 subnet_emission=subnet["subnet_emission"],
                 subnet_tempo=subnet["subnet_tempo"],
-                num_validators=subnet["num_validators"],
+                num_total_validators=subnet["num_total_validators"],
+                num_valid_validators=subnet["num_valid_validators"],
                 rizzo_stake_rank=subnet["rizzo_stake_rank"],
                 rizzo_emission=subnet["rizzo_emission"],
                 rizzo_vtrust=subnet["rizzo_vtrust"],

@@ -172,7 +172,8 @@ class TablePrinter(RichPrinter):
             Text(f"{validator_data.subnet_emission:.2f}%"),
             # Text(rizzo_stake_rank),
             # Text(self._get_float_value(validator_data.rizzo_emission)),
-            Text(self._get_int_value(validator_data.num_validators)),
+            Text(f"{validator_data.num_valid_validators:<2}  "
+                 f"({validator_data.num_total_validators})"),
             Text(self._get_float_value(validator_data.rizzo_vtrust),
                  style=self._get_style(vtrust_status)),
             Text(self._get_float_value(validator_data.max_vtrust)),
