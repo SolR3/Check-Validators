@@ -45,22 +45,22 @@ class SubnetDataPrinter:
             if validator_data.rizzo_emission is not None:
                 total_emission += validator_data.rizzo_emission
 
-            if (validator_data.rizzo_vtrust is None
-                    or (validator_data.avg_vtrust
-                        - validator_data.rizzo_vtrust)
-                        > vtrust_error_threshold):
+            if validator_data.rizzo_vtrust is None:
                 vtrust_status = 2
-            else:
+            elif validator_data.avg_vtrust is None:
+                vtrust_status = 1
+            elif (validator_data.avg_vtrust - validator_data.rizzo_vtrust) > vtrust_error_threshold:
+                vtrust_status = 2
+            else: 
                 vtrust_status = 0
 
-            if (validator_data.rizzo_updated is None
-                    or (validator_data.rizzo_updated
-                        / validator_data.subnet_tempo)
-                        > updated_error_threshold):
+            if validator_data.rizzo_updated is None:
                 updated_status = 2
-            elif ((validator_data.rizzo_updated
-                    / validator_data.subnet_tempo)
-                        > updated_warning_threshold):
+            elif validator_data.rizzo_updated is None:
+                updated_status = 1
+            elif (validator_data.rizzo_updated / validator_data.subnet_tempo) > updated_error_threshold:
+                updated_status = 2
+            elif (validator_data.rizzo_updated / validator_data.subnet_tempo) > updated_warning_threshold:
                 updated_status = 1
             else:
                 updated_status = 0
