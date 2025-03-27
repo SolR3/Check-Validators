@@ -217,15 +217,15 @@ def main():
             with multiprocessing.Pool(processes=options.processes) as pool:
                 pool.starmap(write_json_file, process_args)
 
-                for file_name in os.listdir(options.json_folder):
-                    json_file = os.path.join(options.json_folder, file_name)
-                    print(f"Removing {json_file}")
-                    os.unlink(json_file)
-                for file_name in os.listdir(tempdir):
-                    src_json_file = os.path.join(tempdir, file_name)
-                    dest_json_file = os.path.join(options.json_folder, file_name)
-                    print(f"Moving {src_json_file} to {dest_json_file}")
-                    os.rename(src_json_file, dest_json_file)
+            for file_name in os.listdir(options.json_folder):
+                json_file = os.path.join(options.json_folder, file_name)
+                print(f"Removing {json_file}")
+                os.unlink(json_file)
+            for file_name in os.listdir(tempdir):
+                src_json_file = os.path.join(tempdir, file_name)
+                dest_json_file = os.path.join(options.json_folder, file_name)
+                print(f"Moving {src_json_file} to {dest_json_file}")
+                os.rename(src_json_file, dest_json_file)
 
             os.rmdir(tempdir)
 
