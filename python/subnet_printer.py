@@ -68,11 +68,11 @@ class SubnetDataPrinter:
 
             if validator_data.rizzo_updated is None:
                 updated_status = 2
-            elif validator_data.rizzo_updated is None:
+            elif validator_data.avg_updated is None:
                 updated_status = 1
-            elif (validator_data.rizzo_updated / validator_data.subnet_tempo) > UPDATED_ERROR_THRESHOLD:
+            elif validator_data.rizzo_updated > UPDATED_ERROR_THRESHOLD:
                 updated_status = 2
-            elif (validator_data.rizzo_updated / validator_data.subnet_tempo) > UPDATED_WARNING_THRESHOLD:
+            elif validator_data.rizzo_updated > UPDATED_WARNING_THRESHOLD:
                 updated_status = 1
             else:
                 updated_status = 0
