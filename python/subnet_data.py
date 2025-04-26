@@ -54,10 +54,11 @@ class SubnetDataBase:
 class SubnetData(SubnetDataBase):
     _rizzo_hotkey = "5F2CsUDVbRbVMXTh9fAzF9GacjVX7UapvRxidrxe7z8BYckQ"
 
-    def __init__(self, netuids, network, threads, debug):
+    def __init__(self, netuids, network, threads, debug, other_hotkey=None):
         self._netuids = netuids
         self._network = network
         self._threads = threads
+        self._other_hotkey = other_hotkey
 
         self._validator_data_lock = threading.Lock()
 
@@ -125,9 +126,12 @@ class SubnetData(SubnetDataBase):
         # subnet_tempo = subtensor.get_subnet_hyperparameters(netuid).tempo
         subnet_tempo = 360
 
+        # A hack to be able to check how other validators are doing
+        hotkey = self._other_hotkey or self._rizzo_hotkey
+
         # Get UID for Rizzo.
         try:
-            rizzo_uid = metagraph.hotkeys.index(self._rizzo_hotkey)
+            rizzo_uid = metagraph.hotkeys.index(hotkey)
         except ValueError:
             rizzo_uid = None
             self._print_debug("\nWARNING: Rizzo validator not running on subnet "

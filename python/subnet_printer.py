@@ -14,9 +14,9 @@ class SubnetDataPrinter:
 
     def print_validator_data(
             self, vtrust_error_threshold, updated_error_threshold,
-            sort_subnets=True, print_total_emission=True):
+            sort_subnets=True, print_total_emission=True, vali_name=None):
         updated_warning_threshold = (updated_error_threshold - 1)/2 + 1
-        printer = TablePrinter()
+        printer = TablePrinter(vali_name)
 
         def sort_key(netuid):
             sort_key = self._validator_data[netuid].subnet_emission
@@ -127,22 +127,25 @@ class RichPrinter:
 class TablePrinter(RichPrinter):
     reverse_sort = True
 
-    def __init__(self):
+    def __init__(self, vali_name):
         super().__init__()
 
-        self._table = Table(title="Rizzo Validators")
+        if vali_name is None:
+            vali_name = "Rizzo"
+
+        self._table = Table(title=f"{vali_name} Validators")
         self._table.add_column(
             "Subnet", justify="center", no_wrap=True)
         self._table.add_column(
             "Subnet E", justify="center", no_wrap=True)
         # self._table.add_column(
-        #     "Rizzo Rank", justify="center", no_wrap=True)
+        #     f"{vali_name} Rank", justify="center", no_wrap=True)
         # self._table.add_column(
-        #     "Rizzo E", justify="center", no_wrap=True)
+        #     f"{vali_name} E", justify="center", no_wrap=True)
         self._table.add_column(
             "# Valis", justify="center", no_wrap=True)
         self._table.add_column(
-            "Rizzo vT", justify="center", no_wrap=True)
+            f"{vali_name} vT", justify="center", no_wrap=True)
         self._table.add_column(
             "Max vT", justify="center", no_wrap=True)
         self._table.add_column(
@@ -150,7 +153,7 @@ class TablePrinter(RichPrinter):
         self._table.add_column(
             "Min vT", justify="center", no_wrap=True)
         self._table.add_column(
-            "Rizzo U", justify="center", no_wrap=True)
+            f"{vali_name} U", justify="center", no_wrap=True)
         self._table.add_column(
             "Min U", justify="center", no_wrap=True)
         self._table.add_column(
