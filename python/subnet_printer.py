@@ -3,6 +3,12 @@ from rich.text import Text
 from rich.table import Table
 from rich.console import Console
 
+from subnet_constants import (
+    VTRUST_ERROR_THRESHOLD,
+    VTRUST_WARNING_THRESHOLD,
+    UPDATED_ERROR_THRESHOLD,
+    UPDATED_WARNING_THRESHOLD,
+)
 
 class SubnetDataPrinter:
     def __init__(self, subnet_data_class, *args):
@@ -13,9 +19,8 @@ class SubnetDataPrinter:
         self._netuids = netuids
 
     def print_validator_data(
-            self, vtrust_error_threshold, updated_error_threshold,
-            sort_subnets=True, print_total_emission=True, vali_name=None):
-        updated_warning_threshold = (updated_error_threshold - 1)/2 + 1
+            self, sort_subnets=True, print_total_emission=True, vali_name=None
+        ):
         printer = TablePrinter(vali_name)
 
         def sort_key(netuid):
@@ -49,8 +54,15 @@ class SubnetDataPrinter:
                 vtrust_status = 2
             elif validator_data.avg_vtrust is None:
                 vtrust_status = 1
-            elif (validator_data.avg_vtrust - validator_data.rizzo_vtrust) > vtrust_error_threshold:
+            # Commenting this out for now. Sometimes the min vT is 0.9+ and
+            # our vT is 0.9+ as well but just barely below the min so it shows
+            # red when really it should be green.
+            # elif validator_data.rizzo_vtrust < validator_data.min_vtrust:
+            #     vtrust_status = 2
+            elif (validator_data.avg_vtrust - validator_data.rizzo_vtrust) > VTRUST_ERROR_THRESHOLD:
                 vtrust_status = 2
+            elif (validator_data.avg_vtrust - validator_data.rizzo_vtrust) > VTRUST_WARNING_THRESHOLD:
+                vtrust_status = 1
             else: 
                 vtrust_status = 0
 
@@ -58,9 +70,9 @@ class SubnetDataPrinter:
                 updated_status = 2
             elif validator_data.rizzo_updated is None:
                 updated_status = 1
-            elif (validator_data.rizzo_updated / validator_data.subnet_tempo) > updated_error_threshold:
+            elif (validator_data.rizzo_updated / validator_data.subnet_tempo) > UPDATED_ERROR_THRESHOLD:
                 updated_status = 2
-            elif (validator_data.rizzo_updated / validator_data.subnet_tempo) > updated_warning_threshold:
+            elif (validator_data.rizzo_updated / validator_data.subnet_tempo) > UPDATED_WARNING_THRESHOLD:
                 updated_status = 1
             else:
                 updated_status = 0

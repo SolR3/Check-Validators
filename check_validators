@@ -11,7 +11,6 @@ import time
 
 # Import local subnet_data module
 sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
-from subnet_constants import DEFAULT_VTRUST_THRESHOLD, DEFAULT_UPDATED_THRESHOLD
 
 LOCAL_NETWORK = "ws://subtensor-moonbase.rizzo.network:9944"
 
@@ -30,17 +29,6 @@ def _get_subnets(network=LOCAL_NETWORK):
 
 
 def _parse_args():
-    # class SubnetsAction(argparse.Action):       
-    #     def __call__(self, parser, namespace, values, option_string=None):
-    #         min_subnet = _get_subnets()[0]
-    #         max_subnet = _get_subnets()[-1]
-    #         bad_values = [v for v in values if v < min_subnet or v > max_subnet]
-    #         if bad_values:
-    #             raise argparse.ArgumentError(
-    #                 argument=self,
-    #                 message=f"Subnet values are not between {min_subnet} "
-    #                         f"and {max_subnet}: {bad_values}")
-    #         setattr(namespace, self.dest, values)
     
     class ThreadsAction(argparse.Action):       
         def __call__(self, parser, namespace, values, option_string=None):
@@ -48,23 +36,6 @@ def _parse_args():
                 raise argparse.ArgumentError(
                     argument=self,
                     message=f"Thread value ({values}) must be >= 0.")
-            setattr(namespace, self.dest, values)
-    
-    class VtrustAction(argparse.Action):       
-        def __call__(self, parser, namespace, values, option_string=None):
-            if values < 0 or values > 1:
-                raise argparse.ArgumentError(
-                    argument=self,
-                    message=f"Vtrust threshold ({values}) must be in the "
-                             "range [0-1].")
-            setattr(namespace, self.dest, values)
-    
-    class UpdatedAction(argparse.Action):       
-        def __call__(self, parser, namespace, values, option_string=None):
-            if values <= 1:
-                raise argparse.ArgumentError(
-                    argument=self,
-                    message=f"Updated threshold ({values}) must be > 1.")
             setattr(namespace, self.dest, values)
 
     parser = argparse.ArgumentParser()
@@ -79,27 +50,8 @@ def _parse_args():
         "-s", "--subnets",
         nargs="+",
         type=int,
-        # action = SubnetsAction,
         help="When specified, the list of netuids are checked. When not "
              "specified, all subnets are checked.")
-
-    parser.add_argument(
-        "-V", "--vtrust-threshold",
-        type=float,
-        default=DEFAULT_VTRUST_THRESHOLD,
-        action = VtrustAction,
-        help="The vTrust threshold. Float value betweeon [0-1]. If "
-             "Rizzo vTrust < (avg vTrust - threshold) then it is bad. "
-            f"The default value is {DEFAULT_VTRUST_THRESHOLD}.")
-
-    parser.add_argument(
-        "-U", "--updated-threshold",
-        type=float,
-        default=DEFAULT_UPDATED_THRESHOLD,
-        action = UpdatedAction,
-        help="The Updated value threshold. Float value > 1. If "
-             "Rizzo Updated > (subnet tempo * threshold) then it is bad. "
-            f"The default value is {DEFAULT_UPDATED_THRESHOLD}.")
 
     parser.add_argument(
         "-t", "--threads",
@@ -146,8 +98,6 @@ def main(options):
     sort_subnets = not bool(options.subnets)
     print_total_emission = not bool(options.subnets)
     subnet_data_printer.print_validator_data(
-        options.vtrust_threshold,
-        options.updated_threshold,
         sort_subnets,
         print_total_emission,
         options.vali_name)
