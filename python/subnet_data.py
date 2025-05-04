@@ -1,7 +1,8 @@
 # bittensor import
-import bittensor
+from bittensor.core.async_subtensor import AsyncSubtensor
 
 # standart imports
+import asyncio
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
 import json
@@ -62,9 +63,6 @@ class SubnetData(SubnetDataBase):
 
         self._validator_data_lock = threading.Lock()
 
-        # Get subtensor and list of netuids.
-        self._subtensor = bittensor.subtensor(network=self._network)
-
         super(SubnetData, self).__init__(debug)
 
     def to_dict(self):
@@ -90,12 +88,12 @@ class SubnetData(SubnetDataBase):
         for attempt in range(1, max_attempts+1):
             self._print_debug(f"\nAttempt {attempt} of {max_attempts}")
             if self._threads:
+                # TODO - This could be way better now that it's using asyncio.
+                #        Or just get rid of threading now.
                 with ThreadPoolExecutor(max_workers=self._threads) as executor:
-                    executor.map(self._get_validator_data,
-                        netuids, [True for _ in range(len(netuids))])
+                    executor.map(self._get_validator_data, netuids)
             else:
-                for netuid in netuids:
-                    self._get_validator_data(netuid, False)
+                self._get_validator_data(netuids)
 
             # Get netuids missing data
             netuids = list(set(netuids).difference(set(self._validator_data)))
@@ -105,20 +103,33 @@ class SubnetData(SubnetDataBase):
             else:
                 break
 
-    def _get_validator_data(self, netuid, init_new_subtensor):
-        start_time = time.time()
-        self._print_debug(f"\nObtaining data for subnet {netuid}\n")
+    def _get_validator_data(self, netuids):
+        asyncio.run(self._async_get_validator_data(netuids))
+
+    async def _async_get_validator_data(self, netuids):
+        if type(netuids) != list:
+            netuids = [netuids]
 
         # When threading, re-get subtensor for obtaining the updated values.
         # The subtensor object can't seem to handle multiple threads calling
         # the blocks_since_last_update() method at the same time.
-        subtensor = bittensor.subtensor(network=self._network) \
-                        if init_new_subtensor \
-                            else self._subtensor
+        start_time = time.time()
+        self._print_debug(f"\nObtaining data for subnets: {netuids}\n")
 
-        # Get metagraph for the subnet.
-        metagraph = subtensor.metagraph(netuid=netuid)
-    
+        async with AsyncSubtensor(network="archive") as subtensor:
+            block = await subtensor.block
+            metagraphs = await asyncio.gather(
+                *[subtensor.metagraph(netuid=netuid, block=block) for netuid in netuids]
+            )
+            for i, netuid in enumerate(netuids):
+                metagraph = metagraphs[i]
+                self._get_data_from_metagraph(metagraph, netuid, block)
+
+        total_time = time.time() - start_time
+        self._print_debug(f"\nData gathered in {int(total_time)} seconds "
+                          f"for subnets: {netuids}.")
+
+    def _get_data_from_metagraph(self, metagraph, netuid, current_block):    
         # Get emission percentage for the subnet.
         subnet_emission = metagraph.emissions.tao_in_emission * 100
 
@@ -134,8 +145,10 @@ class SubnetData(SubnetDataBase):
             rizzo_uid = metagraph.hotkeys.index(hotkey)
         except ValueError:
             rizzo_uid = None
-            self._print_debug("\nWARNING: Rizzo validator not running on subnet "
-                 f"{netuid}")
+            self._print_debug(
+                "\nWARNING: Rizzo validator not running on subnet "
+                f"{netuid}"
+            )
 
         # Get Rizzo validator values
         if rizzo_uid is None:
@@ -146,8 +159,7 @@ class SubnetData(SubnetDataBase):
         else:
             rizzo_emission = metagraph.E[rizzo_uid]
             rizzo_vtrust = metagraph.Tv[rizzo_uid]
-            rizzo_updated = subtensor.blocks_since_last_update(
-                netuid=netuid, uid=rizzo_uid)
+            rizzo_updated = current_block - metagraph.last_update[rizzo_uid]
 
             rizzo_stake = metagraph.S[rizzo_uid]
             rizzo_stake_rank = (
@@ -164,7 +176,7 @@ class SubnetData(SubnetDataBase):
         valid_uids = [
             i for i in all_uids
             if (metagraph.Tv[i] > MIN_VTRUST_THRESHOLD)
-            & (subtensor.blocks_since_last_update(netuid=netuid, uid=i) < MAX_U_THRESHOLD)
+            & (current_block - metagraph.last_update[i] < MAX_U_THRESHOLD)
         ]
         num_valid_validators = len(valid_uids)
 
@@ -185,17 +197,13 @@ class SubnetData(SubnetDataBase):
             max_updated = None
         else:
             # Get min/max/average vTrust values.
-            # vtrusts = [metagraph.Tv[uid] for uid in valid_uids]
             vtrusts = metagraph.Tv[valid_uids]
             max_vtrust = numpy.max(vtrusts)
             avg_vtrust = numpy.average(vtrusts)
             min_vtrust = numpy.min(vtrusts)
 
             # Get min/max/average Updated values.
-            updateds = []
-            for uid in valid_uids:
-                updateds.append(subtensor.blocks_since_last_update(
-                    netuid=netuid, uid=uid))
+            updateds = current_block - metagraph.last_update[valid_uids]
             min_updated = numpy.min(updateds)
             avg_updated = int(numpy.round(numpy.average(updateds)))
             max_updated = numpy.max(updateds)
@@ -218,10 +226,7 @@ class SubnetData(SubnetDataBase):
                 min_updated=min_updated,
                 avg_updated=avg_updated,
                 max_updated=max_updated,)
-        
-        total_time = time.time() - start_time
-        self._print_debug(f"\nSubnet {netuid} data gathered in "
-                         f"{int(total_time)} seconds.")
+
 
 class SubnetDataFromWebServer(SubnetDataBase):
     def __init__(self, public_ip, port, username, password, debug):
