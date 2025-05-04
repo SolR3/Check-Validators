@@ -88,7 +88,8 @@ class SubnetData(SubnetDataBase):
         for attempt in range(1, max_attempts+1):
             self._print_debug(f"\nAttempt {attempt} of {max_attempts}")
             if self._threads:
-                # TODO - This could be way better now that it's using asyncio
+                # TODO - This could be way better now that it's using asyncio.
+                #        Or just get rid of threading now.
                 with ThreadPoolExecutor(max_workers=self._threads) as executor:
                     executor.map(self._get_validator_data, netuids)
             else:
