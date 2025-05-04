@@ -12,14 +12,13 @@ import time
 # Import local subnet_data module
 sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 
-LOCAL_NETWORK = "ws://subtensor-moonbase.rizzo.network:9944"
 
 # TODO - Make this better.
 # Can't use this in the actual data gathering as the
 # user may specify the --local-subtensor arg instead.
 # Throw away subnet 0.
 _SUBNET_IDS = None
-def _get_subnets(network=LOCAL_NETWORK):
+def _get_subnets(network):
     global _SUBNET_IDS
 
     if not _SUBNET_IDS:
@@ -42,9 +41,8 @@ def _parse_args():
 
     parser.add_argument(
         "-l", "--local-subtensor",
-        action="store_true",
-        help="When specified, use a local running subtensor. When not "
-             "specified, use the 'finney' network subtensor.")
+        help="Use the specified local subtensor (i.e. la, cali, titan, etc.). "
+             "When not specified, use the 'finney' network subtensor.")
 
     parser.add_argument(
         "-s", "--subnets",
@@ -85,7 +83,11 @@ def format_time(total_time):
 
 
 def main(options):
-    network = LOCAL_NETWORK if options.local_subtensor else "finney"
+    network = (
+        f"ws://subtensor-{options.local_subtensor}.rizzo.network:9944"
+        if options.local_subtensor
+        else "finney"
+    )
     netuids = options.subnets or _get_subnets(network)
 
     start_time = time.time()

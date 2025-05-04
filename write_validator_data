@@ -42,7 +42,7 @@ def _parse_args():
     parser.add_argument(
         "-l", "--local-subtensor",
         help="Use the specified local subtensor (i.e. la, cali, titan, etc.). "
-        "When not specified, use the 'finney' network subtensor.")
+             "When not specified, use the 'finney' network subtensor.")
 
     parser.add_argument(
         "-p", "--processes",
