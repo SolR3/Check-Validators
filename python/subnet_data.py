@@ -116,7 +116,7 @@ class SubnetData(SubnetDataBase):
         start_time = time.time()
         self._print_debug(f"\nObtaining data for subnets: {netuids}\n")
 
-        async with AsyncSubtensor(network="archive") as subtensor:
+        async with AsyncSubtensor(network=self._network) as subtensor:
             block = await subtensor.block
             metagraphs = await asyncio.gather(
                 *[subtensor.metagraph(netuid=netuid, block=block) for netuid in netuids]
