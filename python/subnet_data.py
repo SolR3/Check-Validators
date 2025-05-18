@@ -34,7 +34,21 @@ class SubnetDataBase:
         "rizzo_updated",
         "min_updated",
         "avg_updated",
-        "max_updated",])
+        "max_updated",
+        "chk_fraction",
+        "chk_vtrust",
+        "chk_updated",
+        "child_hotkey_data",
+        ]
+    )
+    ChildHotkeyData = namedtuple(
+        "ChildHotkeyData", [
+            "fraction",
+            "hotkey",
+            "vtrust",
+            "updated",
+        ]
+    )
 
     def __init__(self, debug):
         self._debug = debug
@@ -65,13 +79,27 @@ class SubnetData(SubnetDataBase):
 
         super(SubnetData, self).__init__(debug)
 
+    @property
+    def hotkey(self):
+        # A hack to be able to check how other validators are doing
+        return self._other_hotkey or self._rizzo_hotkey
+
     def to_dict(self):
         def serializable(value):
+            if isinstance(value, self.ChildHotkeyData):
+                return namedtuple_to_dict(value)
+            if isinstance(value, list):
+                return [serializable(v) for v in value]
             if isinstance(value, numpy.float32):
                 return float(value)
             if isinstance(value, numpy.int64):
                 return int(value)
             return value
+
+        def namedtuple_to_dict(data):
+            return dict(
+                [(f, serializable(getattr(data, f))) for f in data._fields]
+            )
 
         data_dict = {}
         for netuid in self._validator_data:
@@ -117,19 +145,33 @@ class SubnetData(SubnetDataBase):
         self._print_debug(f"\nObtaining data for subnets: {netuids}\n")
 
         async with AsyncSubtensor(network=self._network) as subtensor:
+            # Get the block to pass to async calls so everything is in sync
             block = await subtensor.block
+
+            # Get the list of child hotkeys for each netuid
+            children = await asyncio.gather(
+                *[subtensor.get_children(netuid=netuid, hotkey=self.hotkey) for netuid in netuids]
+            )
+
+            # Get the metagraph for each netuid
             metagraphs = await asyncio.gather(
                 *[subtensor.metagraph(netuid=netuid, block=block) for netuid in netuids]
             )
+
             for i, netuid in enumerate(netuids):
+                success, child_hotkeys, msg = children[i]
+                if not success:
+                    self._print_debug(
+                        f"Failed to obtain child hotkeys from netuid {netuid}: {msg}"
+                    )
                 metagraph = metagraphs[i]
-                self._get_data_from_metagraph(metagraph, netuid, block)
+                self._get_data_from_metagraph(metagraph, netuid, child_hotkeys, block)
 
         total_time = time.time() - start_time
         self._print_debug(f"\nData gathered in {int(total_time)} seconds "
                           f"for subnets: {netuids}.")
 
-    def _get_data_from_metagraph(self, metagraph, netuid, current_block):    
+    def _get_data_from_metagraph(self, metagraph, netuid, child_hotkeys, current_block):    
         # Get emission percentage for the subnet.
         subnet_emission = metagraph.emissions.tao_in_emission * 100
 
@@ -137,21 +179,15 @@ class SubnetData(SubnetDataBase):
         # subnet_tempo = subtensor.get_subnet_hyperparameters(netuid).tempo
         subnet_tempo = 360
 
-        # A hack to be able to check how other validators are doing
-        hotkey = self._other_hotkey or self._rizzo_hotkey
-
-        # Get UID for Rizzo.
+        # Get Rizzo validator data
         try:
-            rizzo_uid = metagraph.hotkeys.index(hotkey)
+            rizzo_uid = metagraph.hotkeys.index(self.hotkey)
         except ValueError:
-            rizzo_uid = None
             self._print_debug(
                 "\nWARNING: Rizzo validator not running on subnet "
                 f"{netuid}"
             )
-
-        # Get Rizzo validator values
-        if rizzo_uid is None:
+            rizzo_uid = None
             rizzo_emission = None
             rizzo_vtrust = None
             rizzo_updated = None
@@ -160,10 +196,45 @@ class SubnetData(SubnetDataBase):
             rizzo_emission = metagraph.E[rizzo_uid]
             rizzo_vtrust = metagraph.Tv[rizzo_uid]
             rizzo_updated = current_block - metagraph.last_update[rizzo_uid]
-
             rizzo_stake = metagraph.S[rizzo_uid]
             rizzo_stake_rank = (
                 len(metagraph.S) - sorted(metagraph.S).index(rizzo_stake))
+
+        # Get child hotkey data
+        chk_fraction = 0.0
+        child_hotkey_data = []
+        if len(child_hotkeys) == 0:
+            chk_vtrust = None
+            chk_updated = None
+        else:
+            chk_vtrust = 0.0
+            chk_updated = 0
+            for fraction, child_hotkey in child_hotkeys:
+                try:
+                    child_uid = metagraph.hotkeys.index(child_hotkey)
+                except ValueError:
+                    child_vtrust = None
+                    child_updated = None
+                else:
+                    child_vtrust = metagraph.Tv[child_uid]
+                    child_updated = current_block - metagraph.last_update[child_uid]
+
+                child_hotkey_data.append(
+                    self.ChildHotkeyData(
+                        fraction=fraction,
+                        hotkey=child_hotkey,
+                        vtrust=child_vtrust,
+                        updated=child_updated,
+                    )
+                )
+
+                # Calculate total chk stats
+                chk_fraction += fraction
+                chk_vtrust += child_vtrust * fraction
+                if child_updated > chk_updated:
+                    chk_updated = child_updated
+
+            chk_vtrust /= chk_fraction
 
         # Get all validator uids that have valid stake amount
         all_uids = [
@@ -188,6 +259,7 @@ class SubnetData(SubnetDataBase):
             ):
                 num_valid_validators += 1
 
+        # Get other validator data
         if not valid_uids:
             max_vtrust = None
             avg_vtrust = None
@@ -225,7 +297,12 @@ class SubnetData(SubnetDataBase):
                 rizzo_updated=rizzo_updated,
                 min_updated=min_updated,
                 avg_updated=avg_updated,
-                max_updated=max_updated,)
+                max_updated=max_updated,
+                chk_fraction=chk_fraction,
+                chk_vtrust=chk_vtrust,
+                chk_updated=chk_updated,
+                child_hotkey_data=child_hotkey_data,
+            )
 
 
 class SubnetDataFromWebServer(SubnetDataBase):
@@ -284,7 +361,11 @@ class SubnetDataFromWebServer(SubnetDataBase):
                 rizzo_updated=subnet["rizzo_updated"],
                 min_updated=subnet["min_updated"],
                 avg_updated=subnet["avg_updated"],
-                max_updated=subnet["max_updated"],)
+                max_updated=subnet["max_updated"],
+                chk_fraction=subnet["chk_fraction"],
+                chk_vtrust=subnet["chk_vtrust"],
+                chk_updated=subnet["chk_updated"],
+                child_hotkey_data=subnet["child_hotkey_data"])
 
 
 class SubnetDataFromJson(SubnetDataBase):
@@ -339,4 +420,8 @@ class SubnetDataFromJson(SubnetDataBase):
                 rizzo_updated=subnet["rizzo_updated"],
                 min_updated=subnet["min_updated"],
                 avg_updated=subnet["avg_updated"],
-                max_updated=subnet["max_updated"],)
+                max_updated=subnet["max_updated"],
+                chk_fraction=subnet["chk_fraction"],
+                chk_vtrust=subnet["chk_vtrust"],
+                chk_updated=subnet["chk_updated"],
+                child_hotkey_data=subnet["child_hotkey_data"])
