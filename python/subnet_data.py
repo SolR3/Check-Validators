@@ -1,5 +1,6 @@
 # bittensor import
 from bittensor.core.async_subtensor import AsyncSubtensor
+from bittensor.utils import u16_normalized_float
 
 # standart imports
 import asyncio
@@ -45,6 +46,7 @@ class SubnetDataBase:
         "ChildHotkeyData", [
             "fraction",
             "hotkey",
+            "take",
             "vtrust",
             "updated",
         ]
@@ -158,20 +160,39 @@ class SubnetData(SubnetDataBase):
                 *[subtensor.metagraph(netuid=netuid, block=block) for netuid in netuids]
             )
 
+            # Get the take for each child hotkey on each netuid.
+            chk_take_func_calls = []
+            chk_take_dict = {}
+            func_call_index = 0
             for i, netuid in enumerate(netuids):
                 success, child_hotkeys, msg = children[i]
                 if not success:
                     self._print_debug(
                         f"Failed to obtain child hotkeys from netuid {netuid}: {msg}"
                     )
+                for _, child_hotkey in child_hotkeys:
+                    chk_take_func_calls.append(
+                        subtensor.substrate.query(
+                            module="SubtensorModule",
+                            storage_function="ChildkeyTake",
+                            params=[child_hotkey, netuid]
+                        )
+                    )
+                    chk_take_dict.setdefault(netuid, []).append(func_call_index)
+                    func_call_index += 1
+            all_child_takes = [u16_normalized_float(r.value) for r in await asyncio.gather(*chk_take_func_calls)]
+            for i, netuid in enumerate(netuids):
+                child_hotkeys = children[i][1]
                 metagraph = metagraphs[i]
-                self._get_data_from_metagraph(metagraph, netuid, child_hotkeys, block)
+                cti = chk_take_dict.get(netuid)
+                child_takes = all_child_takes[cti[0]:cti[-1]+1] if cti else []
+                self._get_data_from_metagraph(metagraph, netuid, child_hotkeys, child_takes , block)
 
         total_time = time.time() - start_time
         self._print_debug(f"\nData gathered in {int(total_time)} seconds "
                           f"for subnets: {netuids}.")
 
-    def _get_data_from_metagraph(self, metagraph, netuid, child_hotkeys, current_block):    
+    def _get_data_from_metagraph(self, metagraph, netuid, child_hotkeys, child_takes, current_block):
         # Get emission percentage for the subnet.
         subnet_emission = metagraph.emissions.tao_in_emission * 100
 
@@ -209,7 +230,8 @@ class SubnetData(SubnetDataBase):
         else:
             chk_vtrust = 0.0
             chk_updated = 0
-            for fraction, child_hotkey in child_hotkeys:
+            for i, (child_fraction, child_hotkey) in enumerate(child_hotkeys):
+                child_take = child_takes[i]
                 try:
                     child_uid = metagraph.hotkeys.index(child_hotkey)
                 except ValueError:
@@ -221,16 +243,17 @@ class SubnetData(SubnetDataBase):
 
                 child_hotkey_data.append(
                     self.ChildHotkeyData(
-                        fraction=fraction,
+                        fraction=child_fraction,
                         hotkey=child_hotkey,
+                        take=child_take,
                         vtrust=child_vtrust,
                         updated=child_updated,
                     )
                 )
 
                 # Calculate total chk stats
-                chk_fraction += fraction
-                chk_vtrust += child_vtrust * fraction
+                chk_fraction += child_fraction
+                chk_vtrust += child_vtrust * child_fraction
                 if child_updated > chk_updated:
                     chk_updated = child_updated
 
