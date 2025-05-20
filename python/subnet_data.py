@@ -180,7 +180,10 @@ class SubnetData(SubnetDataBase):
                     )
                     chk_take_dict.setdefault(netuid, []).append(func_call_index)
                     func_call_index += 1
-            all_child_takes = [u16_normalized_float(r.value) for r in await asyncio.gather(*chk_take_func_calls)]
+            all_child_takes = (
+                [u16_normalized_float(r.value) for r in await asyncio.gather(*chk_take_func_calls)]
+                if chk_take_func_calls else []
+            )
             for i, netuid in enumerate(netuids):
                 child_hotkeys = children[i][1]
                 metagraph = metagraphs[i]
