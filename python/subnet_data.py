@@ -6,7 +6,7 @@ from bittensor.utils import u16_normalized_float
 import asyncio
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
-import json
+# import json
 import numpy
 import threading
 import time
@@ -331,123 +331,123 @@ class SubnetData(SubnetDataBase):
             )
 
 
-class SubnetDataFromWebServer(SubnetDataBase):
-    def __init__(self, public_ip, port, username, password, debug):
-        self._public_ip = public_ip
-        self._port = port
-        self._username = username
-        self._password = password
+# class SubnetDataFromWebServer(SubnetDataBase):
+#     def __init__(self, public_ip, port, username, password, debug):
+#         self._public_ip = public_ip
+#         self._port = port
+#         self._username = username
+#         self._password = password
 
-        super(SubnetDataFromWebServer, self).__init__(debug)
+#         super(SubnetDataFromWebServer, self).__init__(debug)
 
-    def _get_subnet_data(self):
-        from bs4 import BeautifulSoup
-        import requests
+#     def _get_subnet_data(self):
+#         from bs4 import BeautifulSoup
+#         import requests
 
-        subnets_data = {}
+#         subnets_data = {}
 
-        main_url = f"http://{self._public_ip}:{self._port}"
-        self._print_debug(f"Obtaining validator json data from: {main_url}")
-        response = requests.get(main_url, auth=(self._username, self._password))
-        if response.status_code != 200:
-            self._print_debug("\nERROR: Failed to obtain validator json data."
-                              f"\nurl: {main_url}"
-                              f"\nstatus code: {response.status_code}"
-                              f"\nreason: {response.reason}")
-            return
+#         main_url = f"http://{self._public_ip}:{self._port}"
+#         self._print_debug(f"Obtaining validator json data from: {main_url}")
+#         response = requests.get(main_url, auth=(self._username, self._password))
+#         if response.status_code != 200:
+#             self._print_debug("\nERROR: Failed to obtain validator json data."
+#                               f"\nurl: {main_url}"
+#                               f"\nstatus code: {response.status_code}"
+#                               f"\nreason: {response.reason}")
+#             return
 
-        html_content = BeautifulSoup(response.content.decode(), features="html.parser")
-        for li_tag in html_content.findAll("li"):
-            json_file = li_tag.find("a").get("href")
-            json_url = f"http://{self._public_ip}:{self._port}/{json_file}"
-            self._print_debug(f"Updating validator json data with: {json_url}")
-            response = requests.get(json_url, auth=(self._username, self._password))
-            if response.status_code != 200:
-                self._print_debug("\nERROR: Failed to obtain validator json data."
-                                  f"\nurl: {json_url}"
-                                  f"\nstatus code: {response.status_code}"
-                                  f"\nreason: {response.reason}")
-                return
+#         html_content = BeautifulSoup(response.content.decode(), features="html.parser")
+#         for li_tag in html_content.findAll("li"):
+#             json_file = li_tag.find("a").get("href")
+#             json_url = f"http://{self._public_ip}:{self._port}/{json_file}"
+#             self._print_debug(f"Updating validator json data with: {json_url}")
+#             response = requests.get(json_url, auth=(self._username, self._password))
+#             if response.status_code != 200:
+#                 self._print_debug("\nERROR: Failed to obtain validator json data."
+#                                   f"\nurl: {json_url}"
+#                                   f"\nstatus code: {response.status_code}"
+#                                   f"\nreason: {response.reason}")
+#                 return
             
-            subnets_data.update(response.json())
+#             subnets_data.update(response.json())
 
-        for subnet in subnets_data.values():
-            self._validator_data[subnet["netuid"]] = self.ValidatorData(
-                netuid=subnet["netuid"],
-                subnet_emission=subnet["subnet_emission"],
-                subnet_tempo=subnet["subnet_tempo"],
-                num_total_validators=subnet["num_total_validators"],
-                num_valid_validators=subnet["num_valid_validators"],
-                rizzo_stake_rank=subnet["rizzo_stake_rank"],
-                rizzo_emission=subnet["rizzo_emission"],
-                rizzo_vtrust=subnet["rizzo_vtrust"],
-                max_vtrust=subnet["max_vtrust"],
-                avg_vtrust=subnet["avg_vtrust"],
-                min_vtrust=subnet["min_vtrust"],
-                rizzo_updated=subnet["rizzo_updated"],
-                min_updated=subnet["min_updated"],
-                avg_updated=subnet["avg_updated"],
-                max_updated=subnet["max_updated"],
-                chk_fraction=subnet["chk_fraction"],
-                chk_vtrust=subnet["chk_vtrust"],
-                chk_updated=subnet["chk_updated"],
-                child_hotkey_data=subnet["child_hotkey_data"])
+#         for subnet in subnets_data.values():
+#             self._validator_data[subnet["netuid"]] = self.ValidatorData(
+#                 netuid=subnet["netuid"],
+#                 subnet_emission=subnet["subnet_emission"],
+#                 subnet_tempo=subnet["subnet_tempo"],
+#                 num_total_validators=subnet["num_total_validators"],
+#                 num_valid_validators=subnet["num_valid_validators"],
+#                 rizzo_stake_rank=subnet["rizzo_stake_rank"],
+#                 rizzo_emission=subnet["rizzo_emission"],
+#                 rizzo_vtrust=subnet["rizzo_vtrust"],
+#                 max_vtrust=subnet["max_vtrust"],
+#                 avg_vtrust=subnet["avg_vtrust"],
+#                 min_vtrust=subnet["min_vtrust"],
+#                 rizzo_updated=subnet["rizzo_updated"],
+#                 min_updated=subnet["min_updated"],
+#                 avg_updated=subnet["avg_updated"],
+#                 max_updated=subnet["max_updated"],
+#                 chk_fraction=subnet["chk_fraction"],
+#                 chk_vtrust=subnet["chk_vtrust"],
+#                 chk_updated=subnet["chk_updated"],
+#                 child_hotkey_data=subnet["child_hotkey_data"])
 
 
-class SubnetDataFromJson(SubnetDataBase):
-    def __init__(self, json_file, host, port, username, ssh_key_path, password, debug):
-        self._json_file = json_file
-        self._host = host
-        self._port = port
-        self._username = username
-        self._ssh_key_path = ssh_key_path
-        self._password = password
+# class SubnetDataFromJson(SubnetDataBase):
+#     def __init__(self, json_file, host, port, username, ssh_key_path, password, debug):
+#         self._json_file = json_file
+#         self._host = host
+#         self._port = port
+#         self._username = username
+#         self._ssh_key_path = ssh_key_path
+#         self._password = password
 
-        super(SubnetDataFromJson, self).__init__(debug)
+#         super(SubnetDataFromJson, self).__init__(debug)
 
-    def _get_subnet_data(self):
-        import paramiko
+#     def _get_subnet_data(self):
+#         import paramiko
 
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+#         client = paramiko.SSHClient()
+#         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-        if self._ssh_key_path:
-            ssh_key = paramiko.RSAKey.from_private_key_file(self._ssh_key_path)
-            auth_arg = {"pkey": ssh_key}
-        else:
-            auth_arg = {"password": self._password}
-        client.connect(
-            self._host,
-            port=self._port,
-            username=self._username,
-            **auth_arg)
+#         if self._ssh_key_path:
+#             ssh_key = paramiko.RSAKey.from_private_key_file(self._ssh_key_path)
+#             auth_arg = {"pkey": ssh_key}
+#         else:
+#             auth_arg = {"password": self._password}
+#         client.connect(
+#             self._host,
+#             port=self._port,
+#             username=self._username,
+#             **auth_arg)
 
-        stdin, stdout, stderr = client.exec_command(f"cat {self._json_file}")
-        json_str = stdout.read().decode()
+#         stdin, stdout, stderr = client.exec_command(f"cat {self._json_file}")
+#         json_str = stdout.read().decode()
 
-        stdin.close()
-        stdout.close()
-        stderr.close()
-        client.close()
-        subnets_data = json.loads(json_str)
-        for subnet in subnets_data.values():
-            self._validator_data[subnet["netuid"]] = self.ValidatorData(
-                netuid=subnet["netuid"],
-                subnet_emission=subnet["subnet_emission"],
-                subnet_tempo=subnet["subnet_tempo"],
-                num_total_validators=subnet["num_total_validators"],
-                num_valid_validators=subnet["num_valid_validators"],
-                rizzo_stake_rank=subnet["rizzo_stake_rank"],
-                rizzo_emission=subnet["rizzo_emission"],
-                rizzo_vtrust=subnet["rizzo_vtrust"],
-                max_vtrust=subnet["max_vtrust"],
-                avg_vtrust=subnet["avg_vtrust"],
-                min_vtrust=subnet["min_vtrust"],
-                rizzo_updated=subnet["rizzo_updated"],
-                min_updated=subnet["min_updated"],
-                avg_updated=subnet["avg_updated"],
-                max_updated=subnet["max_updated"],
-                chk_fraction=subnet["chk_fraction"],
-                chk_vtrust=subnet["chk_vtrust"],
-                chk_updated=subnet["chk_updated"],
-                child_hotkey_data=subnet["child_hotkey_data"])
+#         stdin.close()
+#         stdout.close()
+#         stderr.close()
+#         client.close()
+#         subnets_data = json.loads(json_str)
+#         for subnet in subnets_data.values():
+#             self._validator_data[subnet["netuid"]] = self.ValidatorData(
+#                 netuid=subnet["netuid"],
+#                 subnet_emission=subnet["subnet_emission"],
+#                 subnet_tempo=subnet["subnet_tempo"],
+#                 num_total_validators=subnet["num_total_validators"],
+#                 num_valid_validators=subnet["num_valid_validators"],
+#                 rizzo_stake_rank=subnet["rizzo_stake_rank"],
+#                 rizzo_emission=subnet["rizzo_emission"],
+#                 rizzo_vtrust=subnet["rizzo_vtrust"],
+#                 max_vtrust=subnet["max_vtrust"],
+#                 avg_vtrust=subnet["avg_vtrust"],
+#                 min_vtrust=subnet["min_vtrust"],
+#                 rizzo_updated=subnet["rizzo_updated"],
+#                 min_updated=subnet["min_updated"],
+#                 avg_updated=subnet["avg_updated"],
+#                 max_updated=subnet["max_updated"],
+#                 chk_fraction=subnet["chk_fraction"],
+#                 chk_vtrust=subnet["chk_vtrust"],
+#                 chk_updated=subnet["chk_updated"],
+#                 child_hotkey_data=subnet["child_hotkey_data"])

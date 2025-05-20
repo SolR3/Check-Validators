@@ -11,12 +11,10 @@ from subnet_constants import (
 )
 
 class SubnetDataPrinter:
-    def __init__(self, subnet_data_class, *args):
-        self._netuids = None
-        self._validator_data = subnet_data_class(*args).validator_data
-
-    def set_netuids(self, netuids):
+    def __init__(self, subnet_data_class, netuids, chk_only, *subnet_data_args):
         self._netuids = netuids
+        self._chk_only = chk_only
+        self._validator_data = subnet_data_class(*subnet_data_args).validator_data
 
     @staticmethod
     def _get_vtrust_status(vtrust, avg_vtrust):
@@ -70,6 +68,9 @@ class SubnetDataPrinter:
                 continue
 
             validator_data = self._validator_data[netuid]
+
+            if self._chk_only and not validator_data.child_hotkey_data:
+                continue
 
             if validator_data.rizzo_emission is not None:
                 total_emission += validator_data.rizzo_emission
