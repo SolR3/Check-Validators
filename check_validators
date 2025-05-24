@@ -121,6 +121,6 @@ if __name__ == "__main__":
 
     # Import local subnet_data module
     from subnet_data import SubnetData
-    from subnet_printer import SubnetDataPrinter
+    from subnet_status_printer import SubnetDataPrinter
 
     main(options)
