@@ -29,12 +29,13 @@ class SubnetDataPrinter:
 
         # Loop through all subnets and print out
         # their vtrust and updated data.
-        if self._netuids is not None:
+        if self._netuids:
             netuids = (sorted(self._netuids, key=sort_key)
                        if sort_subnets else self._netuids)
         else:
             netuids = (sorted(self._validator_data, key=sort_key)
                        if sort_subnets else self._validator_data.keys())
+
         for netuid in netuids:
             if netuid not in self._validator_data:
                 missing_data.append(str(netuid))
@@ -157,25 +158,38 @@ class TablePrinter(RichPrinter):
             chk_vtrust_value = f"{chk_vtrust_value} ({chk_fraction_value}%)"
 
         columns = [
-            Text(f"{validator_data.netuid}",
-                 style=self._get_style(
-                     max(rizzo_vtrust_status, rizzo_updated_status))),
+            Text(
+                str(validator_data.netuid),
+                style=self._get_style(
+                    max(rizzo_vtrust_status, rizzo_updated_status)
+                )
+            ),
             Text(f"{validator_data.subnet_emission:.2f}%"),
             # Text(rizzo_stake_rank),
             # Text(self._get_float_value(validator_data.rizzo_emission, True)),
-            Text(f"{validator_data.num_valid_validators:<2}  "
-                 f"({validator_data.num_total_validators})"),
-            Text(chk_vtrust_value,
-                 style=self._get_style(chk_vtrust_status)),
-            Text(rizzo_vtrust_value,
-                 style=self._get_style(rizzo_vtrust_status)),
+            Text(
+                f"{validator_data.num_valid_validators:<2}  "
+                f"({validator_data.num_total_validators})"
+            ),
+            Text(
+                chk_vtrust_value,
+                style=self._get_style(chk_vtrust_status)
+            ),
+            Text(
+                rizzo_vtrust_value,
+                style=self._get_style(rizzo_vtrust_status)
+            ),
             Text(self._get_float_value(validator_data.max_vtrust, True)),
             Text(self._get_float_value(validator_data.avg_vtrust, True)),
             Text(self._get_float_value(validator_data.min_vtrust, True)),
-            Text(self._get_int_value(validator_data.chk_updated, False),
-                 style=self._get_style(chk_updated_status)),
-            Text(self._get_int_value(validator_data.rizzo_updated, True),
-                 style=self._get_style(rizzo_updated_status)),
+            Text(
+                self._get_int_value(validator_data.chk_updated, False),
+                style=self._get_style(chk_updated_status)
+            ),
+            Text(
+                self._get_int_value(validator_data.rizzo_updated, True),
+                style=self._get_style(rizzo_updated_status)
+            ),
             Text(self._get_int_value(validator_data.min_updated, True)),
             Text(self._get_int_value(validator_data.avg_updated, True)),
             Text(self._get_int_value(validator_data.max_updated, True)),

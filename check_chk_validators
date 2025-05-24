@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# bittensor import
+# import bittensor
+
 # standard imports
 import argparse
 import os
@@ -33,12 +36,6 @@ def _parse_args():
         type=int,
         help="When specified, the list of netuids are checked. When not "
              "specified, all subnets are checked.")
-    
-    parser.add_argument(
-        "-c", "--chk-only",
-        action="store_true",
-        help="When specified, only subnets in which we are child-hotkeying "
-             "are displayed. When not specified, all subnets are displayed.")
 
     parser.add_argument(
         "-t", "--threads",
@@ -81,18 +78,13 @@ def main(options):
 
     start_time = time.time()
     subnet_data_printer = SubnetDataPrinter(
-        SubnetData, netuids, options.chk_only,  # args for SubnetDataPrinter (this is very dumb)
+        SubnetData, netuids,  # args for SubnetDataPrinter (this is very dumb)
         netuids, network, options.threads, True, options.hotkey  # args for SubnetData (this is very dumb)
     )
     total_time = time.time() - start_time
 
     sort_subnets = not bool(options.subnets)
-    print_total_emission = not bool(options.subnets)
-    subnet_data_printer.print_validator_data(
-        sort_subnets,
-        print_total_emission,
-        options.vali_name
-    )
+    subnet_data_printer.print_validator_data(sort_subnets, options.vali_name)
 
     print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
 
@@ -105,6 +97,6 @@ if __name__ == "__main__":
 
     # Import local subnet_data module
     from subnet_data import SubnetData
-    from subnet_status_printer import SubnetDataPrinter
+    from subnet_chk_printer import SubnetDataPrinter
 
     main(options)
