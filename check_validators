@@ -92,7 +92,7 @@ def main(options):
     total_time = time.time() - start_time
 
     sort_subnets = not bool(options.subnets)
-    print_total_emission = not bool(options.subnets)
+    print_total_emission = not (options.chk_only or bool(options.subnets))
     subnet_data_printer.print_validator_data(
         sort_subnets,
         print_total_emission,
