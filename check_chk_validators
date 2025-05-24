@@ -54,6 +54,11 @@ def _parse_args():
         default="Rizzo",
         help="Specify a different validator name in the table printout.")
 
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Print verbose debug output.")
+
     return parser.parse_args()
 
 
@@ -79,7 +84,7 @@ def main(options):
     start_time = time.time()
     subnet_data_printer = SubnetDataPrinter(
         SubnetData, netuids,  # args for SubnetDataPrinter (this is very dumb)
-        netuids, network, options.threads, True, options.hotkey  # args for SubnetData (this is very dumb)
+        netuids, network, options.threads, options.verbose, options.hotkey  # args for SubnetData (this is very dumb)
     )
     total_time = time.time() - start_time
 
