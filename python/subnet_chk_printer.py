@@ -8,12 +8,18 @@ from subnet_printer_base import RichPrinterBase
 
 
 class SubnetDataPrinter:
-    def __init__(self, subnet_data_class, netuids, *subnet_data_args):
+    def __init__(self, subnet_data_class, netuids, pending, *subnet_data_args):
         self._netuids = netuids
+        self._pending = pending
         self._validator_data = subnet_data_class(*subnet_data_args).validator_data
 
     def print_validator_data(self, sort_subnets=True, vali_name=None):
-        printer = TablePrinter(vali_name)
+        if self._pending:
+            printer = PendingCHKTablePrinter(vali_name)
+            child_hotkey_attr = "pending_child_hotkey_data"
+        else:
+            printer = CHKTablePrinter(vali_name)
+            child_hotkey_attr = "child_hotkey_data"
 
         def sort_key(netuid):
             sort_key = self._validator_data[netuid].subnet_emission
@@ -39,7 +45,7 @@ class SubnetDataPrinter:
 
             validator_data = self._validator_data[netuid]
 
-            if not validator_data.child_hotkey_data:
+            if not getattr(validator_data, child_hotkey_attr):
                 if self._netuids:
                     no_chk_subntets.append(str(netuid))
                 continue
@@ -80,6 +86,8 @@ class RichPrinter(RichPrinterBase):
 
 
 class TablePrinter(RichPrinter):
+    _table_title_suffix = None  # This is defined in subclassess
+    _child_hotkey_attr = None  # This is defined in subclassess
     reverse_sort = True
 
     def __init__(self, vali_name):
@@ -88,23 +96,29 @@ class TablePrinter(RichPrinter):
         if vali_name is None:
             vali_name = "Rizzo"
 
-        self._table = Table(title=f"{vali_name} CHK")
-        self._table.add_column(
-            "Subnet", justify="left", no_wrap=True)
-        self._table.add_column(
-            "Subnet E", justify="left", no_wrap=True)
-        self._table.add_column(
-            "CHK %", justify="left", no_wrap=True)
-        self._table.add_column(
-            "Take %", justify="left", no_wrap=True)
-        self._table.add_column(
-            "vTrust", justify="left", no_wrap=True)
-        self._table.add_column(
-            "Updated", justify="left", no_wrap=True)
-        self._table.add_column(
-            "Hotkey", justify="left", no_wrap=True)
+        table_title = f"{vali_name} " + self._table_title_suffix
+        self._table = Table(title=table_title)
+        for column_header in self._get_column_headers():
+            self._table.add_column(column_header, justify="left", no_wrap=True)
+
+    def _get_column_headers(self):
+        column_headers = [
+            "Subnet",
+            "Subnet E",
+            "CHK %",
+            "Take %",
+            "vTrust",
+            "Updated",
+            "Hotkey"
+        ]
+
+        return column_headers
 
     def update_printout(self, validator_data):
+        row_columns = self._get_row(validator_data)
+        self._table.add_row(*row_columns)
+
+    def _get_row(self, validator_data):
         row_status = 0
         chk_percents = []
         chk_hotkeys = []
@@ -112,7 +126,7 @@ class TablePrinter(RichPrinter):
         chk_vtrusts = []
         chk_updateds = []
         epsilon = 1e-5
-        for child_hotkey in validator_data.child_hotkey_data:
+        for child_hotkey in getattr(validator_data, self._child_hotkey_attr):
             hotkey_vtrust_status = self._get_vtrust_status(
                 child_hotkey.vtrust, validator_data.avg_vtrust
             )
@@ -157,7 +171,7 @@ class TablePrinter(RichPrinter):
         chk_updateds.pop()
         chk_hotkeys.pop()
 
-        columns = [
+        row_columns = [
             Text(
                 str(validator_data.netuid),
                 style=self._get_style(row_status)
@@ -169,8 +183,42 @@ class TablePrinter(RichPrinter):
             Text.assemble(*chk_updateds),
             Text.assemble(*chk_hotkeys),
         ]
-        self._table.add_row(*columns)
+        
+        return row_columns
 
     def print_everything(self):
         self._console.print(self._table)
         super().print_everything()
+
+
+class CHKTablePrinter(TablePrinter):
+    _table_title_suffix = "CHK"
+    _child_hotkey_attr = "child_hotkey_data"
+
+
+class PendingCHKTablePrinter(TablePrinter):
+    _table_title_suffix = "Pending CHK"
+    _child_hotkey_attr = "pending_child_hotkey_data"
+
+    def _get_column_headers(self):
+        column_headers = super()._get_column_headers()
+        column_headers.insert(-1, "Pending Time")
+
+        return column_headers
+
+    def _get_row(self, validator_data):
+        row_columns = super()._get_row(validator_data)
+
+        def format_time(s):
+            h = s / 3600
+            hours = int(h)
+            minutes = round((h - hours) * 60)
+            time_tuple = [f"{hours}h"] if hours else []
+            if minutes or not hours:
+                time_tuple.append(f"{minutes}m")
+            return ",".join(time_tuple)
+
+        chk_pending_time = format_time(validator_data.chk_pending_time)
+        row_columns.insert(-1, Text(chk_pending_time))
+
+        return row_columns

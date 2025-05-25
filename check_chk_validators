@@ -14,7 +14,7 @@ sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 
 
 def _parse_args():
-    
+
     class ThreadsAction(argparse.Action):       
         def __call__(self, parser, namespace, values, option_string=None):
             if values < 0:
@@ -36,6 +36,11 @@ def _parse_args():
         type=int,
         help="When specified, the list of netuids are checked. When not "
              "specified, all subnets are checked.")
+
+    parser.add_argument(
+        "-p", "--pending",
+        action="store_true",
+        help="When specified, print data for pending CHK hotkeys.")
 
     parser.add_argument(
         "-t", "--threads",
@@ -66,10 +71,10 @@ def format_time(total_time):
     m = total_time/60
     minutes = int(m)
     seconds = round((m - minutes)*60)
-    
+
     runtime_text = f"{minutes} minutes, " if minutes else ""
     runtime_text += f"{seconds} seconds"
-    
+
     return runtime_text
 
 
@@ -83,13 +88,13 @@ def main(options):
 
     start_time = time.time()
     subnet_data_printer = SubnetDataPrinter(
-        SubnetData, netuids,  # args for SubnetDataPrinter (this is very dumb)
+        SubnetData, netuids, options.pending,  # args for SubnetDataPrinter (this is very dumb)
         netuids, network, options.threads, options.verbose, options.hotkey  # args for SubnetData (this is very dumb)
     )
     total_time = time.time() - start_time
 
-    sort_subnets = not bool(options.subnets)
-    subnet_data_printer.print_validator_data(sort_subnets, options.vali_name)
+    # sort_subnets = not bool(options.subnets)
+    subnet_data_printer.print_validator_data(False, options.vali_name)
 
     print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
 

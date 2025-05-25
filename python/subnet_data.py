@@ -39,7 +39,10 @@ class SubnetDataBase:
         "chk_fraction",
         "chk_vtrust",
         "chk_updated",
+        "chk_pending_block",
+        "chk_pending_time",
         "child_hotkey_data",
+        "pending_child_hotkey_data",
         ]
     )
     ChildHotkeyData = namedtuple(
@@ -152,50 +155,101 @@ class SubnetData(SubnetDataBase):
 
             # Get the list of child hotkeys for each netuid
             children = await asyncio.gather(
-                *[subtensor.get_children(netuid=netuid, hotkey=self.hotkey) for netuid in netuids]
+                *[
+                    subtensor.get_children(netuid=netuid, hotkey=self.hotkey)
+                    for netuid in netuids
+                ]
+            )
+
+            # Get the list of pending child hotkeys for each netuid
+            children_pending = await asyncio.gather(
+                *[
+                    subtensor.get_children_pending(netuid=netuid, hotkey=self.hotkey)
+                    for netuid in netuids
+                ]
             )
 
             # Get the metagraph for each netuid
             metagraphs = await asyncio.gather(
-                *[subtensor.metagraph(netuid=netuid, block=block) for netuid in netuids]
+                *[
+                    subtensor.metagraph(netuid=netuid, block=block)
+                    for netuid in netuids
+                ]
             )
 
             # Get the take for each child hotkey on each netuid.
-            chk_take_func_calls = []
-            chk_take_dict = {}
-            func_call_index = 0
-            for i, netuid in enumerate(netuids):
-                success, child_hotkeys, msg = children[i]
-                if not success:
-                    self._print_debug(
-                        f"Failed to obtain child hotkeys from netuid {netuid}: {msg}"
-                    )
-                for _, child_hotkey in child_hotkeys:
-                    chk_take_func_calls.append(
-                        subtensor.substrate.query(
-                            module="SubtensorModule",
-                            storage_function="ChildkeyTake",
-                            params=[child_hotkey, netuid]
-                        )
-                    )
-                    chk_take_dict.setdefault(netuid, []).append(func_call_index)
-                    func_call_index += 1
-            all_child_takes = (
-                [u16_normalized_float(r.value) for r in await asyncio.gather(*chk_take_func_calls)]
-                if chk_take_func_calls else []
+            chk_takes_dict = await self._get_child_hotkey_take_data(
+                subtensor, netuids, children, False
             )
+
+            # Get the take for each pending child hotkey on each netuid.
+            chk_takes_pending_dict = await self._get_child_hotkey_take_data(
+                subtensor, netuids, children_pending, True
+            )
+
+            # Get all of the rest of the data from the metagraph.
             for i, netuid in enumerate(netuids):
-                child_hotkeys = children[i][1]
                 metagraph = metagraphs[i]
-                cti = chk_take_dict.get(netuid)
-                child_takes = all_child_takes[cti[0]:cti[-1]+1] if cti else []
-                self._get_data_from_metagraph(metagraph, netuid, child_hotkeys, child_takes , block)
+                child_hotkeys = children[i][1]
+                child_takes = chk_takes_dict.get(netuid, [])
+                child_hotkeys_pending, chk_pending_block = children_pending[i]
+                child_takes_pending = chk_takes_pending_dict.get(netuid, [])
+                self._get_data_from_metagraph(
+                    metagraph, netuid, child_hotkeys, child_takes,
+                    child_hotkeys_pending, child_takes_pending,
+                    block, chk_pending_block
+                )
 
         total_time = time.time() - start_time
         self._print_debug(f"\nData gathered in {int(total_time)} seconds "
                           f"for subnets: {netuids}.")
 
-    def _get_data_from_metagraph(self, metagraph, netuid, child_hotkeys, child_takes, current_block):
+    async def _get_child_hotkey_take_data(
+            self, subtensor, netuids, children, do_pending
+    ):
+        # Get the take for each child hotkey on each netuid.
+        chk_take_func_calls = []
+        chk_take_funcs_dict = {}
+        chk_takes_dict = {}
+        func_call_index = 0
+        for i, netuid in enumerate(netuids):
+            if do_pending:
+                child_hotkeys, _ = children[i]
+            else:
+                success, child_hotkeys, msg = children[i]
+                if not success:
+                    self._print_debug(
+                        f"Failed to obtain child hotkeys from netuid {netuid}: {msg}"
+                    )
+
+            chk_take_funcs_dict[netuid] = []
+            for _, child_hotkey in child_hotkeys:
+                chk_take_func_calls.append(
+                    subtensor.substrate.query(
+                        module="SubtensorModule",
+                        storage_function="ChildkeyTake",
+                        params=[child_hotkey, netuid]
+                    )
+                )
+                chk_take_funcs_dict[netuid].append(func_call_index)
+                func_call_index += 1
+        all_child_takes = (
+            [u16_normalized_float(r.value) for r in await asyncio.gather(*chk_take_func_calls)]
+            if chk_take_func_calls else []
+        )
+
+        # Massage the child take data to make it easier to obtain later on.
+        for i, netuid in enumerate(netuids):
+            cti = chk_take_funcs_dict.get(netuid)
+            chk_takes_dict[netuid] = all_child_takes[cti[0]:cti[-1]+1] if cti else []
+
+        return chk_takes_dict
+
+    def _get_data_from_metagraph(
+            self, metagraph, netuid, child_hotkeys, child_takes,
+            child_hotkeys_pending, child_takes_pending,
+            current_block, chk_pending_block
+    ):
         # Get emission percentage for the subnet.
         subnet_emission = metagraph.emissions.tao_in_emission * 100
 
@@ -262,6 +316,34 @@ class SubnetData(SubnetDataBase):
 
             chk_vtrust /= chk_fraction
 
+        # Get pending child hotkey data
+        pending_child_hotkey_data = []
+        if len(child_hotkeys_pending) == 0:
+            chk_pending_block = None
+            chk_pending_time = None
+        else:
+            chk_pending_time = (chk_pending_block - current_block) * 12
+            for i, (child_fraction, child_hotkey) in enumerate(child_hotkeys_pending):
+                child_take = child_takes_pending[i]
+                try:
+                    child_uid = metagraph.hotkeys.index(child_hotkey)
+                except ValueError:
+                    child_vtrust = None
+                    child_updated = None
+                else:
+                    child_vtrust = metagraph.Tv[child_uid]
+                    child_updated = current_block - metagraph.last_update[child_uid]
+
+                pending_child_hotkey_data.append(
+                    self.ChildHotkeyData(
+                        fraction=child_fraction,
+                        hotkey=child_hotkey,
+                        take=child_take,
+                        vtrust=child_vtrust,
+                        updated=child_updated,
+                    )
+                )
+
         # Get all validator uids that have valid stake amount
         all_uids = [
             i for (i, s) in enumerate(metagraph.S)
@@ -327,7 +409,10 @@ class SubnetData(SubnetDataBase):
                 chk_fraction=chk_fraction,
                 chk_vtrust=chk_vtrust,
                 chk_updated=chk_updated,
+                chk_pending_block=chk_pending_block,
+                chk_pending_time=chk_pending_time,
                 child_hotkey_data=child_hotkey_data,
+                pending_child_hotkey_data=pending_child_hotkey_data,
             )
 
 
