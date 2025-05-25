@@ -8,15 +8,21 @@ from subnet_printer_base import RichPrinterBase
 
 
 class SubnetDataPrinter:
-    def __init__(self, subnet_data_class, netuids, chk_only, *subnet_data_args):
+    def __init__(
+            self, subnet_data_class,
+            netuids, chk_only, sort_subnets,
+            print_total_emission, vali_name,
+            *subnet_data_args
+        ):
         self._netuids = netuids
         self._chk_only = chk_only
+        self._sort_subnets = sort_subnets
+        self._print_total_emission = print_total_emission
+        self._vali_name = vali_name
         self._validator_data = subnet_data_class(*subnet_data_args).validator_data
 
-    def print_validator_data(
-            self, sort_subnets=True, print_total_emission=True, vali_name=None
-        ):
-        printer = TablePrinter(vali_name)
+    def print_validator_data(self):
+        printer = TablePrinter(self._vali_name)
 
         def sort_key(netuid):
             sort_key = self._validator_data[netuid].subnet_emission
@@ -31,10 +37,10 @@ class SubnetDataPrinter:
         # their vtrust and updated data.
         if self._netuids:
             netuids = (sorted(self._netuids, key=sort_key)
-                       if sort_subnets else self._netuids)
+                       if self._sort_subnets else self._netuids)
         else:
             netuids = (sorted(self._validator_data, key=sort_key)
-                       if sort_subnets else self._validator_data.keys())
+                       if self._sort_subnets else self._validator_data.keys())
 
         for netuid in netuids:
             if netuid not in self._validator_data:
@@ -54,7 +60,7 @@ class SubnetDataPrinter:
         # Print extra stuff
         printer.add_extra_printout(
             missing_data,
-            total_emission if print_total_emission else None
+            total_emission if self._print_total_emission else None
         )
         
         # Print everything

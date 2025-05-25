@@ -85,17 +85,17 @@ def main(options):
         else "finney"
     )
     netuids = options.subnets or bittensor.subtensor(network=network).get_subnets()[1:]
+    # sort_subnets = not bool(options.subnets)
 
     start_time = time.time()
     subnet_data_printer = SubnetDataPrinter(
-        SubnetData, netuids, options.pending,  # args for SubnetDataPrinter (this is very dumb)
+        SubnetData,
+        netuids, options.pending, False, options.vali_name,  # args for SubnetDataPrinter (this is very dumb)
         netuids, network, options.threads, options.verbose, options.hotkey  # args for SubnetData (this is very dumb)
     )
     total_time = time.time() - start_time
 
-    # sort_subnets = not bool(options.subnets)
-    subnet_data_printer.print_validator_data(False, options.vali_name)
-
+    subnet_data_printer.print_validator_data()
     print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
 
 

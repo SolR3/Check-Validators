@@ -8,17 +8,23 @@ from subnet_printer_base import RichPrinterBase
 
 
 class SubnetDataPrinter:
-    def __init__(self, subnet_data_class, netuids, pending, *subnet_data_args):
+    def __init__(
+            self, subnet_data_class,
+            netuids, pending, sort_subnets, vali_name,
+            *subnet_data_args
+        ):
         self._netuids = netuids
         self._pending = pending
+        self._sort_subnets = sort_subnets
+        self._vali_name = vali_name
         self._validator_data = subnet_data_class(*subnet_data_args).validator_data
 
-    def print_validator_data(self, sort_subnets=True, vali_name=None):
+    def print_validator_data(self):
         if self._pending:
-            printer = PendingCHKTablePrinter(vali_name)
+            printer = PendingCHKTablePrinter(self._vali_name)
             child_hotkey_attr = "pending_child_hotkey_data"
         else:
-            printer = CHKTablePrinter(vali_name)
+            printer = CHKTablePrinter(self._vali_name)
             child_hotkey_attr = "child_hotkey_data"
 
         def sort_key(netuid):
@@ -33,10 +39,10 @@ class SubnetDataPrinter:
         # Loop through all subnets and print out their CHK data.
         if self._netuids:
             netuids = (sorted(self._netuids, key=sort_key)
-                       if sort_subnets else self._netuids)
+                       if self._sort_subnets else self._netuids)
         else:
             netuids = (sorted(self._validator_data, key=sort_key)
-                       if sort_subnets else self._validator_data.keys())
+                       if self._sort_subnets else self._validator_data.keys())
 
         for netuid in netuids:
             if netuid not in self._validator_data:
