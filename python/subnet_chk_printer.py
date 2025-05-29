@@ -22,10 +22,10 @@ class SubnetDataPrinter:
     def print_validator_data(self):
         if self._pending:
             printer = PendingCHKTablePrinter(self._vali_name)
-            child_hotkey_attr = "pending_child_hotkey_data"
+            chk_test_attr = "chk_pending_block"
         else:
             printer = CHKTablePrinter(self._vali_name)
-            child_hotkey_attr = "child_hotkey_data"
+            chk_test_attr = "chk_fraction"
 
         def sort_key(netuid):
             sort_key = self._validator_data[netuid].subnet_emission
@@ -51,7 +51,7 @@ class SubnetDataPrinter:
 
             validator_data = self._validator_data[netuid]
 
-            if not getattr(validator_data, child_hotkey_attr):
+            if not getattr(validator_data, chk_test_attr):
                 if self._netuids:
                     no_chk_subntets.append(str(netuid))
                 continue
@@ -132,7 +132,17 @@ class TablePrinter(RichPrinter):
         chk_vtrusts = []
         chk_updateds = []
         epsilon = 1e-5
-        for child_hotkey in getattr(validator_data, self._child_hotkey_attr):
+        
+        child_hotkey_data = getattr(validator_data, self._child_hotkey_attr)
+
+        if not child_hotkey_data:
+            chk_percents = ["---", "\n"]
+            chk_hotkeys = ["---", "\n"]
+            chk_takes = ["---", "\n"]
+            chk_vtrusts = ["---", "\n"]
+            chk_updateds = ["---", "\n"]
+
+        for child_hotkey in child_hotkey_data:
             hotkey_vtrust_status = self._get_vtrust_status(
                 child_hotkey.vtrust, validator_data.avg_vtrust
             )

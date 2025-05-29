@@ -318,7 +318,7 @@ class SubnetData(SubnetDataBase):
 
         # Get pending child hotkey data
         pending_child_hotkey_data = []
-        if len(child_hotkeys_pending) == 0:
+        if chk_pending_block == 0:
             chk_pending_block = None
             chk_pending_time = None
         else:
