@@ -45,6 +45,28 @@ class RichPrinterBase:
         if (avg_vtrust - vtrust) > VTRUST_WARNING_THRESHOLD:
             return 1
         return 0
+    
+    @staticmethod
+    def _get_chk_vtrust_status(vtrust, avg_vtrust):
+        if avg_vtrust is None:
+            return 1
+        if vtrust is None:
+            return 2
+        if vtrust < 0.9:
+            return 2
+        if vtrust < 0.95:
+            return 1
+        return 0
+    
+    @staticmethod
+    def _get_rt21_vtrust_gap_status(vtrust_gap):
+        if vtrust_gap is None:
+            return 0
+        if vtrust_gap > 0.2:
+            return 2
+        if vtrust_gap > 0.05:
+            return 1
+        return 0
 
     @staticmethod
     def _get_updated_status(updated, avg_updated):

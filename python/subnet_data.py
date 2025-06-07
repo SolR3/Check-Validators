@@ -29,6 +29,8 @@ class SubnetDataBase:
         "rizzo_stake_rank",
         "rizzo_emission",
         "rizzo_vtrust",
+        "rt21_vtrust",
+        "rt21_vtrust_gap",
         "max_vtrust",
         "avg_vtrust",
         "min_vtrust",
@@ -73,6 +75,7 @@ class SubnetDataBase:
 
 class SubnetData(SubnetDataBase):
     _rizzo_hotkey = "5F2CsUDVbRbVMXTh9fAzF9GacjVX7UapvRxidrxe7z8BYckQ"
+    _rt21_hotkey = "5FFApaS75bv5pJHfAp2FVLBj9ZaXuFDjEypsaBNc1wCfe52v"
 
     def __init__(self, netuids, network, threads, debug, other_hotkey=None):
         self._netuids = netuids
@@ -367,6 +370,19 @@ class SubnetData(SubnetDataBase):
             ):
                 num_valid_validators += 1
 
+        # Get rt21 vTrust
+        try:
+            rt21_uid = metagraph.hotkeys.index(self._rt21_hotkey)
+        except ValueError:
+            rt21_vtrust = None
+        else:
+            rt21_vtrust = metagraph.Tv[rt21_uid]
+        rt21_vtrust_gap = (
+            rt21_vtrust - rizzo_vtrust
+            if rt21_vtrust is not None and rizzo_vtrust is not None
+            else None
+        )
+
         # Get other validator data
         if not valid_uids:
             max_vtrust = None
@@ -399,6 +415,8 @@ class SubnetData(SubnetDataBase):
                 rizzo_stake_rank=rizzo_stake_rank,
                 rizzo_emission=rizzo_emission,
                 rizzo_vtrust=rizzo_vtrust,
+                rt21_vtrust=rt21_vtrust,
+                rt21_vtrust_gap=rt21_vtrust_gap,
                 max_vtrust=max_vtrust,
                 avg_vtrust=avg_vtrust,
                 min_vtrust=min_vtrust,

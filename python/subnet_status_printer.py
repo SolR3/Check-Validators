@@ -118,6 +118,8 @@ class TablePrinter(RichPrinter):
         self._table.add_column(
             f"{vali_name} vT", justify="left", no_wrap=True)
         self._table.add_column(
+            "Rt21 vT Gap", justify="left", no_wrap=True)
+        self._table.add_column(
             "Max vT", justify="left", no_wrap=True)
         self._table.add_column(
             "Avg vT", justify="left", no_wrap=True)
@@ -142,11 +144,15 @@ class TablePrinter(RichPrinter):
             validator_data.rizzo_updated, validator_data.avg_updated
         )
 
-        chk_vtrust_status = self._get_vtrust_status(
+        chk_vtrust_status = self._get_chk_vtrust_status(
             validator_data.chk_vtrust, validator_data.avg_vtrust
         )
         chk_updated_status = self._get_updated_status(
             validator_data.chk_updated, validator_data.avg_updated
+        )
+
+        rt21_vtrust_gap_status = self._get_rt21_vtrust_gap_status(
+            validator_data.rt21_vtrust_gap
         )
 
         # if validator_data.rizzo_stake_rank is None:
@@ -163,18 +169,25 @@ class TablePrinter(RichPrinter):
             chk_fraction_value = int(round(validator_data.chk_fraction * 100))
             chk_vtrust_value = f"{chk_vtrust_value} ({chk_fraction_value}%)"
 
+        rt21_vtrust_gap_value = self._get_float_value(
+            validator_data.rt21_vtrust_gap, False
+        )
+        if rt21_vtrust_gap_value:
+            rt21_vtrust_value = self._get_float_value(validator_data.rt21_vtrust, False)
+            rt21_vtrust_gap_value = f"{rt21_vtrust_gap_value:>6} ({rt21_vtrust_value})"
+
         columns = [
             Text(
                 str(validator_data.netuid),
                 style=self._get_style(
-                    max(rizzo_vtrust_status, rizzo_updated_status)
+                    max(rizzo_vtrust_status, rizzo_updated_status, rt21_vtrust_gap_status)
                 )
             ),
             Text(f"{validator_data.subnet_emission:.2f}%"),
             # Text(rizzo_stake_rank),
             # Text(self._get_float_value(validator_data.rizzo_emission, True)),
             Text(
-                f"{validator_data.num_valid_validators:<2}  "
+                f"{validator_data.num_valid_validators:>2}  "
                 f"({validator_data.num_total_validators})"
             ),
             Text(
@@ -184,6 +197,10 @@ class TablePrinter(RichPrinter):
             Text(
                 rizzo_vtrust_value,
                 style=self._get_style(rizzo_vtrust_status)
+            ),
+            Text(
+                rt21_vtrust_gap_value,
+                style=self._get_style(rt21_vtrust_gap_status)
             ),
             Text(self._get_float_value(validator_data.max_vtrust, True)),
             Text(self._get_float_value(validator_data.avg_vtrust, True)),
