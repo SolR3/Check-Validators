@@ -74,7 +74,7 @@ class SubnetDataBase:
 
 
 class SubnetData(SubnetDataBase):
-    _rizzo_hotkey = "5F2CsUDVbRbVMXTh9fAzF9GacjVX7UapvRxidrxe7z8BYckQ"
+    _rizzo_hotkey = "5GduQSUxNJ4E3ReCDoPDtoHHgeoE4yHmnnLpUXBz9DAwmHWV"
     _rt21_hotkey = "5DhTjxp58wqoJ1zTdbVYUcw3pogSJVrTAtQedBtrAKF4Px65"
 
     def __init__(self, netuids, network, threads, debug, other_hotkey=None):
