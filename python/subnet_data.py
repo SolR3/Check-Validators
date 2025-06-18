@@ -75,7 +75,7 @@ class SubnetDataBase:
 
 class SubnetData(SubnetDataBase):
     _rizzo_hotkey = "5GduQSUxNJ4E3ReCDoPDtoHHgeoE4yHmnnLpUXBz9DAwmHWV"
-    _rt21_hotkey = "5DhTjxp58wqoJ1zTdbVYUcw3pogSJVrTAtQedBtrAKF4Px65"
+    _rt21_coldkey = "5GZSAgaVGQqegjhEkxpJjpSVLVmNnE2vx2PFLzr7kBBMKpGQ"
 
     def __init__(self, netuids, network, threads, debug, other_hotkey=None):
         self._netuids = netuids
@@ -372,7 +372,7 @@ class SubnetData(SubnetDataBase):
 
         # Get rt21 vTrust
         try:
-            rt21_uid = metagraph.hotkeys.index(self._rt21_hotkey)
+            rt21_uid = metagraph.coldkeys.index(self._rt21_coldkey)
         except ValueError:
             rt21_vtrust = None
         else:
