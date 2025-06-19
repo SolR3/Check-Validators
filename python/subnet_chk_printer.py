@@ -143,7 +143,7 @@ class TablePrinter(RichPrinter):
             chk_updateds = ["---", "\n"]
 
         for child_hotkey in child_hotkey_data:
-            hotkey_vtrust_status = self._get_vtrust_status(
+            hotkey_vtrust_status = self._get_chk_vtrust_status(
                 child_hotkey.vtrust, validator_data.avg_vtrust
             )
             hotkey_updated_status = self._get_updated_status(
