@@ -171,12 +171,14 @@ class TablePrinter(RichPrinter):
                 [(f"{hotkey_take}%", self._get_style(hotkey_take_status)), "\n"]
             )
 
+            hotkey_vtrust = self._get_float_value(child_hotkey.vtrust, True)
             chk_vtrusts.extend(
-                [(f"{child_hotkey.vtrust:.3f}", self._get_style(hotkey_vtrust_status)), "\n"]
+                [(hotkey_vtrust, self._get_style(hotkey_vtrust_status)), "\n"]
             )
 
+            hotkey_updated = self._get_int_value(child_hotkey.updated, True)
             chk_updateds.extend(
-                [(str(child_hotkey.updated), self._get_style(hotkey_updated_status)), "\n"]
+                [(hotkey_updated, self._get_style(hotkey_updated_status)), "\n"]
             )
 
             chk_hotkeys.extend([child_hotkey.hotkey, "\n"])

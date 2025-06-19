@@ -313,8 +313,8 @@ class SubnetData(SubnetDataBase):
 
                 # Calculate total chk stats
                 chk_fraction += child_fraction
-                chk_vtrust += child_vtrust * child_fraction
-                if child_updated > chk_updated:
+                chk_vtrust += (child_vtrust or 0.0) * child_fraction
+                if child_updated is not None and child_updated > chk_updated:
                     chk_updated = child_updated
 
             chk_vtrust /= chk_fraction
