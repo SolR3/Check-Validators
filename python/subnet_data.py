@@ -78,11 +78,15 @@ class SubnetData(SubnetDataBase):
     _rizzo_coldkey = "5CMEwRYLefRmtJg7zzRyJtcXrQqmspr9B1r1nKySDReA37Z1"
     _rt21_coldkey = "5GZSAgaVGQqegjhEkxpJjpSVLVmNnE2vx2PFLzr7kBBMKpGQ"
 
-    def __init__(self, netuids, network, threads, debug, other_hotkey=None):
+    def __init__(
+            self, netuids, network, threads, debug,
+            other_coldkey=None, other_chk_hotkey=None
+        ):
         self._netuids = netuids
         self._network = network
         self._threads = threads
-        self._other_hotkey = other_hotkey
+        self._other_coldkey = other_coldkey
+        self._other_chk_hotkey = other_chk_hotkey
 
         self._validator_data_lock = threading.Lock()
 
@@ -113,21 +117,14 @@ class SubnetData(SubnetDataBase):
         return data_dict
 
     def _get_uid(self, metagraph):
-        # TODO - Change to _other_coldkey
-        if self._other_hotkey:
-            try:
-                return metagraph.hotkeys.index(self._other_hotkey)
-            except ValueError:
-                return None
-
+        coldkey = self._other_coldkey or self._rizzo_coldkey
         try:
-            return metagraph.coldkeys.index(self._rizzo_coldkey)
+            return metagraph.coldkeys.index(coldkey)
         except ValueError:
             return None
 
     def _get_chk_hotkey(self):
-        # TODO - Change to _other_chk_hotkey
-        return self._other_hotkey or self._rizzo_chk_hotkey
+        return self._other_chk_hotkey or self._rizzo_chk_hotkey
 
     def _get_subnet_data(self):
         self._print_debug("\nGathering data")
@@ -169,21 +166,29 @@ class SubnetData(SubnetDataBase):
             # Get the block to pass to async calls so everything is in sync
             block = await subtensor.block
 
-            # Get the list of child hotkeys for each netuid
-            children = await asyncio.gather(
-                *[
-                    subtensor.get_children(netuid=netuid, hotkey=self._get_chk_hotkey())
-                    for netuid in netuids
-                ]
-            )
+            # No point in printing CHK column when checking a different
+            # coldkey until we figure out exactly how the CHK'ing is going
+            # to work for us vs. rt21 and others and the code is updated
+            # accordingly.
+            if self._other_coldkey:
+                children = [(True, [], '') for _ in netuids]
+                children_pending = [([], 0) for _ in netuids]
+            else:
+                # Get the list of child hotkeys for each netuid
+                children = await asyncio.gather(
+                    *[
+                        subtensor.get_children(netuid=netuid, hotkey=self._get_chk_hotkey())
+                        for netuid in netuids
+                    ]
+                )
 
-            # Get the list of pending child hotkeys for each netuid
-            children_pending = await asyncio.gather(
-                *[
-                    subtensor.get_children_pending(netuid=netuid, hotkey=self._get_chk_hotkey())
-                    for netuid in netuids
-                ]
-            )
+                # Get the list of pending child hotkeys for each netuid
+                children_pending = await asyncio.gather(
+                    *[
+                        subtensor.get_children_pending(netuid=netuid, hotkey=self._get_chk_hotkey())
+                        for netuid in netuids
+                    ]
+                )
 
             # Get the metagraph for each netuid
             metagraphs = await asyncio.gather(

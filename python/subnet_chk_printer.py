@@ -11,13 +11,15 @@ class SubnetDataPrinter:
     def __init__(
             self, subnet_data_class,
             netuids, pending, sort_subnets, vali_name,
-            *subnet_data_args
+            *subnet_data_args, **subnet_data_kwargs,
         ):
         self._netuids = netuids
         self._pending = pending
         self._sort_subnets = sort_subnets
         self._vali_name = vali_name
-        self._validator_data = subnet_data_class(*subnet_data_args).validator_data
+        self._validator_data = subnet_data_class(
+            *subnet_data_args, **subnet_data_kwargs,
+        ).validator_data
 
     def print_validator_data(self):
         if self._pending:

@@ -91,7 +91,8 @@ def main(options):
     subnet_data_printer = SubnetDataPrinter(
         SubnetData,
         netuids, options.pending, False, options.vali_name,  # args for SubnetDataPrinter (this is very dumb)
-        netuids, network, options.threads, options.verbose, options.hotkey  # args for SubnetData (this is very dumb)
+        netuids, network, options.threads, options.verbose,  # args for SubnetData (this is very dumb)
+        other_chk_hotkey=options.hotkey,  # args for SubnetData (this is very dumb)
     )
     total_time = time.time() - start_time
 
