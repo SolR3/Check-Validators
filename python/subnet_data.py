@@ -45,6 +45,7 @@ class SubnetDataBase:
         "chk_pending_time",
         "child_hotkey_data",
         "pending_child_hotkey_data",
+        "validator_hotkeys",
         ]
     )
     ChildHotkeyData = namedtuple(
@@ -54,6 +55,14 @@ class SubnetDataBase:
             "take",
             "vtrust",
             "updated",
+        ]
+    )
+    ValidatorHotkeys = namedtuple(
+        "ValidatorHotkeys", [
+            "Rizzo",
+            "Rt21",
+            "OTF",
+            "Yuma",
         ]
     )
 
@@ -75,8 +84,12 @@ class SubnetDataBase:
 
 class SubnetData(SubnetDataBase):
     _rizzo_chk_hotkey = "5GduQSUxNJ4E3ReCDoPDtoHHgeoE4yHmnnLpUXBz9DAwmHWV"
-    _rizzo_coldkey = "5CMEwRYLefRmtJg7zzRyJtcXrQqmspr9B1r1nKySDReA37Z1"
-    _rt21_coldkey = "5GZSAgaVGQqegjhEkxpJjpSVLVmNnE2vx2PFLzr7kBBMKpGQ"
+    _coldkeys = {
+        "Rizzo": "5CMEwRYLefRmtJg7zzRyJtcXrQqmspr9B1r1nKySDReA37Z1",
+        "Rt21": "5GZSAgaVGQqegjhEkxpJjpSVLVmNnE2vx2PFLzr7kBBMKpGQ",
+        "OTF": "5HBtpwxuGNL1gwzwomwR7sjwUt8WXYSuWcLYN6f9KpTZkP4k",
+        "Yuma": "5E9fVY1jexCNVMjd2rdBsAxeamFGEMfzHcyTn2fHgdHeYc5p",
+    }
 
     def __init__(
             self, netuids, network, threads, debug,
@@ -94,7 +107,10 @@ class SubnetData(SubnetDataBase):
 
     def to_dict(self):
         def serializable(value):
-            if isinstance(value, self.ChildHotkeyData):
+            if (
+                isinstance(value, self.ChildHotkeyData)
+                or isinstance(value, self.ValidatorHotkeys)
+            ):
                 return namedtuple_to_dict(value)
             if isinstance(value, list):
                 return [serializable(v) for v in value]
@@ -117,7 +133,7 @@ class SubnetData(SubnetDataBase):
         return data_dict
 
     def _get_uid(self, metagraph):
-        coldkey = self._other_coldkey or self._rizzo_coldkey
+        coldkey = self._other_coldkey or self._coldkeys["Rizzo"]
         try:
             return metagraph.coldkeys.index(coldkey)
         except ValueError:
@@ -271,6 +287,17 @@ class SubnetData(SubnetDataBase):
             child_hotkeys_pending, child_takes_pending,
             current_block, chk_pending_block
     ):
+        # Get the hotkeys that we care about (Rizzo, Rt21, etc.)
+        vali_hotkeys = {}
+        for vali_name, vali_coldkey in self._coldkeys.items():
+            try:
+                vali_index = metagraph.coldkeys.index(vali_coldkey)
+            except ValueError:
+                vali_hotkeys[vali_name] = None
+            else:
+                vali_hotkeys[vali_name] = metagraph.hotkeys[vali_index]
+        validator_hotkeys = self.ValidatorHotkeys(**vali_hotkeys)
+
         # Get emission percentage for the subnet.
         subnet_emission = metagraph.emissions.tao_in_emission * 100
 
@@ -388,7 +415,7 @@ class SubnetData(SubnetDataBase):
 
         # Get rt21 vTrust
         try:
-            rt21_uid = metagraph.coldkeys.index(self._rt21_coldkey)
+            rt21_uid = metagraph.coldkeys.index(self._coldkeys["Rt21"])
         except ValueError:
             rt21_vtrust = None
         else:
@@ -447,6 +474,7 @@ class SubnetData(SubnetDataBase):
                 chk_pending_time=chk_pending_time,
                 child_hotkey_data=child_hotkey_data,
                 pending_child_hotkey_data=pending_child_hotkey_data,
+                validator_hotkeys=validator_hotkeys,
             )
 
 
