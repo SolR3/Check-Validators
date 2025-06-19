@@ -74,7 +74,8 @@ class SubnetDataBase:
 
 
 class SubnetData(SubnetDataBase):
-    _rizzo_hotkey = "5GduQSUxNJ4E3ReCDoPDtoHHgeoE4yHmnnLpUXBz9DAwmHWV"
+    _rizzo_chk_hotkey = "5GduQSUxNJ4E3ReCDoPDtoHHgeoE4yHmnnLpUXBz9DAwmHWV"
+    _rizzo_coldkey = "5CMEwRYLefRmtJg7zzRyJtcXrQqmspr9B1r1nKySDReA37Z1"
     _rt21_coldkey = "5GZSAgaVGQqegjhEkxpJjpSVLVmNnE2vx2PFLzr7kBBMKpGQ"
 
     def __init__(self, netuids, network, threads, debug, other_hotkey=None):
@@ -86,11 +87,6 @@ class SubnetData(SubnetDataBase):
         self._validator_data_lock = threading.Lock()
 
         super(SubnetData, self).__init__(debug)
-
-    @property
-    def hotkey(self):
-        # A hack to be able to check how other validators are doing
-        return self._other_hotkey or self._rizzo_hotkey
 
     def to_dict(self):
         def serializable(value):
@@ -115,6 +111,23 @@ class SubnetData(SubnetDataBase):
             data_dict[netuid] = dict(
                 [(f, serializable(getattr(data, f))) for f in data._fields])
         return data_dict
+
+    def _get_uid(self, metagraph):
+        # TODO - Change to _other_coldkey
+        if self._other_hotkey:
+            try:
+                return metagraph.hotkeys.index(self._other_hotkey)
+            except ValueError:
+                return None
+
+        try:
+            return metagraph.coldkeys.index(self._rizzo_coldkey)
+        except ValueError:
+            return None
+
+    def _get_chk_hotkey(self):
+        # TODO - Change to _other_chk_hotkey
+        return self._other_hotkey or self._rizzo_chk_hotkey
 
     def _get_subnet_data(self):
         self._print_debug("\nGathering data")
@@ -159,7 +172,7 @@ class SubnetData(SubnetDataBase):
             # Get the list of child hotkeys for each netuid
             children = await asyncio.gather(
                 *[
-                    subtensor.get_children(netuid=netuid, hotkey=self.hotkey)
+                    subtensor.get_children(netuid=netuid, hotkey=self._get_chk_hotkey())
                     for netuid in netuids
                 ]
             )
@@ -167,7 +180,7 @@ class SubnetData(SubnetDataBase):
             # Get the list of pending child hotkeys for each netuid
             children_pending = await asyncio.gather(
                 *[
-                    subtensor.get_children_pending(netuid=netuid, hotkey=self.hotkey)
+                    subtensor.get_children_pending(netuid=netuid, hotkey=self._get_chk_hotkey())
                     for netuid in netuids
                 ]
             )
@@ -261,14 +274,12 @@ class SubnetData(SubnetDataBase):
         subnet_tempo = 360
 
         # Get Rizzo validator data
-        try:
-            rizzo_uid = metagraph.hotkeys.index(self.hotkey)
-        except ValueError:
+        rizzo_uid = self._get_uid(metagraph)
+        if rizzo_uid is None:
             self._print_debug(
                 "\nWARNING: Rizzo validator not running on subnet "
                 f"{netuid}"
             )
-            rizzo_uid = None
             rizzo_emission = None
             rizzo_vtrust = None
             rizzo_updated = None
