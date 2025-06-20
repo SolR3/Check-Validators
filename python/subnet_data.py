@@ -182,6 +182,14 @@ class SubnetData(SubnetDataBase):
             # Get the block to pass to async calls so everything is in sync
             block = await subtensor.block
 
+            # Get the metagraph for each netuid
+            metagraphs = await asyncio.gather(
+                *[
+                    subtensor.metagraph(netuid=netuid, block=block)
+                    for netuid in netuids
+                ]
+            )
+
             # No point in printing CHK column when checking a different
             # coldkey until we figure out exactly how the CHK'ing is going
             # to work for us vs. rt21 and others and the code is updated
@@ -197,6 +205,7 @@ class SubnetData(SubnetDataBase):
                         for netuid in netuids
                     ]
                 )
+                self._filter_hotkey_swap_hotkeys(metagraphs, children, False)
 
                 # Get the list of pending child hotkeys for each netuid
                 children_pending = await asyncio.gather(
@@ -205,14 +214,7 @@ class SubnetData(SubnetDataBase):
                         for netuid in netuids
                     ]
                 )
-
-            # Get the metagraph for each netuid
-            metagraphs = await asyncio.gather(
-                *[
-                    subtensor.metagraph(netuid=netuid, block=block)
-                    for netuid in netuids
-                ]
-            )
+                self._filter_hotkey_swap_hotkeys(metagraphs, children_pending, True)
 
             # Get the take for each child hotkey on each netuid.
             chk_takes_dict = await self._get_child_hotkey_take_data(
@@ -240,6 +242,23 @@ class SubnetData(SubnetDataBase):
         total_time = time.time() - start_time
         self._print_debug(f"\nData gathered in {int(total_time)} seconds "
                           f"for subnets: {netuids}.")
+
+    def _filter_hotkey_swap_hotkeys(self, metagraphs, children, do_pending):
+        for i, netuid_element in enumerate(children):
+            metagraph = metagraphs[i]
+            try:
+                vali_index = metagraph.coldkeys.index(self._coldkeys["Rizzo"])
+            except ValueError:
+                continue
+            hotkey = metagraph.hotkeys[vali_index]
+
+            if do_pending:
+                child_hotkeys = netuid_element[0]
+            else:
+                child_hotkeys = netuid_element[1]
+            for hotkey_element in child_hotkeys:
+                if hotkey_element[1] == hotkey:
+                    child_hotkeys.remove(hotkey_element)
 
     async def _get_child_hotkey_take_data(
             self, subtensor, netuids, children, do_pending
