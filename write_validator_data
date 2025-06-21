@@ -3,7 +3,6 @@
 # standard imports
 import argparse
 import json
-import multiprocessing
 import numpy
 import os
 import sys
@@ -44,13 +43,6 @@ def _parse_args():
     procs_or_chunks = parser.add_mutually_exclusive_group()
 
     procs_or_chunks.add_argument(
-        "-p", "--processes",
-        type=int,
-        default=0,
-        help="The number of processes. Each process will write a different json file "
-             "for a range of validators.")
-
-    procs_or_chunks.add_argument(
         "-c", "--chunks",
         type=int,
         default=0,
@@ -85,12 +77,8 @@ def format_time(total_time):
 
 
 def write_json_file(
-        network, all_subnets, json_folder,
-        sleep_time=0, netuid_start=None, netuid_end=None
+        network, all_subnets, json_folder, netuid_start=None, netuid_end=None
     ):
-    if sleep_time:
-        time.sleep(sleep_time)
-
     print("Gathering subnet data.")
     start_time = time.time()
 
@@ -154,22 +142,20 @@ def get_json_args(
     chunk_size = int(numpy.ceil(num_subnets / num_chunks))
     process_args = []
     netuid_start = 1
-    sleep_time = 0
     while True:
         netuid_end = netuid_start + chunk_size - 1
         if netuid_end >= num_subnets:
             process_args.append((
                 network, all_subnets, json_folder,
-                sleep_time, netuid_start, None
+                netuid_start, None
             ))
             break
         else:
             process_args.append((
                 network, all_subnets, json_folder,
-                sleep_time, netuid_start, netuid_end
+                netuid_start, netuid_end
             ))
             netuid_start = netuid_end + 1
-            sleep_time += 1
 
     return process_args
 
@@ -201,21 +187,14 @@ def main(options):
         all_subnets = bittensor.subtensor(network=network).get_subnets()
         tempdir = tempfile.mkdtemp(prefix="write_vali_data_")
 
-        if options.processes or options.chunks:
-            if options.processes:
-                chunk_arg = options.processes
-            else:  # options.chunks
-                chunk_arg = options.chunks
+        if options.chunks: 
             write_json_args = get_json_args(
-                network, all_subnets, tempdir, chunk_arg
+                network, all_subnets, tempdir, options.chunks
             )
-
-            if options.processes:
-                with multiprocessing.Pool(processes=options.processes) as pool:
-                    pool.starmap(write_json_file, write_json_args)
-            else:
-                for i in range(options.chunks):
-                    write_json_file(*write_json_args[i])
+            for i in range(options.chunks):
+                if i > 0:
+                    time.sleep(2)
+                write_json_file(*write_json_args[i])
         else:
             write_json_file(network, all_subnets, tempdir)
 
