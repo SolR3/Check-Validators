@@ -15,6 +15,7 @@ sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 
 
 LOCAL_TIMEZONE = "MST7MDT"
+JSON_FILE_NAME = "validator_data.json"
 TIMESTAMP_FILE_NAME = "timestamp.json"
 LOCAL_SUBTENSORS = [
     "cali",
@@ -29,7 +30,6 @@ LOCAL_SUBTENSOR_ROTATE_ARG = "rotate"
 def _parse_args():
     parser = argparse.ArgumentParser()
 
-    # TODO - Add a json checker action
     parser.add_argument(
         "-j", "--json-folder",
         required=True,
@@ -71,43 +71,6 @@ def _parse_args():
     return parser.parse_args()
 
 
-class SubnetDataWriter:
-    json_file_name = "validator_data.json"
-
-    def write_data(self, network, all_subnets, json_folder, netuid_start=None, netuid_end=None):
-        print("Gathering subnet data.")
-        start_time = time.time()
-
-        if netuid_start is not None:
-            if netuid_end is not None:
-                netuids = all_subnets[netuid_start:netuid_end+1]
-                netuid_range = f"{netuid_start}-{netuid_end}"
-            else:
-                netuids = all_subnets[netuid_start:]
-                netuid_range = f"{netuid_start}-"
-            json_base, json_ext = os.path.splitext(self.json_file_name)
-            json_file_name = f"{json_base}.{netuid_range}{json_ext}"
-            final_json_file = os.path.join(json_folder, json_file_name)
-        else:
-            netuids = all_subnets[1:]
-            final_json_file = os.path.join(json_folder, self.json_file_name)
-
-        data_dict = SubnetData(netuids, network, True).to_dict()
-
-        temp_json_file = final_json_file + ".tmp"
-        print(f"\nWriting data to file: {temp_json_file}")
-        with open(temp_json_file, "w") as fd:
-            json.dump(data_dict, fd, indent=4)
-
-        print(f"\nMoving {temp_json_file} to {final_json_file}")
-        if os.path.exists(final_json_file):
-            os.unlink(final_json_file)
-        os.rename(temp_json_file, final_json_file)
-
-        total_time = time.time() - start_time
-        print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
-
-
 def format_time(total_time):
     m = total_time/60
     minutes = int(m)
@@ -122,16 +85,43 @@ def format_time(total_time):
 
 
 def write_json_file(
-        network, all_subnets, sleep_time=0, subnet_data_writer=None,
-        json_folder=None, netuid_start=None, netuid_end=None
+        network, all_subnets, json_folder,
+        sleep_time=0, netuid_start=None, netuid_end=None
     ):
     if sleep_time:
         time.sleep(sleep_time)
-    if not subnet_data_writer:
-        subnet_data_writer = SubnetDataWriter()
-    subnet_data_writer.write_data(
-        network, all_subnets, json_folder, netuid_start, netuid_end
-    )
+
+    print("Gathering subnet data.")
+    start_time = time.time()
+
+    if netuid_start is not None:
+        if netuid_end is not None:
+            netuids = all_subnets[netuid_start:netuid_end+1]
+            netuid_range = f"{netuid_start}-{netuid_end}"
+        else:
+            netuids = all_subnets[netuid_start:]
+            netuid_range = f"{netuid_start}-"
+        json_base, json_ext = os.path.splitext(JSON_FILE_NAME)
+        json_file_name = f"{json_base}.{netuid_range}{json_ext}"
+        final_json_file = os.path.join(json_folder, json_file_name)
+    else:
+        netuids = all_subnets[1:]
+        final_json_file = os.path.join(json_folder, JSON_FILE_NAME)
+
+    data_dict = SubnetData(netuids, network, True).to_dict()
+
+    temp_json_file = final_json_file + ".tmp"
+    print(f"\nWriting data to file: {temp_json_file}")
+    with open(temp_json_file, "w") as fd:
+        json.dump(data_dict, fd, indent=4)
+
+    print(f"\nMoving {temp_json_file} to {final_json_file}")
+    if os.path.exists(final_json_file):
+        os.unlink(final_json_file)
+    os.rename(temp_json_file, final_json_file)
+
+    total_time = time.time() - start_time
+    print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
 
 
 def write_timestamp(json_folder):
@@ -139,7 +129,7 @@ def write_timestamp(json_folder):
     time.tzset()
 
     max_file_time = 0
-    json_base, json_ext = os.path.splitext(SubnetDataWriter.json_file_name)
+    json_base, json_ext = os.path.splitext(JSON_FILE_NAME)
     for _file in os.listdir(json_folder):
         file_base, file_ext = os.path.splitext(_file)
         if not file_base.startswith(json_base) or file_ext != json_ext:
@@ -158,8 +148,7 @@ def write_timestamp(json_folder):
 
 
 def get_json_args(
-        network, all_subnets, subnet_data_writer,
-        num_chunks, json_folder
+        network, all_subnets, json_folder, num_chunks
     ):
     num_subnets = len(all_subnets) - 1
     chunk_size = int(numpy.ceil(num_subnets / num_chunks))
@@ -170,14 +159,14 @@ def get_json_args(
         netuid_end = netuid_start + chunk_size - 1
         if netuid_end >= num_subnets:
             process_args.append((
-                network, all_subnets, sleep_time, subnet_data_writer,
-                json_folder, netuid_start, None
+                network, all_subnets, json_folder,
+                sleep_time, netuid_start, None
             ))
             break
         else:
             process_args.append((
-                network, all_subnets, sleep_time, subnet_data_writer,
-                json_folder, netuid_start, netuid_end
+                network, all_subnets, json_folder,
+                sleep_time, netuid_start, netuid_end
             ))
             netuid_start = netuid_end + 1
             sleep_time += 1
@@ -204,8 +193,6 @@ def main(options):
 
     local_subtensor_index = -1
     interval_seconds = round(options.interval * 60)
-    if not options.processes:
-        subnet_data_writer = SubnetDataWriter()
 
     while True:
         start_time = time.time()
@@ -216,14 +203,11 @@ def main(options):
 
         if options.processes or options.chunks:
             if options.processes:
-                writer_arg = None
                 chunk_arg = options.processes
             else:  # options.chunks
-                writer_arg = subnet_data_writer
                 chunk_arg = options.chunks
             write_json_args = get_json_args(
-                network, all_subnets, writer_arg,
-                chunk_arg, tempdir
+                network, all_subnets, tempdir, chunk_arg
             )
 
             if options.processes:
@@ -233,11 +217,7 @@ def main(options):
                 for i in range(options.chunks):
                     write_json_file(*write_json_args[i])
         else:
-            write_json_file(
-                network, all_subnets,
-                subnet_data_writer=subnet_data_writer,
-                json_folder=tempdir,
-            )
+            write_json_file(network, all_subnets, tempdir)
 
         # Copy files over to relevant location
         for file_name in os.listdir(options.json_folder):
