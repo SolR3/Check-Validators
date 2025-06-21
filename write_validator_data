@@ -95,7 +95,7 @@ def write_json_file(
     json_file_name = f"{json_base}.{netuid_range}{json_ext}"
     json_file = os.path.join(json_folder, json_file_name)
 
-    data_dict = SubnetData(netuids, network, True).to_dict()
+    data_dict = SubnetData(netuids, network).to_dict()
 
     print(f"\nWriting data to file: {json_file}")
     with open(json_file, "w") as fd:

@@ -43,7 +43,7 @@ def _parse_args():
     parser.add_argument(
         "-v", "--verbose",
         action="store_true",
-        help="Print verbose debug output.")
+        help="Print verbose output.")
 
     return parser.parse_args()
 
@@ -70,12 +70,12 @@ def main(options):
     print_total_emission = not (options.chk_only or bool(options.subnets))
 
     start_time = time.time()
+    validator_data = SubnetData(
+        netuids, network, verbose=options.verbose, other_coldkey=options.coldkey
+    ).validator_data
     subnet_data_printer = SubnetDataPrinter(
-        SubnetData,
-        netuids, options.chk_only, sort_subnets,
-        print_total_emission, options.vali_name,  # args for SubnetDataPrinter (this is very dumb)
-        netuids, network, options.verbose,  # args for SubnetData (this is very dumb)
-        other_coldkey=options.coldkey,  # args for SubnetData (this is very dumb)
+        validator_data, netuids, options.chk_only, sort_subnets,
+        print_total_emission, options.vali_name
     )
     total_time = time.time() - start_time
 

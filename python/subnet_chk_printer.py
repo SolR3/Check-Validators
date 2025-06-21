@@ -9,17 +9,12 @@ from subnet_printer_base import RichPrinterBase
 
 class SubnetDataPrinter:
     def __init__(
-            self, subnet_data_class,
-            netuids, pending, sort_subnets, vali_name,
-            *subnet_data_args, **subnet_data_kwargs,
+            self, validator_data, netuids, pending, vali_name,
         ):
         self._netuids = netuids
         self._pending = pending
-        self._sort_subnets = sort_subnets
         self._vali_name = vali_name
-        self._validator_data = subnet_data_class(
-            *subnet_data_args, **subnet_data_kwargs,
-        ).validator_data
+        self._validator_data = validator_data
 
     def print_validator_data(self):
         if self._pending:
@@ -39,13 +34,7 @@ class SubnetDataPrinter:
         no_chk_subntets = []
 
         # Loop through all subnets and print out their CHK data.
-        if self._netuids:
-            netuids = (sorted(self._netuids, key=sort_key)
-                       if self._sort_subnets else self._netuids)
-        else:
-            netuids = (sorted(self._validator_data, key=sort_key)
-                       if self._sort_subnets else self._validator_data.keys())
-
+        netuids = self._netuids or self._validator_data.keys()
         for netuid in netuids:
             if netuid not in self._validator_data:
                 missing_data.append(str(netuid))

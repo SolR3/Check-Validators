@@ -65,8 +65,8 @@ class SubnetDataBase:
         ]
     )
 
-    def __init__(self, debug):
-        self._debug = debug
+    def __init__(self, verbose):
+        self._verbose = verbose
         self._validator_data = {}
 
         # Gather the data for all given subnets
@@ -76,8 +76,8 @@ class SubnetDataBase:
     def validator_data(self):
         return self._validator_data
 
-    def _print_debug(self, message):
-        if self._debug:
+    def _print_verbose(self, message):
+        if self._verbose:
             print(message)
 
 
@@ -91,7 +91,7 @@ class SubnetData(SubnetDataBase):
     }
 
     def __init__(
-            self, netuids, network, debug,
+            self, netuids, network, verbose=True,
             other_coldkey=None, other_chk_hotkey=None
         ):
         self._netuids = netuids
@@ -101,7 +101,7 @@ class SubnetData(SubnetDataBase):
 
         self._validator_data_lock = threading.Lock()
 
-        super(SubnetData, self).__init__(debug)
+        super(SubnetData, self).__init__(verbose)
 
     def to_dict(self):
         def serializable(value):
@@ -141,12 +141,12 @@ class SubnetData(SubnetDataBase):
         return self._other_chk_hotkey or self._rizzo_chk_hotkey
 
     def _get_subnet_data(self):
-        self._print_debug("\nGathering data")
+        self._print_verbose("\nGathering data")
 
         max_attempts = 5
         netuids = self._netuids
         for attempt in range(1, max_attempts+1):
-            self._print_debug(f"\nAttempt {attempt} of {max_attempts}")
+            self._print_verbose(f"\nAttempt {attempt} of {max_attempts}")
             self._get_validator_data(netuids)
 
             # Get netuids missing data
@@ -154,7 +154,7 @@ class SubnetData(SubnetDataBase):
             # just in case.
             netuids = list(set(netuids).difference(set(self._validator_data)))
             if netuids:
-                self._print_debug("\nFailed to gather data for subnets: "
+                self._print_verbose("\nFailed to gather data for subnets: "
                                  f"{', '.join([str(n) for n in netuids])}.")
             else:
                 break
@@ -167,8 +167,8 @@ class SubnetData(SubnetDataBase):
             netuids = [netuids]
 
         start_time = time.time()
-        self._print_debug(f"\nConnecting to subtensor network: {self._network}")
-        self._print_debug(f"Obtaining data for subnets: {netuids}\n")
+        self._print_verbose(f"\nConnecting to subtensor network: {self._network}")
+        self._print_verbose(f"Obtaining data for subnets: {netuids}\n")
 
         async with AsyncSubtensor(network=self._network) as subtensor:
             # Get the block to pass to async calls so everything is in sync
@@ -232,7 +232,7 @@ class SubnetData(SubnetDataBase):
                 )
 
         total_time = time.time() - start_time
-        self._print_debug(f"\nData gathered in {int(total_time)} seconds "
+        self._print_verbose(f"\nData gathered in {int(total_time)} seconds "
                           f"for subnets: {netuids}.")
 
     def _filter_hotkey_swap_hotkeys(self, metagraphs, children, do_pending):
@@ -266,7 +266,7 @@ class SubnetData(SubnetDataBase):
             else:
                 success, child_hotkeys, msg = children[i]
                 if not success:
-                    self._print_debug(
+                    self._print_verbose(
                         f"Failed to obtain child hotkeys from netuid {netuid}: {msg}"
                     )
 
@@ -319,7 +319,7 @@ class SubnetData(SubnetDataBase):
         # Get Rizzo validator data
         rizzo_uid = self._get_uid(metagraph)
         if rizzo_uid is None:
-            self._print_debug(
+            self._print_verbose(
                 "\nWARNING: Rizzo validator not running on subnet "
                 f"{netuid}"
             )
@@ -490,13 +490,13 @@ class SubnetData(SubnetDataBase):
 
 
 # class SubnetDataFromWebServer(SubnetDataBase):
-#     def __init__(self, public_ip, port, username, password, debug):
+#     def __init__(self, public_ip, port, username, password, verbose):
 #         self._public_ip = public_ip
 #         self._port = port
 #         self._username = username
 #         self._password = password
 
-#         super(SubnetDataFromWebServer, self).__init__(debug)
+#         super(SubnetDataFromWebServer, self).__init__(verbose)
 
 #     def _get_subnet_data(self):
 #         from bs4 import BeautifulSoup
@@ -505,10 +505,10 @@ class SubnetData(SubnetDataBase):
 #         subnets_data = {}
 
 #         main_url = f"http://{self._public_ip}:{self._port}"
-#         self._print_debug(f"Obtaining validator json data from: {main_url}")
+#         self._print_verbose(f"Obtaining validator json data from: {main_url}")
 #         response = requests.get(main_url, auth=(self._username, self._password))
 #         if response.status_code != 200:
-#             self._print_debug("\nERROR: Failed to obtain validator json data."
+#             self._print_verbose("\nERROR: Failed to obtain validator json data."
 #                               f"\nurl: {main_url}"
 #                               f"\nstatus code: {response.status_code}"
 #                               f"\nreason: {response.reason}")
@@ -518,10 +518,10 @@ class SubnetData(SubnetDataBase):
 #         for li_tag in html_content.findAll("li"):
 #             json_file = li_tag.find("a").get("href")
 #             json_url = f"http://{self._public_ip}:{self._port}/{json_file}"
-#             self._print_debug(f"Updating validator json data with: {json_url}")
+#             self._print_verbose(f"Updating validator json data with: {json_url}")
 #             response = requests.get(json_url, auth=(self._username, self._password))
 #             if response.status_code != 200:
-#                 self._print_debug("\nERROR: Failed to obtain validator json data."
+#                 self._print_verbose("\nERROR: Failed to obtain validator json data."
 #                                   f"\nurl: {json_url}"
 #                                   f"\nstatus code: {response.status_code}"
 #                                   f"\nreason: {response.reason}")
@@ -553,7 +553,7 @@ class SubnetData(SubnetDataBase):
 
 
 # class SubnetDataFromJson(SubnetDataBase):
-#     def __init__(self, json_file, host, port, username, ssh_key_path, password, debug):
+#     def __init__(self, json_file, host, port, username, ssh_key_path, password, verbose):
 #         self._json_file = json_file
 #         self._host = host
 #         self._port = port
@@ -561,7 +561,7 @@ class SubnetData(SubnetDataBase):
 #         self._ssh_key_path = ssh_key_path
 #         self._password = password
 
-#         super(SubnetDataFromJson, self).__init__(debug)
+#         super(SubnetDataFromJson, self).__init__(verbose)
 
 #     def _get_subnet_data(self):
 #         import paramiko

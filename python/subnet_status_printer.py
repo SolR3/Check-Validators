@@ -9,19 +9,15 @@ from subnet_printer_base import RichPrinterBase
 
 class SubnetDataPrinter:
     def __init__(
-            self, subnet_data_class,
-            netuids, chk_only, sort_subnets,
+            self, validator_data, netuids, chk_only, sort_subnets,
             print_total_emission, vali_name,
-            *subnet_data_args, **subnet_data_kwargs,
         ):
         self._netuids = netuids
         self._chk_only = chk_only
         self._sort_subnets = sort_subnets
         self._print_total_emission = print_total_emission
         self._vali_name = vali_name
-        self._validator_data = subnet_data_class(
-            *subnet_data_args, **subnet_data_kwargs,
-        ).validator_data
+        self._validator_data = validator_data
 
     def print_validator_data(self):
         printer = TablePrinter(self._vali_name)
