@@ -176,7 +176,8 @@ class SubnetData(SubnetDataBase):
         # The subtensor object can't seem to handle multiple threads calling
         # the blocks_since_last_update() method at the same time.
         start_time = time.time()
-        self._print_debug(f"\nObtaining data for subnets: {netuids}\n")
+        self._print_debug(f"\nConnecting to subtensor network: {self._network}")
+        self._print_debug(f"Obtaining data for subnets: {netuids}\n")
 
         async with AsyncSubtensor(network=self._network) as subtensor:
             # Get the block to pass to async calls so everything is in sync

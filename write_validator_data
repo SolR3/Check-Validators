@@ -16,6 +16,14 @@ sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 
 LOCAL_TIMEZONE = "MST7MDT"
 TIMESTAMP_FILE_NAME = "timestamp.json"
+LOCAL_SUBTENSORS = [
+    "cali",
+    "candyland",
+    "la",
+    "moonbase",
+    "titan",
+]
+LOCAL_SUBTENSOR_ROTATE_ARG = "rotate"
 
 
 def _parse_args():
@@ -30,7 +38,8 @@ def _parse_args():
     parser.add_argument(
         "-l", "--local-subtensor",
         help="Use the specified local subtensor (i.e. la, cali, titan, etc.). "
-             "When not specified, use the 'finney' network subtensor.")
+             f"Specify '{LOCAL_SUBTENSOR_ROTATE_ARG}' to rotate between all local "
+             "subtensors. When not specified, use the 'finney' network subtensor.")
 
     procs_or_chunks = parser.add_mutually_exclusive_group()
 
@@ -72,11 +81,10 @@ def _parse_args():
 class SubnetDataWriter:
     json_file_name = "validator_data.json"
 
-    def __init__(self, network, threads):
-        self._network = network
+    def __init__(self, threads):
         self._threads = threads
 
-    def write_data(self, all_subnets, json_folder, netuid_start=None, netuid_end=None):
+    def write_data(self, network, all_subnets, json_folder, netuid_start=None, netuid_end=None):
         print("Gathering subnet data.")
         start_time = time.time()
 
@@ -95,7 +103,7 @@ class SubnetDataWriter:
             final_json_file = os.path.join(json_folder, self.json_file_name)
 
         data_dict = SubnetData(
-            netuids, self._network, self._threads, True
+            netuids, network, self._threads, True
         ).to_dict()
 
         temp_json_file = final_json_file + ".tmp"
@@ -125,15 +133,16 @@ def format_time(total_time):
     return runtime_text
 
 
-def write_json_file(all_subnets, sleep_time=0, subnet_data_writer=None,
-                    network=None, threads=None, json_folder=None,
-                    netuid_start=None, netuid_end=None):
+def write_json_file(
+        network, all_subnets, sleep_time=0, subnet_data_writer=None,
+        threads=None, json_folder=None, netuid_start=None, netuid_end=None
+    ):
     if sleep_time:
         time.sleep(sleep_time)
     if not subnet_data_writer:
-        subnet_data_writer = SubnetDataWriter(network, threads)
+        subnet_data_writer = SubnetDataWriter(threads)
     subnet_data_writer.write_data(
-        all_subnets, json_folder, netuid_start, netuid_end
+        network, all_subnets, json_folder, netuid_start, netuid_end
     )
 
 
@@ -161,7 +170,7 @@ def write_timestamp(json_folder):
 
 
 def get_json_args(
-        all_subnets, network, subnet_data_writer,
+        network, all_subnets, subnet_data_writer,
         num_chunks, threads, json_folder
     ):
     num_subnets = len(all_subnets) - 1
@@ -173,13 +182,13 @@ def get_json_args(
         netuid_end = netuid_start + chunk_size - 1
         if netuid_end >= num_subnets:
             process_args.append((
-                all_subnets, sleep_time, subnet_data_writer, network,
+                network, all_subnets, sleep_time, subnet_data_writer,
                 threads, json_folder, netuid_start, None
             ))
             break
         else:
             process_args.append((
-                all_subnets, sleep_time, subnet_data_writer, network,
+                network, all_subnets, sleep_time, subnet_data_writer,
                 threads, json_folder, netuid_start, netuid_end
             ))
             netuid_start = netuid_end + 1
@@ -188,40 +197,44 @@ def get_json_args(
     return process_args
 
 
-def main(options):
-    # 
-    # This is all very shoddy
-    # 
-    network = (
-        f"ws://subtensor-{options.local_subtensor}.rizzo.network:9944"
-        if options.local_subtensor
+def get_network(local_subtensor, local_subtensor_index):
+    network_name = (
+        LOCAL_SUBTENSORS[local_subtensor_index]
+        if local_subtensor == LOCAL_SUBTENSOR_ROTATE_ARG
+        else local_subtensor
+    )
+
+    return (
+        f"ws://subtensor-{network_name}.rizzo.network:9944"
+        if network_name
         else "finney"
     )
-    interval_seconds = round(options.interval * 60)
 
+
+def main(options):
     os.makedirs(options.json_folder, exist_ok=True)
 
+    local_subtensor_index = -1
+    interval_seconds = round(options.interval * 60)
     if not options.processes:
-        subnet_data_writer = SubnetDataWriter(
-            network, options.threads
-        )
-    
+        subnet_data_writer = SubnetDataWriter(options.threads)
+
     while True:
         start_time = time.time()
+        local_subtensor_index = (local_subtensor_index + 1) % len(LOCAL_SUBTENSORS)
+        network = get_network(options.local_subtensor, local_subtensor_index)
         all_subnets = bittensor.subtensor(network=network).get_subnets()
         tempdir = tempfile.mkdtemp(prefix="write_vali_data_")
 
         if options.processes or options.chunks:
             if options.processes:
-                network_arg = network
                 writer_arg = None
                 chunk_arg = options.processes
             else:  # options.chunks
-                network_arg = None
                 writer_arg = subnet_data_writer
                 chunk_arg = options.chunks
             write_json_args = get_json_args(
-                all_subnets, network_arg, writer_arg,
+                network, all_subnets, writer_arg,
                 chunk_arg, options.threads, tempdir
             )
 
@@ -233,7 +246,7 @@ def main(options):
                     write_json_file(*write_json_args[i])
         else:
             write_json_file(
-                all_subnets, subnet_data_writer=subnet_data_writer,
+                network, all_subnets, subnet_data_writer=subnet_data_writer,
                 threads=options.threads, json_folder=tempdir,
             )
 
