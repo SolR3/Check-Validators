@@ -85,28 +85,21 @@ def write_json_file(
     if netuid_start is not None:
         if netuid_end is not None:
             netuids = all_subnets[netuid_start:netuid_end+1]
-            netuid_range = f"{netuid_start}-{netuid_end}"
         else:
             netuids = all_subnets[netuid_start:]
-            netuid_range = f"{netuid_start}-"
-        json_base, json_ext = os.path.splitext(JSON_FILE_NAME)
-        json_file_name = f"{json_base}.{netuid_range}{json_ext}"
-        final_json_file = os.path.join(json_folder, json_file_name)
     else:
         netuids = all_subnets[1:]
-        final_json_file = os.path.join(json_folder, JSON_FILE_NAME)
+
+    netuid_range = f"{netuids[0]}-{netuids[-1]}"
+    json_base, json_ext = os.path.splitext(JSON_FILE_NAME)
+    json_file_name = f"{json_base}.{netuid_range}{json_ext}"
+    json_file = os.path.join(json_folder, json_file_name)
 
     data_dict = SubnetData(netuids, network, True).to_dict()
 
-    temp_json_file = final_json_file + ".tmp"
-    print(f"\nWriting data to file: {temp_json_file}")
-    with open(temp_json_file, "w") as fd:
+    print(f"\nWriting data to file: {json_file}")
+    with open(json_file, "w") as fd:
         json.dump(data_dict, fd, indent=4)
-
-    print(f"\nMoving {temp_json_file} to {final_json_file}")
-    if os.path.exists(final_json_file):
-        os.unlink(final_json_file)
-    os.rename(temp_json_file, final_json_file)
 
     total_time = time.time() - start_time
     print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
@@ -135,29 +128,16 @@ def write_timestamp(json_folder):
             json.dump(timestamp, fd)
 
 
-def get_json_args(
-        network, all_subnets, json_folder, num_chunks
-    ):
-    num_subnets = len(all_subnets) - 1
+def get_netuid_start_end_args(num_subnets, num_chunks):
     chunk_size = int(numpy.ceil(num_subnets / num_chunks))
-    process_args = []
     netuid_start = 1
     while True:
         netuid_end = netuid_start + chunk_size - 1
         if netuid_end >= num_subnets:
-            process_args.append((
-                network, all_subnets, json_folder,
-                netuid_start, None
-            ))
+            yield netuid_start, None
             break
-        else:
-            process_args.append((
-                network, all_subnets, json_folder,
-                netuid_start, netuid_end
-            ))
-            netuid_start = netuid_end + 1
-
-    return process_args
+        yield netuid_start, netuid_end
+        netuid_start = netuid_end + 1
 
 
 def get_network(local_subtensor, local_subtensor_index):
@@ -187,14 +167,16 @@ def main(options):
         all_subnets = bittensor.subtensor(network=network).get_subnets()
         tempdir = tempfile.mkdtemp(prefix="write_vali_data_")
 
-        if options.chunks: 
-            write_json_args = get_json_args(
-                network, all_subnets, tempdir, options.chunks
-            )
-            for i in range(options.chunks):
+        if options.chunks:
+            num_subnets = len(all_subnets) - 1
+            for i, (netuid_start, netuid_end) in enumerate(
+                get_netuid_start_end_args(num_subnets, options.chunks)
+            ):
                 if i > 0:
                     time.sleep(2)
-                write_json_file(*write_json_args[i])
+                write_json_file(
+                    network, all_subnets, tempdir, netuid_start, netuid_end
+                )
         else:
             write_json_file(network, all_subnets, tempdir)
 
