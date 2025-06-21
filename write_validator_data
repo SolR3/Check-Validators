@@ -58,13 +58,6 @@ def _parse_args():
              "for a range of validators. This is only valid when not multi-processing.")
 
     parser.add_argument(
-        "-t", "--threads",
-        type=int,
-        default=0,
-        help="Gather the subnet metagraph data using the specified number of "
-             "threads. When not specified, multithreading is not used.")
-
-    parser.add_argument(
         "-o", "--run-once",
         action="store_true",
         help="When specified, the data gathering and json write happnes only once.")
@@ -80,9 +73,6 @@ def _parse_args():
 
 class SubnetDataWriter:
     json_file_name = "validator_data.json"
-
-    def __init__(self, threads):
-        self._threads = threads
 
     def write_data(self, network, all_subnets, json_folder, netuid_start=None, netuid_end=None):
         print("Gathering subnet data.")
@@ -102,9 +92,7 @@ class SubnetDataWriter:
             netuids = all_subnets[1:]
             final_json_file = os.path.join(json_folder, self.json_file_name)
 
-        data_dict = SubnetData(
-            netuids, network, self._threads, True
-        ).to_dict()
+        data_dict = SubnetData(netuids, network, True).to_dict()
 
         temp_json_file = final_json_file + ".tmp"
         print(f"\nWriting data to file: {temp_json_file}")
@@ -135,12 +123,12 @@ def format_time(total_time):
 
 def write_json_file(
         network, all_subnets, sleep_time=0, subnet_data_writer=None,
-        threads=None, json_folder=None, netuid_start=None, netuid_end=None
+        json_folder=None, netuid_start=None, netuid_end=None
     ):
     if sleep_time:
         time.sleep(sleep_time)
     if not subnet_data_writer:
-        subnet_data_writer = SubnetDataWriter(threads)
+        subnet_data_writer = SubnetDataWriter()
     subnet_data_writer.write_data(
         network, all_subnets, json_folder, netuid_start, netuid_end
     )
@@ -171,7 +159,7 @@ def write_timestamp(json_folder):
 
 def get_json_args(
         network, all_subnets, subnet_data_writer,
-        num_chunks, threads, json_folder
+        num_chunks, json_folder
     ):
     num_subnets = len(all_subnets) - 1
     chunk_size = int(numpy.ceil(num_subnets / num_chunks))
@@ -183,13 +171,13 @@ def get_json_args(
         if netuid_end >= num_subnets:
             process_args.append((
                 network, all_subnets, sleep_time, subnet_data_writer,
-                threads, json_folder, netuid_start, None
+                json_folder, netuid_start, None
             ))
             break
         else:
             process_args.append((
                 network, all_subnets, sleep_time, subnet_data_writer,
-                threads, json_folder, netuid_start, netuid_end
+                json_folder, netuid_start, netuid_end
             ))
             netuid_start = netuid_end + 1
             sleep_time += 1
@@ -217,7 +205,7 @@ def main(options):
     local_subtensor_index = -1
     interval_seconds = round(options.interval * 60)
     if not options.processes:
-        subnet_data_writer = SubnetDataWriter(options.threads)
+        subnet_data_writer = SubnetDataWriter()
 
     while True:
         start_time = time.time()
@@ -235,7 +223,7 @@ def main(options):
                 chunk_arg = options.chunks
             write_json_args = get_json_args(
                 network, all_subnets, writer_arg,
-                chunk_arg, options.threads, tempdir
+                chunk_arg, tempdir
             )
 
             if options.processes:
@@ -246,8 +234,9 @@ def main(options):
                     write_json_file(*write_json_args[i])
         else:
             write_json_file(
-                network, all_subnets, subnet_data_writer=subnet_data_writer,
-                threads=options.threads, json_folder=tempdir,
+                network, all_subnets,
+                subnet_data_writer=subnet_data_writer,
+                json_folder=tempdir,
             )
 
         # Copy files over to relevant location

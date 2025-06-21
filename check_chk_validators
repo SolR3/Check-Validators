@@ -14,15 +14,6 @@ sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 
 
 def _parse_args():
-
-    class ThreadsAction(argparse.Action):       
-        def __call__(self, parser, namespace, values, option_string=None):
-            if values < 0:
-                raise argparse.ArgumentError(
-                    argument=self,
-                    message=f"Thread value ({values}) must be >= 0.")
-            setattr(namespace, self.dest, values)
-
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -41,14 +32,6 @@ def _parse_args():
         "-p", "--pending",
         action="store_true",
         help="When specified, print data for pending CHK hotkeys.")
-
-    parser.add_argument(
-        "-t", "--threads",
-        type=int,
-        default=0,
-        action = ThreadsAction,
-        help="Gather the subnet metagraph data using the specified number of "
-             "threads. When not specified, multithreading is not used.")
 
     parser.add_argument(
         "-k", "--hotkey",
@@ -91,7 +74,7 @@ def main(options):
     subnet_data_printer = SubnetDataPrinter(
         SubnetData,
         netuids, options.pending, False, options.vali_name,  # args for SubnetDataPrinter (this is very dumb)
-        netuids, network, options.threads, options.verbose,  # args for SubnetData (this is very dumb)
+        netuids, network, options.verbose,  # args for SubnetData (this is very dumb)
         other_chk_hotkey=options.hotkey,  # args for SubnetData (this is very dumb)
     )
     total_time = time.time() - start_time

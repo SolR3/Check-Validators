@@ -11,15 +11,6 @@ sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 
 
 def _parse_args():
-    
-    class ThreadsAction(argparse.Action):       
-        def __call__(self, parser, namespace, values, option_string=None):
-            if values < 0:
-                raise argparse.ArgumentError(
-                    argument=self,
-                    message=f"Thread value ({values}) must be >= 0.")
-            setattr(namespace, self.dest, values)
-
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -39,14 +30,6 @@ def _parse_args():
         action="store_true",
         help="When specified, only subnets in which we are child-hotkeying "
              "are displayed. When not specified, all subnets are displayed.")
-
-    parser.add_argument(
-        "-t", "--threads",
-        type=int,
-        default=0,
-        action = ThreadsAction,
-        help="Gather the subnet metagraph data using the specified number of "
-             "threads. When not specified, multithreading is not used.")
 
     parser.add_argument(
         "-k", "--coldkey",
@@ -91,7 +74,7 @@ def main(options):
         SubnetData,
         netuids, options.chk_only, sort_subnets,
         print_total_emission, options.vali_name,  # args for SubnetDataPrinter (this is very dumb)
-        netuids, network, options.threads, options.verbose,  # args for SubnetData (this is very dumb)
+        netuids, network, options.verbose,  # args for SubnetData (this is very dumb)
         other_coldkey=options.coldkey,  # args for SubnetData (this is very dumb)
     )
     total_time = time.time() - start_time

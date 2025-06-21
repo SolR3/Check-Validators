@@ -5,7 +5,6 @@ from bittensor.utils import u16_normalized_float
 # standart imports
 import asyncio
 from collections import namedtuple
-from concurrent.futures import ThreadPoolExecutor
 # import json
 import numpy
 import threading
@@ -92,12 +91,11 @@ class SubnetData(SubnetDataBase):
     }
 
     def __init__(
-            self, netuids, network, threads, debug,
+            self, netuids, network, debug,
             other_coldkey=None, other_chk_hotkey=None
         ):
         self._netuids = netuids
         self._network = network
-        self._threads = threads
         self._other_coldkey = other_coldkey
         self._other_chk_hotkey = other_chk_hotkey
 
@@ -149,15 +147,11 @@ class SubnetData(SubnetDataBase):
         netuids = self._netuids
         for attempt in range(1, max_attempts+1):
             self._print_debug(f"\nAttempt {attempt} of {max_attempts}")
-            if self._threads:
-                # TODO - This could be way better now that it's using asyncio.
-                #        Or just get rid of threading now.
-                with ThreadPoolExecutor(max_workers=self._threads) as executor:
-                    executor.map(self._get_validator_data, netuids)
-            else:
-                self._get_validator_data(netuids)
+            self._get_validator_data(netuids)
 
             # Get netuids missing data
+            # I don't think this is needed anymore but keeping it around
+            # just in case.
             netuids = list(set(netuids).difference(set(self._validator_data)))
             if netuids:
                 self._print_debug("\nFailed to gather data for subnets: "
@@ -172,9 +166,6 @@ class SubnetData(SubnetDataBase):
         if type(netuids) != list:
             netuids = [netuids]
 
-        # When threading, re-get subtensor for obtaining the updated values.
-        # The subtensor object can't seem to handle multiple threads calling
-        # the blocks_since_last_update() method at the same time.
         start_time = time.time()
         self._print_debug(f"\nConnecting to subtensor network: {self._network}")
         self._print_debug(f"Obtaining data for subnets: {netuids}\n")
