@@ -24,12 +24,6 @@ class SubnetDataPrinter:
             printer = CHKTablePrinter(self._vali_name)
             chk_test_attr = "chk_fraction"
 
-        def sort_key(netuid):
-            sort_key = self._validator_data[netuid].subnet_emission
-            if printer.reverse_sort:
-                sort_key *= -1
-            return sort_key
-
         missing_data = []
         no_chk_subntets = []
 
@@ -64,18 +58,24 @@ class RichPrinter(RichPrinterBase):
     def add_extra_printout(self, missing_data, no_chk_subntets):
         if missing_data:
             self._extra_printout.append(
-                 Text("\nFailed to obtain data from the following subnets."
-                      "\n(Try running these separately)"
-                      "\n===================="
-                     f"\n{self._tab}{', '.join(sorted(missing_data))}",
-                      style=self._get_style(2)))
+                Text(
+                    "\nFailed to obtain data from the following subnets."
+                    "\n(Try running these separately)"
+                    "\n===================="
+                    f"\n{self._tab}{', '.join(sorted(missing_data))}",
+                    style=self._get_style(2)
+                )
+            )
 
         if no_chk_subntets:
             self._extra_printout.append(
-                 Text("\nThe following subnets do not have child hotkeys."
-                      "\n===================="
-                     f"\n{self._tab}{', '.join(sorted(no_chk_subntets))}",
-                      style=self._get_style(1)))
+                Text(
+                    "\nThe following subnets do not have child hotkeys."
+                    "\n===================="
+                    f"\n{self._tab}{', '.join(sorted(no_chk_subntets))}",
+                    style=self._get_style(1)
+                )
+            )
 
     def print_everything(self):
         for text in self._extra_printout:
@@ -106,7 +106,7 @@ class TablePrinter(RichPrinter):
             "Take %",
             "vTrust",
             "Updated",
-            "Hotkey"
+            "Hotkey",
         ]
 
         return column_headers

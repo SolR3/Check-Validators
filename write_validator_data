@@ -32,13 +32,15 @@ def _parse_args():
     parser.add_argument(
         "-j", "--json-folder",
         required=True,
-        help="The json folder in which to write the json files.")
+        help="The json folder in which to write the json files."
+    )
 
     parser.add_argument(
         "-l", "--local-subtensor",
         help="Use the specified local subtensor (i.e. la, cali, titan, etc.). "
              f"Specify '{LOCAL_SUBTENSOR_ROTATE_ARG}' to rotate between all local "
-             "subtensors. When not specified, use the 'finney' network subtensor.")
+             "subtensors. When not specified, use the 'finney' network subtensor."
+    )
 
     procs_or_chunks = parser.add_mutually_exclusive_group()
 
@@ -47,18 +49,21 @@ def _parse_args():
         type=int,
         default=0,
         help="The number of chunks. Each chunk will write a different json file "
-             "for a range of validators. This is only valid when not multi-processing.")
+             "for a range of validators. This is only valid when not multi-processing."
+    )
 
     parser.add_argument(
         "-o", "--run-once",
         action="store_true",
-        help="When specified, the data gathering and json write happnes only once.")
+        help="When specified, the data gathering and json write happnes only once."
+    )
 
     parser.add_argument(
         "-i", "--interval",
         type=float,
         default=5,
-        help="The number of minutes between validator data gathering.")
+        help="The number of minutes between validator data gathering."
+    )
 
     return parser.parse_args()
 

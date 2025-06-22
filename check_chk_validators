@@ -19,33 +19,39 @@ def _parse_args():
     parser.add_argument(
         "-l", "--local-subtensor",
         help="Use the specified local subtensor (i.e. la, cali, titan, etc.). "
-             "When not specified, use the 'finney' network subtensor.")
+             "When not specified, use the 'finney' network subtensor."
+    )
 
     parser.add_argument(
         "-s", "--subnets",
         nargs="+",
         type=int,
         help="When specified, the list of netuids are checked. When not "
-             "specified, all subnets are checked.")
+             "specified, all subnets are checked."
+    )
 
     parser.add_argument(
         "-p", "--pending",
         action="store_true",
-        help="When specified, print data for pending CHK hotkeys.")
+        help="When specified, print data for pending CHK hotkeys."
+    )
 
     parser.add_argument(
         "-k", "--hotkey",
-        help="Specify a different hotkey to check than Rizzo.")
+        help="Specify a different hotkey to check than Rizzo."
+    )
 
     parser.add_argument(
         "-n", "--vali-name",
         default="Rizzo",
-        help="Specify a different validator name in the table printout.")
+        help="Specify a different validator name in the table printout."
+    )
 
     parser.add_argument(
         "-v", "--verbose",
         action="store_true",
-        help="Print verbose output.")
+        help="Print verbose output."
+    )
 
     return parser.parse_args()
 

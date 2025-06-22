@@ -7,7 +7,6 @@ import asyncio
 from collections import namedtuple
 # import json
 import numpy
-import threading
 import time
 
 
@@ -19,32 +18,32 @@ MAX_U_THRESHOLD = 100800 # 2 weeks
 
 class SubnetDataBase:
     ValidatorData = namedtuple(
-    "ValidatorData", [
-        "netuid",
-        "subnet_emission",
-        "subnet_tempo",
-        "num_total_validators",
-        "num_valid_validators",
-        "rizzo_stake_rank",
-        "rizzo_emission",
-        "rizzo_vtrust",
-        "rt21_vtrust",
-        "rt21_vtrust_gap",
-        "max_vtrust",
-        "avg_vtrust",
-        "min_vtrust",
-        "rizzo_updated",
-        "min_updated",
-        "avg_updated",
-        "max_updated",
-        "chk_fraction",
-        "chk_vtrust",
-        "chk_updated",
-        "chk_pending_block",
-        "chk_pending_time",
-        "child_hotkey_data",
-        "pending_child_hotkey_data",
-        "validator_hotkeys",
+        "ValidatorData", [
+            "netuid",
+            "subnet_emission",
+            "subnet_tempo",
+            "num_total_validators",
+            "num_valid_validators",
+            "rizzo_stake_rank",
+            "rizzo_emission",
+            "rizzo_vtrust",
+            "rt21_vtrust",
+            "rt21_vtrust_gap",
+            "max_vtrust",
+            "avg_vtrust",
+            "min_vtrust",
+            "rizzo_updated",
+            "min_updated",
+            "avg_updated",
+            "max_updated",
+            "chk_fraction",
+            "chk_vtrust",
+            "chk_updated",
+            "chk_pending_block",
+            "chk_pending_time",
+            "child_hotkey_data",
+            "pending_child_hotkey_data",
+            "validator_hotkeys",
         ]
     )
     ChildHotkeyData = namedtuple(
@@ -99,8 +98,6 @@ class SubnetData(SubnetDataBase):
         self._other_coldkey = other_coldkey
         self._other_chk_hotkey = other_chk_hotkey
 
-        self._validator_data_lock = threading.Lock()
-
         super(SubnetData, self).__init__(verbose)
 
     def to_dict(self):
@@ -127,7 +124,8 @@ class SubnetData(SubnetDataBase):
         for netuid in self._validator_data:
             data = self._validator_data[netuid]
             data_dict[netuid] = dict(
-                [(f, serializable(getattr(data, f))) for f in data._fields])
+                [(f, serializable(getattr(data, f))) for f in data._fields]
+            )
         return data_dict
 
     def _get_uid(self, metagraph):
@@ -154,8 +152,10 @@ class SubnetData(SubnetDataBase):
             # just in case.
             netuids = list(set(netuids).difference(set(self._validator_data)))
             if netuids:
-                self._print_verbose("\nFailed to gather data for subnets: "
-                                 f"{', '.join([str(n) for n in netuids])}.")
+                self._print_verbose(
+                    "\nFailed to gather data for subnets: "
+                    f"{', '.join([str(n) for n in netuids])}."
+                )
             else:
                 break
 
@@ -232,8 +232,9 @@ class SubnetData(SubnetDataBase):
                 )
 
         total_time = time.time() - start_time
-        self._print_verbose(f"\nData gathered in {int(total_time)} seconds "
-                          f"for subnets: {netuids}.")
+        self._print_verbose(
+            f"\nData gathered in {int(total_time)} seconds for subnets: {netuids}."
+        )
 
     def _filter_hotkey_swap_hotkeys(self, metagraphs, children, do_pending):
         for i, netuid_element in enumerate(children):
@@ -333,7 +334,8 @@ class SubnetData(SubnetDataBase):
             rizzo_updated = current_block - metagraph.last_update[rizzo_uid]
             rizzo_stake = metagraph.S[rizzo_uid]
             rizzo_stake_rank = (
-                len(metagraph.S) - sorted(metagraph.S).index(rizzo_stake))
+                len(metagraph.S) - sorted(metagraph.S).index(rizzo_stake)
+            )
 
         # Get child hotkey data
         chk_fraction = 0.0
@@ -459,34 +461,33 @@ class SubnetData(SubnetDataBase):
             max_updated = numpy.max(updateds)
 
         # Store the data.
-        with self._validator_data_lock:
-            self._validator_data[netuid] = self.ValidatorData(
-                netuid=netuid,
-                subnet_emission=subnet_emission,
-                subnet_tempo=subnet_tempo,
-                num_total_validators=num_total_validators,
-                num_valid_validators=num_valid_validators,
-                rizzo_stake_rank=rizzo_stake_rank,
-                rizzo_emission=rizzo_emission,
-                rizzo_vtrust=rizzo_vtrust,
-                rt21_vtrust=rt21_vtrust,
-                rt21_vtrust_gap=rt21_vtrust_gap,
-                max_vtrust=max_vtrust,
-                avg_vtrust=avg_vtrust,
-                min_vtrust=min_vtrust,
-                rizzo_updated=rizzo_updated,
-                min_updated=min_updated,
-                avg_updated=avg_updated,
-                max_updated=max_updated,
-                chk_fraction=chk_fraction,
-                chk_vtrust=chk_vtrust,
-                chk_updated=chk_updated,
-                chk_pending_block=chk_pending_block,
-                chk_pending_time=chk_pending_time,
-                child_hotkey_data=child_hotkey_data,
-                pending_child_hotkey_data=pending_child_hotkey_data,
-                validator_hotkeys=validator_hotkeys,
-            )
+        self._validator_data[netuid] = self.ValidatorData(
+            netuid=netuid,
+            subnet_emission=subnet_emission,
+            subnet_tempo=subnet_tempo,
+            num_total_validators=num_total_validators,
+            num_valid_validators=num_valid_validators,
+            rizzo_stake_rank=rizzo_stake_rank,
+            rizzo_emission=rizzo_emission,
+            rizzo_vtrust=rizzo_vtrust,
+            rt21_vtrust=rt21_vtrust,
+            rt21_vtrust_gap=rt21_vtrust_gap,
+            max_vtrust=max_vtrust,
+            avg_vtrust=avg_vtrust,
+            min_vtrust=min_vtrust,
+            rizzo_updated=rizzo_updated,
+            min_updated=min_updated,
+            avg_updated=avg_updated,
+            max_updated=max_updated,
+            chk_fraction=chk_fraction,
+            chk_vtrust=chk_vtrust,
+            chk_updated=chk_updated,
+            chk_pending_block=chk_pending_block,
+            chk_pending_time=chk_pending_time,
+            child_hotkey_data=child_hotkey_data,
+            pending_child_hotkey_data=pending_child_hotkey_data,
+            validator_hotkeys=validator_hotkeys,
+        )
 
 
 # class SubnetDataFromWebServer(SubnetDataBase):

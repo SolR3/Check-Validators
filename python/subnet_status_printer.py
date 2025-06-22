@@ -34,11 +34,15 @@ class SubnetDataPrinter:
         # Loop through all subnets and print out
         # their vtrust and updated data.
         if self._netuids:
-            netuids = (sorted(self._netuids, key=sort_key)
-                       if self._sort_subnets else self._netuids)
+            netuids = (
+                sorted(self._netuids, key=sort_key)
+                if self._sort_subnets else self._netuids
+            )
         else:
-            netuids = (sorted(self._validator_data, key=sort_key)
-                       if self._sort_subnets else self._validator_data.keys())
+            netuids = (
+                sorted(self._validator_data, key=sort_key)
+                if self._sort_subnets else self._validator_data.keys()
+            )
 
         for netuid in netuids:
             if netuid not in self._validator_data:
@@ -74,15 +78,19 @@ class RichPrinter(RichPrinterBase):
         
         if total_emission is not None:
             self._extra_printout.append(
-                Text(f"\nTotal Emission = {total_emission:.5f}"))
+                Text(f"\nTotal Emission = {total_emission:.5f}")
+            )
 
         if missing_data:
             self._extra_printout.append(
-                 Text("\nFailed to obtain data from the following subnets."
-                      "\n(Try running these separately)"
-                      "\n===================="
-                     f"\n{self._tab}{', '.join(sorted(missing_data))}",
-                      style=self._get_style(2)))
+                Text(
+                    "\nFailed to obtain data from the following subnets."
+                    "\n(Try running these separately)"
+                    "\n===================="
+                    f"\n{self._tab}{', '.join(sorted(missing_data))}",
+                    style=self._get_style(2)
+                )
+            )
 
     def print_everything(self):
         for text in self._extra_printout:
@@ -100,39 +108,56 @@ class TablePrinter(RichPrinter):
 
         self._table = Table(title=f"{vali_name} Validators")
         self._table.add_column(
-            "Subnet", justify="left", no_wrap=True)
+            "Subnet", justify="left", no_wrap=True
+        )
         self._table.add_column(
-            "Subnet E", justify="left", no_wrap=True)
+            "Subnet E", justify="left", no_wrap=True
+        )
         # self._table.add_column(
-        #     f"{vali_name} Rank", justify="left", no_wrap=True)
+        #     f"{vali_name} Rank", justify="left", no_wrap=True
+        # )
         # self._table.add_column(
-        #     f"{vali_name} E", justify="left", no_wrap=True)
+        #     f"{vali_name} E", justify="left", no_wrap=True
+        # )
         self._table.add_column(
-            "# Valis", justify="left", no_wrap=True)
+            "# Valis", justify="left", no_wrap=True
+        )
         # self._table.add_column(
-        #     f"{vali_name} %", justify="left", no_wrap=True)
+        #     f"{vali_name} %", justify="left", no_wrap=True
+        # )
         self._table.add_column(
-            "CHK vT", justify="left", no_wrap=True)
+            "CHK vT", justify="left", no_wrap=True
+        )
         self._table.add_column(
-            f"{vali_name} vT", justify="left", no_wrap=True)
+            f"{vali_name} vT", justify="left", no_wrap=True
+        )
         self._table.add_column(
-            "Rt21 vT Gap", justify="left", no_wrap=True)
+            "Rt21 vT Gap", justify="left", no_wrap=True
+        )
         self._table.add_column(
-            "Max vT", justify="left", no_wrap=True)
+            "Max vT", justify="left", no_wrap=True
+        )
         self._table.add_column(
-            "Avg vT", justify="left", no_wrap=True)
+            "Avg vT", justify="left", no_wrap=True
+        )
         self._table.add_column(
-            "Min vT", justify="left", no_wrap=True)
+            "Min vT", justify="left", no_wrap=True
+        )
         self._table.add_column(
-            "CHK U", justify="left", no_wrap=True)
+            "CHK U", justify="left", no_wrap=True
+        )
         self._table.add_column(
-            f"{vali_name} U", justify="left", no_wrap=True)
+            f"{vali_name} U", justify="left", no_wrap=True
+        )
         self._table.add_column(
-            "Min U", justify="left", no_wrap=True)
+            "Min U", justify="left", no_wrap=True
+        )
         self._table.add_column(
-            "Avg U", justify="left", no_wrap=True)
+            "Avg U", justify="left", no_wrap=True
+        )
         self._table.add_column(
-            "Max U", justify="left", no_wrap=True)
+            "Max U", justify="left", no_wrap=True
+        )
 
     def update_printout(self, validator_data):
         rizzo_vtrust_status = self._get_vtrust_status(
@@ -158,7 +183,8 @@ class TablePrinter(RichPrinter):
         # else:
         #     rizzo_stake_rank = (
         #         f"{validator_data.rizzo_stake_rank}/"
-        #             f"{validator_data.num_validators}")
+        #         f"{validator_data.num_validators}"
+        #     )
 
         rizzo_vtrust_value = self._get_float_value(validator_data.rizzo_vtrust, True)
         chk_vtrust_value = self._get_float_value(validator_data.chk_vtrust, False)

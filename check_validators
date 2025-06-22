@@ -16,34 +16,40 @@ def _parse_args():
     parser.add_argument(
         "-l", "--local-subtensor",
         help="Use the specified local subtensor (i.e. la, cali, titan, etc.). "
-             "When not specified, use the 'finney' network subtensor.")
+             "When not specified, use the 'finney' network subtensor."
+    )
 
     parser.add_argument(
         "-s", "--subnets",
         nargs="+",
         type=int,
         help="When specified, the list of netuids are checked. When not "
-             "specified, all subnets are checked.")
+             "specified, all subnets are checked."
+    )
     
     parser.add_argument(
         "-c", "--chk-only",
         action="store_true",
         help="When specified, only subnets in which we are child-hotkeying "
-             "are displayed. When not specified, all subnets are displayed.")
+             "are displayed. When not specified, all subnets are displayed."
+    )
 
     parser.add_argument(
         "-k", "--coldkey",
-        help="Specify a different coldkey to check than Rizzo.")
+        help="Specify a different coldkey to check than Rizzo."
+    )
 
     parser.add_argument(
         "-n", "--vali-name",
         default="Rizzo",
-        help="Specify a different validator name in the table printout.")
+        help="Specify a different validator name in the table printout."
+    )
 
     parser.add_argument(
         "-v", "--verbose",
         action="store_true",
-        help="Print verbose output.")
+        help="Print verbose output."
+    )
 
     return parser.parse_args()
 
