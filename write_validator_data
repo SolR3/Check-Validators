@@ -42,9 +42,7 @@ def _parse_args():
              "subtensors. When not specified, use the 'finney' network subtensor."
     )
 
-    procs_or_chunks = parser.add_mutually_exclusive_group()
-
-    procs_or_chunks.add_argument(
+    parser.add_argument(
         "-c", "--chunks",
         type=int,
         default=0,
