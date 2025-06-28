@@ -443,18 +443,20 @@ class SubnetData(SubnetDataBase):
             ):
                 num_valid_validators += 1
 
-        # Get rt21 vTrust
+        # Get rt21 vTrust and gap between rizzo and rt21
         try:
             rt21_uid = metagraph.coldkeys.index(self._coldkeys["Rt21"])
         except ValueError:
             rt21_vtrust = None
         else:
             rt21_vtrust = metagraph.Tv[rt21_uid]
-        rt21_vtrust_gap = (
-            rt21_vtrust - rizzo_vtrust
-            if rt21_vtrust is not None and rizzo_vtrust is not None
-            else None
-        )
+
+        if rt21_vtrust is None:
+            rt21_vtrust_gap = None
+        elif rizzo_vtrust is None:
+            rt21_vtrust_gap = rt21_vtrust
+        else:
+            rt21_vtrust_gap = rt21_vtrust - rizzo_vtrust
 
         # Get other validator data
         if not valid_uids:
