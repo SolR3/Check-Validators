@@ -9,11 +9,12 @@ from subnet_printer_base import RichPrinterBase
 
 class SubnetDataPrinter:
     def __init__(
-            self, validator_data, netuids, chk_only, sort_subnets,
-            print_total_emission, vali_name,
+            self, validator_data, netuids, chk_only, missing_chk,
+            sort_subnets, print_total_emission, vali_name,
         ):
         self._netuids = netuids
         self._chk_only = chk_only
+        self._missing_chk = missing_chk
         self._sort_subnets = sort_subnets
         self._print_total_emission = print_total_emission
         self._vali_name = vali_name
@@ -44,6 +45,7 @@ class SubnetDataPrinter:
                 if self._sort_subnets else self._validator_data.keys()
             )
 
+        epsilon = 1e-5
         for netuid in netuids:
             if netuid not in self._validator_data:
                 missing_data.append(str(netuid))
@@ -52,6 +54,9 @@ class SubnetDataPrinter:
             validator_data = self._validator_data[netuid]
 
             if self._chk_only and not validator_data.child_hotkey_data:
+                continue
+
+            if self._missing_chk and validator_data.missing_chk <= epsilon:
                 continue
 
             if validator_data.rizzo_emission is not None:
@@ -129,6 +134,9 @@ class TablePrinter(RichPrinter):
             "CHK vT", justify="left", no_wrap=True
         )
         self._table.add_column(
+            "CHK ?", justify="left", no_wrap=True  # CHK Missing
+        )
+        self._table.add_column(
             f"{vali_name} vT", justify="left", no_wrap=True
         )
         self._table.add_column(
@@ -160,6 +168,8 @@ class TablePrinter(RichPrinter):
         )
 
     def update_printout(self, validator_data):
+        epsilon = 1e-5
+
         rizzo_vtrust_status = self._get_vtrust_status(
             validator_data.rizzo_vtrust, validator_data.avg_vtrust
         )
@@ -172,6 +182,11 @@ class TablePrinter(RichPrinter):
         )
         chk_updated_status = self._get_updated_status(
             validator_data.chk_updated, validator_data.avg_updated
+        )
+
+        missing_chk_status = (
+            2 if validator_data.missing_chk > epsilon
+            else 0
         )
 
         rt21_vtrust_gap_status = self._get_rt21_vtrust_gap_status(
@@ -193,6 +208,12 @@ class TablePrinter(RichPrinter):
             chk_fraction_value = int(round(validator_data.chk_fraction * 100))
             chk_vtrust_value = f"{chk_vtrust_value} ({chk_fraction_value}%)"
 
+        if validator_data.missing_chk > epsilon:
+            missing_chk_value = int(round(validator_data.missing_chk * 100))
+            missing_chk_value = f"{missing_chk_value}%"
+        else:
+            missing_chk_value = ""
+
         rt21_vtrust_gap_value = self._get_float_value(
             validator_data.rt21_vtrust_gap, False
         )
@@ -204,7 +225,10 @@ class TablePrinter(RichPrinter):
             Text(
                 str(validator_data.netuid),
                 style=self._get_style(
-                    max(rizzo_vtrust_status, rizzo_updated_status, rt21_vtrust_gap_status)
+                    max(
+                        rizzo_vtrust_status, rizzo_updated_status,
+                        rt21_vtrust_gap_status, missing_chk_status
+                    )
                 )
             ),
             Text(f"{validator_data.subnet_emission:.2f}%"),
@@ -217,6 +241,10 @@ class TablePrinter(RichPrinter):
             Text(
                 chk_vtrust_value,
                 style=self._get_style(chk_vtrust_status)
+            ),
+            Text(
+                missing_chk_value,
+                style=self._get_style(missing_chk_status)
             ),
             Text(
                 rizzo_vtrust_value,

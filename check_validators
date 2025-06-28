@@ -35,6 +35,13 @@ def _parse_args():
     )
 
     parser.add_argument(
+        "-m", "--missing-chk",
+        action="store_true",
+        help="When specified, only subnets that have missing CHK are "
+             "displayed. When not specified, all subnets are displayed."
+    )
+
+    parser.add_argument(
         "-k", "--coldkey",
         help="Specify a different coldkey to check than Rizzo."
     )
@@ -73,15 +80,15 @@ def main(options):
     )
     netuids = options.subnets or bittensor.subtensor(network=network).get_subnets()[1:]
     sort_subnets = not bool(options.subnets)
-    print_total_emission = not (options.chk_only or bool(options.subnets))
+    print_total_emission = not (options.chk_only or options.missing_chk or bool(options.subnets))
 
     start_time = time.time()
     validator_data = SubnetData(
         netuids, network, verbose=options.verbose, other_coldkey=options.coldkey
     ).validator_data
     subnet_data_printer = SubnetDataPrinter(
-        validator_data, netuids, options.chk_only, sort_subnets,
-        print_total_emission, options.vali_name
+        validator_data, netuids, options.chk_only, options.missing_chk,
+         sort_subnets, print_total_emission, options.vali_name
     )
     total_time = time.time() - start_time
 
