@@ -39,6 +39,7 @@ class SubnetDataBase:
             "chk_fraction",
             "chk_vtrust",
             "chk_updated",
+            "missing_chk",
             "chk_pending_block",
             "chk_pending_time",
             "child_hotkey_data",
@@ -197,7 +198,9 @@ class SubnetData(SubnetDataBase):
                         for netuid in netuids
                     ]
                 )
-                self._filter_hotkey_swap_hotkeys(metagraphs, children, False)
+                swap_child_hotkeys = self._filter_swap_hotkeys(
+                    metagraphs, children, False
+                )
 
                 # Get the list of pending child hotkeys for each netuid
                 children_pending = await asyncio.gather(
@@ -206,7 +209,9 @@ class SubnetData(SubnetDataBase):
                         for netuid in netuids
                     ]
                 )
-                self._filter_hotkey_swap_hotkeys(metagraphs, children_pending, True)
+                # self._filter_swap_hotkeys(
+                #     metagraphs, children_pending, True
+                # )
 
             # Get the take for each child hotkey on each netuid.
             chk_takes_dict = await self._get_child_hotkey_take_data(
@@ -218,27 +223,29 @@ class SubnetData(SubnetDataBase):
                 subtensor, netuids, children_pending, True
             )
 
-            # Get all of the rest of the data from the metagraph.
-            for i, netuid in enumerate(netuids):
-                metagraph = metagraphs[i]
-                child_hotkeys = children[i][1]
-                child_takes = chk_takes_dict.get(netuid, [])
-                child_hotkeys_pending, chk_pending_block = children_pending[i]
-                child_takes_pending = chk_takes_pending_dict.get(netuid, [])
-                self._get_data_from_metagraph(
-                    metagraph, netuid, child_hotkeys, child_takes,
-                    child_hotkeys_pending, child_takes_pending,
-                    block, chk_pending_block
-                )
+        # Get all of the rest of the data from the metagraph.
+        for i, netuid in enumerate(netuids):
+            metagraph = metagraphs[i]
+            child_hotkeys = children[i][1]
+            child_takes = chk_takes_dict.get(netuid, [])
+            swap_child_hotkey = swap_child_hotkeys[netuid]
+            child_hotkeys_pending, chk_pending_block = children_pending[i]
+            child_takes_pending = chk_takes_pending_dict.get(netuid, [])
+            self._get_data_from_metagraph(
+                metagraph, netuid, child_hotkeys, child_takes, swap_child_hotkey,
+                child_hotkeys_pending, child_takes_pending, block, chk_pending_block
+            )
 
         total_time = time.time() - start_time
         self._print_verbose(
             f"\nData gathered in {int(total_time)} seconds for subnets: {netuids}."
         )
 
-    def _filter_hotkey_swap_hotkeys(self, metagraphs, children, do_pending):
+    def _filter_swap_hotkeys(self, metagraphs, children, do_pending):
+        swap_child_hotkeys = {}
         for i, netuid_element in enumerate(children):
             metagraph = metagraphs[i]
+            swap_child_hotkeys[metagraph.netuid] = (0.0, "")
             try:
                 vali_index = metagraph.coldkeys.index(self._coldkeys["Rizzo"])
             except ValueError:
@@ -251,7 +258,11 @@ class SubnetData(SubnetDataBase):
                 child_hotkeys = netuid_element[1]
             for hotkey_element in child_hotkeys:
                 if hotkey_element[1] == hotkey:
+                    swap_child_hotkeys[metagraph.netuid] = hotkey_element
                     child_hotkeys.remove(hotkey_element)
+                    break
+
+        return swap_child_hotkeys
 
     async def _get_child_hotkey_take_data(
             self, subtensor, netuids, children, do_pending
@@ -295,9 +306,8 @@ class SubnetData(SubnetDataBase):
         return chk_takes_dict
 
     def _get_data_from_metagraph(
-            self, metagraph, netuid, child_hotkeys, child_takes,
-            child_hotkeys_pending, child_takes_pending,
-            current_block, chk_pending_block
+            self, metagraph, netuid, child_hotkeys, child_takes, swap_child_hotkey,
+            child_hotkeys_pending, child_takes_pending, current_block, chk_pending_block
     ):
         # Get the hotkeys that we care about (Rizzo, Rt21, etc.)
         vali_hotkeys = {}
@@ -374,6 +384,13 @@ class SubnetData(SubnetDataBase):
                     chk_updated = child_updated
 
             chk_vtrust /= chk_fraction
+
+        # Get missing CHK amount for subnets with swap hotkeys
+        if validator_hotkeys.Rizzo and validator_hotkeys.Rizzo == self._get_chk_hotkey():
+            missing_chk = 0.0
+        else:
+            swap_chk_fraction = swap_child_hotkey[0]  # if swap_child_hotkey else 0.0
+            missing_chk = 1.0 - chk_fraction - swap_chk_fraction
 
         # Get pending child hotkey data
         pending_child_hotkey_data = []
@@ -482,6 +499,7 @@ class SubnetData(SubnetDataBase):
             chk_fraction=chk_fraction,
             chk_vtrust=chk_vtrust,
             chk_updated=chk_updated,
+            missing_chk=missing_chk,
             chk_pending_block=chk_pending_block,
             chk_pending_time=chk_pending_time,
             child_hotkey_data=child_hotkey_data,
