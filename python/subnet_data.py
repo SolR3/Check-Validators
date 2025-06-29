@@ -90,6 +90,14 @@ class SubnetData(SubnetDataBase):
         "Yuma": "5E9fVY1jexCNVMjd2rdBsAxeamFGEMfzHcyTn2fHgdHeYc5p",
     }
 
+    # This is a fix to handle the subnets on which we're registered on
+    # multiple uids.
+    _multi_uid_hotkeys = {
+        20: "5ExaAP3ENz3bCJufTzWzs6J6dCWuhjjURT8AdZkQ5qA4As2o",
+        86: "5F9FAMhhzZJBraryVEp1PTeaL5bgjRKcw1FSyuvRLmXBds86",
+        124: "5FKk6ucEKuKzLspVYSv9fVHonumxMJ33MdHqbVjZi2NUs124",
+    }
+
     def __init__(
             self, netuids, network, verbose=True,
             other_coldkey=None, other_chk_hotkey=None
@@ -130,6 +138,12 @@ class SubnetData(SubnetDataBase):
         return data_dict
 
     def _get_uid(self, metagraph):
+        # This is a fix to handle the subnets on which we're registered on
+        # multiple uids.
+        if not self._other_coldkey and metagraph.netuid in self._multi_uid_hotkeys:
+            hotkey = self._multi_uid_hotkeys[metagraph.netuid]
+            return metagraph.hotkeys.index(hotkey)
+
         coldkey = self._other_coldkey or self._coldkeys["Rizzo"]
         try:
             return metagraph.coldkeys.index(coldkey)
@@ -246,9 +260,9 @@ class SubnetData(SubnetDataBase):
         for i, netuid_element in enumerate(children):
             metagraph = metagraphs[i]
             swap_child_hotkeys[metagraph.netuid] = (0.0, "")
-            try:
-                vali_index = metagraph.coldkeys.index(self._coldkeys["Rizzo"])
-            except ValueError:
+            
+            vali_index = self._get_uid(metagraph)
+            if vali_index is None:
                 continue
             hotkey = metagraph.hotkeys[vali_index]
 
@@ -312,9 +326,15 @@ class SubnetData(SubnetDataBase):
         # Get the hotkeys that we care about (Rizzo, Rt21, etc.)
         vali_hotkeys = {}
         for vali_name, vali_coldkey in self._coldkeys.items():
-            try:
-                vali_index = metagraph.coldkeys.index(vali_coldkey)
-            except ValueError:
+            if vali_name == "Rizzo":
+                vali_index = self._get_uid(metagraph)
+            else:
+                try:
+                    vali_index = metagraph.coldkeys.index(vali_coldkey)
+                except ValueError:
+                    vali_index = None
+
+            if vali_index is None:
                 vali_hotkeys[vali_name] = None
             else:
                 vali_hotkeys[vali_name] = metagraph.hotkeys[vali_index]
