@@ -82,7 +82,7 @@ class SubnetDataBase:
 
 
 class SubnetData(SubnetDataBase):
-    _rizzo_chk_hotkey = "5GduQSUxNJ4E3ReCDoPDtoHHgeoE4yHmnnLpUXBz9DAwmHWV"
+    _rizzo_chk_hotkey = "5FtBncJvGhxjBs4aFn2pid6aur9tBUuo9QR7sHe5DkoRizzo"
     _coldkeys = {
         "Rizzo": "5CMEwRYLefRmtJg7zzRyJtcXrQqmspr9B1r1nKySDReA37Z1",
         "Rt21": "5GZSAgaVGQqegjhEkxpJjpSVLVmNnE2vx2PFLzr7kBBMKpGQ",
