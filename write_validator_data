@@ -19,6 +19,7 @@ TIMESTAMP_FILE_NAME = "timestamp.json"
 LOCAL_SUBTENSORS = [
     "cali",
     "candyland",
+    "datacenter01",
     "la",
     "moonbase",
     "titan",
