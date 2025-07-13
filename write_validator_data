@@ -171,7 +171,7 @@ def main(options):
         except Exception as err:
             print("")
             print(f"ERROR: Subtensor connection failed on '{network}'")
-            print(err)
+            print(f"{type(err).__name__}: {err}")
             print("")
             if options.local_subtensor is None:
                 print("Rotating subtensors and trying again.")
