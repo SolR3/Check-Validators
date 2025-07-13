@@ -168,7 +168,8 @@ def main(options):
         start_time = time.time()
         local_subtensor_index = (local_subtensor_index + 1) % len(LOCAL_SUBTENSORS)
         network = get_network(options.local_subtensor, local_subtensor_index)
-        all_subnets = bittensor.subtensor(network=network).get_subnets()
+        with bittensor.subtensor(network=network) as subtensor:
+            all_subnets = subtensor.get_subnets()
         tempdir = tempfile.mkdtemp(prefix="write_vali_data_")
 
         if options.chunks:
