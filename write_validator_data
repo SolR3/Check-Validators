@@ -24,7 +24,6 @@ LOCAL_SUBTENSORS = [
     "moonbase",
     "titan",
 ]
-LOCAL_SUBTENSOR_ROTATE_ARG = "rotate"
 
 
 def _parse_args():
@@ -38,8 +37,10 @@ def _parse_args():
 
     parser.add_argument(
         "-l", "--local-subtensor",
+        nargs="?",
+        default=False,
         help="Use the specified local subtensor (i.e. la, cali, titan, etc.). "
-             f"Specify '{LOCAL_SUBTENSOR_ROTATE_ARG}' to rotate between all local "
+             "List the flag without a value to rotate between all local "
              "subtensors. When not specified, use the 'finney' network subtensor."
     )
 
@@ -144,18 +145,14 @@ def get_netuid_start_end_args(num_subnets, num_chunks):
         netuid_start = netuid_end + 1
 
 
-def get_network(local_subtensor, local_subtensor_index):
-    network_name = (
-        LOCAL_SUBTENSORS[local_subtensor_index]
-        if local_subtensor == LOCAL_SUBTENSOR_ROTATE_ARG
-        else local_subtensor
-    )
+def get_subtensor_network(local_subtensor, local_subtensor_index):
+    if local_subtensor is False:
+        return "finney"
 
-    return (
-        f"ws://subtensor-{network_name}.rizzo.network:9944"
-        if network_name
-        else "finney"
+    network_name = (
+        local_subtensor or LOCAL_SUBTENSORS[local_subtensor_index]
     )
+    return f"ws://subtensor-{network_name}.rizzo.network:9944"
 
 
 def main(options):
@@ -167,43 +164,54 @@ def main(options):
     while True:
         start_time = time.time()
         local_subtensor_index = (local_subtensor_index + 1) % len(LOCAL_SUBTENSORS)
-        network = get_network(options.local_subtensor, local_subtensor_index)
-        with bittensor.subtensor(network=network) as subtensor:
-            all_subnets = subtensor.get_subnets()
-        tempdir = tempfile.mkdtemp(prefix="write_vali_data_")
-
-        if options.chunks:
-            num_subnets = len(all_subnets) - 1
-            for i, (netuid_start, netuid_end) in enumerate(
-                get_netuid_start_end_args(num_subnets, options.chunks)
-            ):
-                if i > 0:
-                    time.sleep(2)
-                write_json_file(
-                    network, all_subnets, tempdir, netuid_start, netuid_end
-                )
-        else:
-            write_json_file(network, all_subnets, tempdir)
-
-        # Copy files over to relevant location
-        for file_name in os.listdir(options.json_folder):
-            json_file = os.path.join(options.json_folder, file_name)
-            if (
-                not os.path.isfile(json_file)
-                or os.path.splitext(json_file)[1] != ".json"
-            ):
+        network = get_subtensor_network(options.local_subtensor, local_subtensor_index)
+        try:
+            with bittensor.subtensor(network=network) as subtensor:
+                all_subnets = subtensor.get_subnets()
+        except Exception as err:
+            print("")
+            print(f"ERROR: Subtensor connection failed on '{network}'")
+            print(err)
+            print("")
+            if options.local_subtensor is None:
+                print("Rotating subtensors and trying again.")
+                time.sleep(1)
                 continue
-            print(f"Removing {json_file}")
-            os.unlink(json_file)
-        for file_name in os.listdir(tempdir):
-            src_json_file = os.path.join(tempdir, file_name)
-            dest_json_file = os.path.join(options.json_folder, file_name)
-            print(f"Moving {src_json_file} to {dest_json_file}")
-            os.rename(src_json_file, dest_json_file)
+        else:
+            tempdir = tempfile.mkdtemp(prefix="write_vali_data_")
 
-        os.rmdir(tempdir)
+            if options.chunks:
+                num_subnets = len(all_subnets) - 1
+                for i, (netuid_start, netuid_end) in enumerate(
+                    get_netuid_start_end_args(num_subnets, options.chunks)
+                ):
+                    if i > 0:
+                        time.sleep(2)
+                    write_json_file(
+                        network, all_subnets, tempdir, netuid_start, netuid_end
+                    )
+            else:
+                write_json_file(network, all_subnets, tempdir)
 
-        write_timestamp(options.json_folder)
+            # Copy files over to relevant location
+            for file_name in os.listdir(options.json_folder):
+                json_file = os.path.join(options.json_folder, file_name)
+                if (
+                    not os.path.isfile(json_file)
+                    or os.path.splitext(json_file)[1] != ".json"
+                ):
+                    continue
+                print(f"Removing {json_file}")
+                os.unlink(json_file)
+            for file_name in os.listdir(tempdir):
+                src_json_file = os.path.join(tempdir, file_name)
+                dest_json_file = os.path.join(options.json_folder, file_name)
+                print(f"Moving {src_json_file} to {dest_json_file}")
+                os.rename(src_json_file, dest_json_file)
+
+            os.rmdir(tempdir)
+
+            write_timestamp(options.json_folder)
 
         if options.run_once:
             break
