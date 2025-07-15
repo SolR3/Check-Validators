@@ -143,7 +143,11 @@ class SubnetData(SubnetDataBase):
         # multiple uids.
         if not self._other_coldkey and metagraph.netuid in self._multi_uid_hotkeys:
             hotkey = self._multi_uid_hotkeys[metagraph.netuid]
-            return metagraph.hotkeys.index(hotkey)
+            try:
+                return metagraph.hotkeys.index(hotkey)
+            except ValueError:
+                # We're not registered
+                return None
 
         coldkey = self._other_coldkey or self._coldkeys["Rizzo"]
         try:
