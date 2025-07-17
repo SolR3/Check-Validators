@@ -153,6 +153,7 @@ class SubnetData(SubnetDataBase):
         try:
             return metagraph.coldkeys.index(coldkey)
         except ValueError:
+            # We're not registered
             return None
 
     def _get_chk_hotkey(self):
