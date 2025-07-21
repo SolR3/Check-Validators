@@ -53,16 +53,11 @@ def _parse_args():
     )
 
     parser.add_argument(
-        "-o", "--run-once",
-        action="store_true",
-        help="When specified, the data gathering and json write happnes only once."
-    )
-
-    parser.add_argument(
         "-i", "--interval",
         type=float,
-        default=5,
-        help="The number of minutes between validator data gathering."
+        default=0,
+        help="The number of minutes between validator data gathering. If 0 or not "
+             "specified then the data is gathered only once."
     )
 
     return parser.parse_args()
@@ -213,7 +208,8 @@ def main(options):
 
             write_timestamp(options.json_folder)
 
-        if options.run_once:
+        # Only gather the data once.
+        if not interval_seconds:
             break
 
         total_seconds = round(time.time() - start_time)
@@ -222,6 +218,11 @@ def main(options):
             wait_time_formatted = format_time(wait_seconds)
             print(f"Waiting {wait_time_formatted}.")
             time.sleep(wait_seconds)
+        else:
+            print(
+                f"Processing took {total_seconds} seconds which is longer "
+                f"than {interval_seconds} seconds. Not waiting."
+            )
 
 
 if __name__ == "__main__":
