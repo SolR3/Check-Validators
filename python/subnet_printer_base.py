@@ -59,7 +59,7 @@ class RichPrinterBase:
         return 0
     
     @staticmethod
-    def _get_rt21_vtrust_gap_status(vtrust_gap):
+    def _get_vtrust_gap_status(vtrust_gap):
         if vtrust_gap is None:
             return 0
         if vtrust_gap > 0.2:

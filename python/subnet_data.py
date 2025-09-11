@@ -29,6 +29,8 @@ class SubnetDataBase:
             "rizzo_vtrust",
             "rt21_vtrust",
             "rt21_vtrust_gap",
+            "yuma_vtrust",
+            "yuma_vtrust_gap",
             "max_vtrust",
             "avg_vtrust",
             "min_vtrust",
@@ -484,6 +486,21 @@ class SubnetData(SubnetDataBase):
         else:
             rt21_vtrust_gap = rt21_vtrust - rizzo_vtrust
 
+        # Get yuma vTrust and gap between rizzo and yuma
+        try:
+            yuma_uid = metagraph.coldkeys.index(self._coldkeys["Yuma"])
+        except ValueError:
+            yuma_vtrust = None
+        else:
+            yuma_vtrust = metagraph.Tv[yuma_uid]
+
+        if yuma_vtrust is None:
+            yuma_vtrust_gap = None
+        elif rizzo_vtrust is None:
+            yuma_vtrust_gap = yuma_vtrust
+        else:
+            yuma_vtrust_gap = yuma_vtrust - rizzo_vtrust
+
         # Get other validator data
         if not valid_uids:
             max_vtrust = None
@@ -517,6 +534,8 @@ class SubnetData(SubnetDataBase):
             rizzo_vtrust=rizzo_vtrust,
             rt21_vtrust=rt21_vtrust,
             rt21_vtrust_gap=rt21_vtrust_gap,
+            yuma_vtrust=yuma_vtrust,
+            yuma_vtrust_gap=yuma_vtrust_gap,
             max_vtrust=max_vtrust,
             avg_vtrust=avg_vtrust,
             min_vtrust=min_vtrust,
