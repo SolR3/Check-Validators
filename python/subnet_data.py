@@ -87,10 +87,7 @@ class SubnetDataBase:
             print(message)
 
 
-class SubnetData(SubnetDataBase): 
-
-    
-
+class SubnetData(SubnetDataBase):
     def __init__(
             self, netuids, network, verbose=True,
             other_coldkey=None, other_chk_hotkey=None
