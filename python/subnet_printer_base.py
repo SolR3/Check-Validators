@@ -23,10 +23,10 @@ class RichPrinterBase:
                 return f"color({cls._yellow})"
         if status == 0:
             return f"color({cls._green})"
-        if status == -2:
-            return f"color({cls._blue})"
         if status == -1:
             return f"color({cls._white})"
+        if status == -2:
+            return f"color({cls._blue})"
         return ""
 
     @staticmethod
