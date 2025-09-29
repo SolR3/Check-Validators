@@ -157,10 +157,10 @@ class TablePrinter(RichPrinter):
             elif child_hotkey.hotkey == validator_data.validator_hotkeys.Rizzo:
                 # If validator_hotkeys.Rizzo is not None then we are registered
                 # so set the status to blue.
-                child_hotkey_status = -1
+                child_hotkey_status = -2
             else:
                 # Set the status hotkey to white.
-                child_hotkey_status = -2
+                child_hotkey_status = -1
 
             row_status = max(
                 row_status,

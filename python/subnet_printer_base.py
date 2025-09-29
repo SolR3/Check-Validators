@@ -23,9 +23,11 @@ class RichPrinterBase:
                 return f"color({cls._yellow})"
         if status == 0:
             return f"color({cls._green})"
-        if status == -1:
+        if status == -2:
             return f"color({cls._blue})"
-        return f"color({cls._white})"  # status == -2
+        if status == -1:
+            return f"color({cls._white})"
+        return ""
 
     @staticmethod
     def _get_float_value(value, dashes_if_none):
