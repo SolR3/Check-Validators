@@ -9,11 +9,15 @@ from collections import namedtuple
 import numpy
 import time
 
-
-MIN_STAKE_THRESHOLD = 4000 # TODO - Need some way to verify this
-                           # This is the value used by the taoyield site
-MIN_VTRUST_THRESHOLD = 0.01
-MAX_U_THRESHOLD = 100800 # 2 weeks
+# Local imports
+from subnet_constants import (
+    MIN_STAKE_THRESHOLD,
+    MIN_VTRUST_THRESHOLD,
+    MAX_U_THRESHOLD,
+    COLDKEYS,
+    MULTI_UID_HOTKEYS,
+    RIZZO_CHK_HOTKEY,
+)
 
 
 class SubnetDataBase:
@@ -83,23 +87,9 @@ class SubnetDataBase:
             print(message)
 
 
-class SubnetData(SubnetDataBase):
-    _rizzo_chk_hotkey = "5FtBncJvGhxjBs4aFn2pid6aur9tBUuo9QR7sHe5DkoRizzo"
-    _coldkeys = {
-        "Rizzo": "5FuzgvtfbZWdKSRxyYVPAPYNaNnf9cMnpT7phL3s2T3Kkrzo",
-        "Rt21": "5GZSAgaVGQqegjhEkxpJjpSVLVmNnE2vx2PFLzr7kBBMKpGQ",
-        "OTF": "5HBtpwxuGNL1gwzwomwR7sjwUt8WXYSuWcLYN6f9KpTZkP4k",
-        "Yuma": "5E9fVY1jexCNVMjd2rdBsAxeamFGEMfzHcyTn2fHgdHeYc5p",
-    }
+class SubnetData(SubnetDataBase): 
 
-    # This is a fix to handle the subnets on which we're registered on
-    # multiple uids.
-    _multi_uid_hotkeys = {
-        20: "5ExaAP3ENz3bCJufTzWzs6J6dCWuhjjURT8AdZkQ5qA4As2o",
-        86: "5F9FAMhhzZJBraryVEp1PTeaL5bgjRKcw1FSyuvRLmXBds86",
-        123: "5GzaskJbqJvGGXtu2124i9YLgHfMDDr7Pduq6xfYYgkJs123",
-        124: "5FKk6ucEKuKzLspVYSv9fVHonumxMJ33MdHqbVjZi2NUs124",
-    }
+    
 
     def __init__(
             self, netuids, network, verbose=True,
@@ -143,15 +133,15 @@ class SubnetData(SubnetDataBase):
     def _get_uid(self, metagraph):
         # This is a fix to handle the subnets on which we're registered on
         # multiple uids.
-        if not self._other_coldkey and metagraph.netuid in self._multi_uid_hotkeys:
-            hotkey = self._multi_uid_hotkeys[metagraph.netuid]
+        if not self._other_coldkey and metagraph.netuid in MULTI_UID_HOTKEYS:
+            hotkey = MULTI_UID_HOTKEYS[metagraph.netuid]
             try:
                 return metagraph.hotkeys.index(hotkey)
             except ValueError:
                 # We're not registered
                 return None
 
-        coldkey = self._other_coldkey or self._coldkeys["Rizzo"]
+        coldkey = self._other_coldkey or COLDKEYS["Rizzo"]
         try:
             return metagraph.coldkeys.index(coldkey)
         except ValueError:
@@ -159,7 +149,7 @@ class SubnetData(SubnetDataBase):
             return None
 
     def _get_chk_hotkey(self):
-        return self._other_chk_hotkey or self._rizzo_chk_hotkey
+        return self._other_chk_hotkey or RIZZO_CHK_HOTKEY
 
     def _get_subnet_data(self):
         self._print_verbose("\nGathering data")
@@ -333,7 +323,7 @@ class SubnetData(SubnetDataBase):
     ):
         # Get the hotkeys that we care about (Rizzo, Rt21, etc.)
         vali_hotkeys = {}
-        for vali_name, vali_coldkey in self._coldkeys.items():
+        for vali_name, vali_coldkey in COLDKEYS.items():
             if vali_name == "Rizzo":
                 vali_index = self._get_uid(metagraph)
             else:
@@ -473,7 +463,7 @@ class SubnetData(SubnetDataBase):
 
         # Get rt21 vTrust and gap between rizzo and rt21
         try:
-            rt21_uid = metagraph.coldkeys.index(self._coldkeys["Rt21"])
+            rt21_uid = metagraph.coldkeys.index(COLDKEYS["Rt21"])
         except ValueError:
             rt21_vtrust = None
         else:
@@ -488,7 +478,7 @@ class SubnetData(SubnetDataBase):
 
         # Get yuma vTrust and gap between rizzo and yuma
         try:
-            yuma_uid = metagraph.coldkeys.index(self._coldkeys["Yuma"])
+            yuma_uid = metagraph.coldkeys.index(COLDKEYS["Yuma"])
         except ValueError:
             yuma_vtrust = None
         else:
