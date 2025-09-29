@@ -17,6 +17,7 @@ from subnet_constants import (
     COLDKEYS,
     MULTI_UID_HOTKEYS,
     RIZZO_CHK_HOTKEY,
+    RIZZO_HOTKEYS,
 )
 
 
@@ -51,6 +52,7 @@ class SubnetDataBase:
             "child_hotkey_data",
             "pending_child_hotkey_data",
             "validator_hotkeys",
+            "rizzo_expected_hotkey",
         ]
     )
     ChildHotkeyData = namedtuple(
@@ -131,7 +133,7 @@ class SubnetData(SubnetDataBase):
         # This is a fix to handle the subnets on which we're registered on
         # multiple uids.
         if not self._other_coldkey and metagraph.netuid in MULTI_UID_HOTKEYS:
-            hotkey = MULTI_UID_HOTKEYS[metagraph.netuid]
+            hotkey = RIZZO_HOTKEYS[metagraph.netuid]
             try:
                 return metagraph.hotkeys.index(hotkey)
             except ValueError:
@@ -320,9 +322,13 @@ class SubnetData(SubnetDataBase):
     ):
         # Get the hotkeys that we care about (Rizzo, Rt21, etc.)
         vali_hotkeys = {}
+        rizzo_expected_hotkey = None
         for vali_name, vali_coldkey in COLDKEYS.items():
             if vali_name == "Rizzo":
                 vali_index = self._get_uid(metagraph)
+                if vali_index is None:
+                    # Get our expected hotkey for the case in which we're not registered
+                    rizzo_expected_hotkey = RIZZO_HOTKEYS[metagraph.netuid]
             else:
                 try:
                     vali_index = metagraph.coldkeys.index(vali_coldkey)
@@ -539,6 +545,7 @@ class SubnetData(SubnetDataBase):
             child_hotkey_data=child_hotkey_data,
             pending_child_hotkey_data=pending_child_hotkey_data,
             validator_hotkeys=validator_hotkeys,
+            rizzo_expected_hotkey=rizzo_expected_hotkey,
         )
 
 

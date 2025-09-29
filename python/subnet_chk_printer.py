@@ -147,6 +147,21 @@ class TablePrinter(RichPrinter):
                     else 0
                 )
             )
+            # Don't add this one to the row status since it could be blue
+            # and if it's red then the vtrust and updated statuses will also
+            # be red anyways
+            if child_hotkey.hotkey == validator_data.rizzo_expected_hotkey:
+                # If rizzo_expected_hotkey is not None then we're not registered
+                # so set the status to red.
+                child_hotkey_status = 2
+            elif child_hotkey.hotkey == validator_data.validator_hotkeys.Rizzo:
+                # If validator_hotkeys.Rizzo is not None then we are registered
+                # so set the status to blue.
+                child_hotkey_status = -1
+            else:
+                # Set the status hotkey to white.
+                child_hotkey_status = -2
+
             row_status = max(
                 row_status,
                 hotkey_vtrust_status,
@@ -172,7 +187,9 @@ class TablePrinter(RichPrinter):
                 [(hotkey_updated, self._get_style(hotkey_updated_status)), "\n"]
             )
 
-            chk_hotkeys.extend([child_hotkey.hotkey, "\n"])
+            chk_hotkeys.extend(
+                [(child_hotkey.hotkey, self._get_style(child_hotkey_status)), "\n"]
+            )
 
         chk_percents.pop()
         chk_takes.pop()

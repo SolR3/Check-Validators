@@ -8,19 +8,24 @@ from subnet_constants import (
 
 
 class RichPrinterBase:
+    _blue = "12"
     _red = "9"
     _green = "10"
     _yellow = "11"
+    _white = "15"
     _tab = "    "
 
     @classmethod
     def _get_style(cls, status):
         if status == 2:
             return f"color({cls._red})"
-        elif status == 1:
+        if status == 1:
                 return f"color({cls._yellow})"
-        else:
+        if status == 0:
             return f"color({cls._green})"
+        if status == -1:
+            return f"color({cls._blue})"
+        return f"color({cls._white})"  # status == -2
 
     @staticmethod
     def _get_float_value(value, dashes_if_none):
