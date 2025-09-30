@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+
+# standard imports
+import argparse
+import asyncio
+import os
+import sys
+
+# Add local subnet_data module path
+sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
+
+# Local imports
+from subnet_constants import (
+    COLDKEYS,
+    MULTI_UID_HOTKEYS,
+    RIZZO_HOTKEYS,
+)
+
+
+def _parse_args():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "-s", "--subnets",
+        nargs="+",
+        type=int,
+        help="When specified, the list of netuids are checked. When not "
+             "specified, all subnets are checked."
+    )
+
+    parser.add_argument(
+        "-d", "--diff",
+        action="store_true",
+        help="When specified, only the subnets found with hotkeys different than "
+             "those in subnet_constants.RIZZO_HOTKEYS are printed."
+    )
+
+    parser.add_argument(
+        "-l", "--local-subtensor",
+        help="Use the specified local subtensor (i.e. la, cali, titan, etc.). "
+             "When not specified, use the 'finney' network subtensor."
+    )
+
+    return parser.parse_args()
+
+
+async def get_metagraphs(network, netuids):
+    async with AsyncSubtensor(network=network) as subtensor:
+        if not netuids:
+            netuids = await subtensor.get_subnets()
+            netuids = netuids[1:]
+
+        # Get the block to pass to async calls so everything is in sync
+        block = await subtensor.block
+
+        # Get the metagraph for each netuid
+        metagraphs = await asyncio.gather(
+            *[
+                subtensor.metagraph(netuid=netuid, block=block)
+                for netuid in netuids
+            ]
+        )
+
+    return metagraphs
+
+
+async def main(options):
+    network = (
+        f"ws://subtensor-{options.local_subtensor}.rizzo.network:9944"
+        if options.local_subtensor
+        else "finney"
+    )
+    netuids = options.subnets 
+
+    metagraphs = await get_metagraphs(network, netuids)
+
+    coldkey = COLDKEYS["Rizzo"]
+    hotkeys = {}
+    missing_hotkeys = {}
+    wrong_hotkeys = {}
+    for metagraph in metagraphs:
+        if metagraph.netuid in MULTI_UID_HOTKEYS:
+            found_hotkey = RIZZO_HOTKEYS[metagraph.netuid]
+        else:
+            try:
+                coldkey_index = metagraph.coldkeys.index(coldkey)
+            except ValueError:
+                found_hotkey = None
+            else:
+                found_hotkey = metagraph.hotkeys[coldkey_index]
+
+        if found_hotkey:
+            hotkeys[metagraph.netuid] = found_hotkey
+
+        constants_hotkey = RIZZO_HOTKEYS.get(metagraph.netuid)
+        if not constants_hotkey:
+            missing_hotkeys[metagraph.netuid] = found_hotkey
+        elif found_hotkey and found_hotkey != constants_hotkey:
+            wrong_hotkeys[metagraph.netuid] = (constants_hotkey, found_hotkey)
+
+    if options.diff:
+        print("")
+        if not missing_hotkeys:
+            print("No Missing Hotkeys")
+        else:
+            print("Missing Hotkeys:")
+            for netuid, good_hotkey in missing_hotkeys.items():
+                if good_hotkey:
+                    print(f"{netuid}: {good_hotkey}")
+                else:
+                    print(f"{netuid}: ???")
+        print("")
+        if not wrong_hotkeys:
+            print("No Wrong Hotkeys")
+        else:
+            print("Wrong Hotkeys:")
+            for netuid, (bad_hotkey, good_hotkey) in wrong_hotkeys.items():
+                print(f"{netuid}: {bad_hotkey} --> {good_hotkey}")
+    else:
+        print("")
+        print("Hotkeys:")
+        for netuid, hotkey in hotkeys.items():
+            print(f"{netuid}: {hotkey}")
+
+    print("")
+
+
+if __name__ == "__main__":
+    options = _parse_args()
+
+    # Bittensor import
+    from bittensor.core.async_subtensor import AsyncSubtensor
+
+    asyncio.run(main(options))
