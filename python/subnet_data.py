@@ -328,7 +328,7 @@ class SubnetData(SubnetDataBase):
                 vali_index = self._get_uid(metagraph)
                 if vali_index is None:
                     # Get our expected hotkey for the case in which we're not registered
-                    rizzo_expected_hotkey = RIZZO_HOTKEYS[metagraph.netuid]
+                    rizzo_expected_hotkey = RIZZO_HOTKEYS.get(metagraph.netuid)
             else:
                 try:
                     vali_index = metagraph.coldkeys.index(vali_coldkey)
