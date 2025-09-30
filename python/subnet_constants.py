@@ -28,7 +28,7 @@ COLDKEYS = {
 
 # This is a fix to handle the subnets on which our coldkeys is
 # registered on multiple uids.
-MULTI_UID_HOTKEYS = [20, 86, 123, 124,]
+MULTI_UID_HOTKEYS = (20,)
 
 RIZZO_CHK_HOTKEY = "5FtBncJvGhxjBs4aFn2pid6aur9tBUuo9QR7sHe5DkoRizzo"
 
