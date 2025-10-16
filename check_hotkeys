@@ -36,6 +36,12 @@ def _parse_args():
     )
 
     parser.add_argument(
+        "-t", "--takes",
+        action="store_true",
+        help="When specified print the CHK takes for each hotkey."
+    )
+
+    parser.add_argument(
         "-l", "--local-subtensor",
         help="Use the specified local subtensor (i.e. la, cali, titan, etc.). "
              "When not specified, use the 'finney' network subtensor."
@@ -62,6 +68,27 @@ async def get_metagraphs(network, netuids):
         )
 
     return metagraphs
+
+
+async def get_hotkey_takes(network, hotkeys):
+    async with AsyncSubtensor(network=network) as subtensor:
+        chk_take_func_calls = []
+        for netuid in sorted(hotkeys):
+            hotkey = hotkeys[netuid]
+            chk_take_func_calls.append(
+                subtensor.substrate.query(
+                    module="SubtensorModule",
+                    storage_function="ChildkeyTake",
+                    params=[hotkey, netuid]
+                )
+            )
+        chk_takes = (
+            [u16_normalized_float(r.value) for r in await asyncio.gather(*chk_take_func_calls)]
+            if chk_take_func_calls else []
+        )
+        for i, netuid in enumerate(sorted(hotkeys)):
+            take = int(round(chk_takes[i] * 100))
+            hotkeys[netuid] = (hotkeys[netuid], take)
 
 
 async def main(options):
@@ -98,6 +125,9 @@ async def main(options):
         elif found_hotkey and found_hotkey != constants_hotkey:
             wrong_hotkeys[metagraph.netuid] = (constants_hotkey, found_hotkey)
 
+    if options.takes:
+        await get_hotkey_takes(network, hotkeys)
+
     if options.diff:
         print("")
         if not missing_hotkeys:
@@ -106,21 +136,25 @@ async def main(options):
             print("Missing Hotkeys:")
             for netuid, good_hotkey in missing_hotkeys.items():
                 if good_hotkey:
-                    print(f"{netuid}: {good_hotkey}")
+                    print(f"{netuid:3}: {good_hotkey}")
                 else:
-                    print(f"{netuid}: ???")
+                    print(f"{netuid:3}: ???")
         print("")
         if not wrong_hotkeys:
             print("No Wrong Hotkeys")
         else:
             print("Wrong Hotkeys:")
             for netuid, (bad_hotkey, good_hotkey) in wrong_hotkeys.items():
-                print(f"{netuid}: {bad_hotkey} --> {good_hotkey}")
+                print(f"{netuid:3}: {bad_hotkey} --> {good_hotkey}")
     else:
         print("")
         print("Hotkeys:")
-        for netuid, hotkey in hotkeys.items():
-            print(f"{netuid}: {hotkey}")
+        if options.takes:
+            for netuid, (hotkey, take) in hotkeys.items():
+                print(f"{netuid:3}: {take:2}% - {hotkey}")
+        else:
+            for netuid, hotkey in hotkeys.items():
+                print(f"{netuid:3}: {hotkey}")
 
     print("")
 
@@ -130,5 +164,7 @@ if __name__ == "__main__":
 
     # Bittensor import
     from bittensor.core.async_subtensor import AsyncSubtensor
+    from bittensor.utils import u16_normalized_float
+
 
     asyncio.run(main(options))
