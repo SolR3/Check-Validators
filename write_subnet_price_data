@@ -30,12 +30,6 @@ TAOSTATS_HEADERS = {
     "Authorization": TAOSTATS_API_KEY
 }
 
-# GlobalPriceData = namedtuple(
-#     "GlobalPriceData", [
-#         "tao_price_usd",
-#     ]
-# )
-
 SubnetPriceData = namedtuple(
     "SubnetPriceData", [
         "netuid",
@@ -135,9 +129,7 @@ def gather_subnet_data(netuids):
 
     print("")
     print("Gathering tao price")
-
     tao_price_usd = get_price_from_url()
-    # global_data = GlobalPriceData(tao_price_usd=tao_price_usd)
 
     for netuid in netuids:
         print("")
@@ -156,34 +148,7 @@ def gather_subnet_data(netuids):
             subnet_price_usd=subnet_price_usd,
         )
 
-    # return (global_data, subnet_data)
     return subnet_data
-
-
-# def convert_to_dict(all_data):
-#     global_data, subnet_data = data
-#     def serializable(value):
-#         if isinstance(value, list):
-#             return [serializable(v) for v in value]
-#         if isinstance(value, numpy.float32):
-#             return float(value)
-#         if isinstance(value, numpy.int64):
-#             return int(value)
-#         return value
-
-#     data_dict = dict(
-#         [(f, serializable(getattr(global_data, f))) for f in global_data._fields]
-#     )
-
-#     subnet_data_dict = {}
-#     for netuid in subnet_data:
-#         data = subnet_data[netuid]
-#         subnet_data_dict[netuid] = dict(
-#             [(f, serializable(getattr(data, f))) for f in data._fields]
-#         )
-#     data_dict["subnets"] = subnet_data_dict
-
-#     return data_dict
 
 
 def convert_to_dict(subnet_data):
@@ -215,8 +180,6 @@ def write_json_file(netuids, json_folder):
     json_file_name = f"{json_base}.{netuid_range}{json_ext}"
     json_file = os.path.join(json_folder, json_file_name)
 
-    # all_data = gather_subnet_data(netuids)
-    # data_dict = convert_to_dict(all_data)
     subnet_data = gather_subnet_data(netuids)
     data_dict = convert_to_dict(subnet_data)
 
