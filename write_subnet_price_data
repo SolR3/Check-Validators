@@ -1,0 +1,362 @@
+#!/usr/bin/env python3
+
+# standard imports
+import argparse
+from collections import namedtuple
+import json
+import multiprocessing
+import numpy
+import os
+import requests
+import tempfile
+import time
+
+
+LOCAL_TIMEZONE = "MST7MDT"
+JSON_FILE_NAME = "subnet_price_data.json"
+TIMESTAMP_FILE_NAME = "timestamp.json"
+LOCAL_SUBTENSORS = [
+    "cali",
+    "candyland",
+    "datacenter01",
+    "la",
+    "moonbase",
+    "titan",
+]
+
+TAOSTATS_API_KEY = "tao-55485724-3e43-4305-929f-0798dfbbd359:2e1ca609"
+TAOSTATS_HEADERS = {
+    "accept": "application/json",
+    "Authorization": TAOSTATS_API_KEY
+}
+
+# GlobalPriceData = namedtuple(
+#     "GlobalPriceData", [
+#         "tao_price_usd",
+#     ]
+# )
+
+SubnetPriceData = namedtuple(
+    "SubnetPriceData", [
+        "netuid",
+        "tao_price_usd",
+        "subnet_price_tao",
+        "subnet_price_usd",
+    ]
+)
+
+class SubtensorConnectionError(Exception):
+    pass
+
+
+def _parse_args():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "-j", "--json-folder",
+        required=True,
+        help="The json folder in which to write the json files."
+    )
+
+    parser.add_argument(
+        "-l", "--local-subtensor",
+        nargs="?",
+        default=False,
+        help="Use the specified local subtensor (i.e. la, cali, titan, etc.). "
+             "List the flag without a value to rotate between all local "
+             "subtensors. When not specified, use the 'finney' network subtensor."
+    )
+
+    parser.add_argument(
+        "-i", "--interval",
+        type=float,
+        default=0,
+        help="The number of minutes between validator data gathering. If 0 or not "
+             "specified then the data is gathered only once."
+    )
+
+    return parser.parse_args()
+
+
+def format_time(total_time):
+    m = total_time/60
+    minutes = int(m)
+    seconds = round((m - minutes)*60)
+
+    runtime_text = [f"{minutes} minutes"] if minutes else []
+    if seconds:
+        runtime_text += [f"{seconds} seconds"]
+    runtime_text = ", ".join(runtime_text)
+
+    return runtime_text
+
+
+def query_url(url):
+    num_attempts = 4
+    sleep_time = 10
+
+    for attempt in range(num_attempts):
+        time.sleep(sleep_time)
+
+        response = requests.get(url, headers=TAOSTATS_HEADERS, timeout=10)
+        if response.status_code != 429:
+            return response
+
+        # Getting rate limited. Wait a bit and try again.
+        print(f"Attempt {attempt} failed due to rate limiting on url {url}")
+
+    return response
+
+
+# Courtesy of gregbeard, thanks Greg!
+def get_price_from_url(netuid=None):
+    if netuid is None:
+        url = "https://api.taostats.io/api/price/latest/v1?asset=tao"
+    else:
+        url = f"https://api.taostats.io/api/dtao/pool/latest/v1?netuid={netuid}"
+
+    response = query_url(url)
+    if response.status_code != 200:
+        print(f"ERROR: Failed to obtain data from url: {url} ({response.reason})")
+        return None
+
+    data = response.json()
+    price = data.get("data", [{}])[0].get("price")
+
+    if price is None:
+        print(f"ERROR: No price data found on url: {url}")
+        return None
+
+    return float(price)
+
+
+def gather_subnet_data(netuids):
+    subnet_data = {}
+
+    print("")
+    print("Gathering tao price")
+
+    tao_price_usd = get_price_from_url()
+    # global_data = GlobalPriceData(tao_price_usd=tao_price_usd)
+
+    for netuid in netuids:
+        print("")
+        print(f"Gathering subnet price for netuid {netuid}")
+
+        subnet_price_tao = get_price_from_url(netuid)
+        if subnet_price_tao is None or tao_price_usd is None:
+            subnet_price_usd = None
+        else:
+            subnet_price_usd = subnet_price_tao * tao_price_usd
+
+        subnet_data[netuid] = SubnetPriceData(
+            netuid=netuid,
+            tao_price_usd=tao_price_usd,
+            subnet_price_tao=subnet_price_tao,
+            subnet_price_usd=subnet_price_usd,
+        )
+
+    # return (global_data, subnet_data)
+    return subnet_data
+
+
+# def convert_to_dict(all_data):
+#     global_data, subnet_data = data
+#     def serializable(value):
+#         if isinstance(value, list):
+#             return [serializable(v) for v in value]
+#         if isinstance(value, numpy.float32):
+#             return float(value)
+#         if isinstance(value, numpy.int64):
+#             return int(value)
+#         return value
+
+#     data_dict = dict(
+#         [(f, serializable(getattr(global_data, f))) for f in global_data._fields]
+#     )
+
+#     subnet_data_dict = {}
+#     for netuid in subnet_data:
+#         data = subnet_data[netuid]
+#         subnet_data_dict[netuid] = dict(
+#             [(f, serializable(getattr(data, f))) for f in data._fields]
+#         )
+#     data_dict["subnets"] = subnet_data_dict
+
+#     return data_dict
+
+
+def convert_to_dict(subnet_data):
+    def serializable(value):
+        if isinstance(value, list):
+            return [serializable(v) for v in value]
+        if isinstance(value, numpy.float32):
+            return float(value)
+        if isinstance(value, numpy.int64):
+            return int(value)
+        return value
+
+    data_dict = {}
+    for netuid in subnet_data:
+        data = subnet_data[netuid]
+        data_dict[netuid] = dict(
+            [(f, serializable(getattr(data, f))) for f in data._fields]
+        )
+
+    return data_dict
+
+
+def write_json_file(netuids, json_folder):
+    print("Gathering subnet data.")
+    start_time = time.time()
+
+    netuid_range = f"{netuids[0]}-{netuids[-1]}"
+    json_base, json_ext = os.path.splitext(JSON_FILE_NAME)
+    json_file_name = f"{json_base}.{netuid_range}{json_ext}"
+    json_file = os.path.join(json_folder, json_file_name)
+
+    # all_data = gather_subnet_data(netuids)
+    # data_dict = convert_to_dict(all_data)
+    subnet_data = gather_subnet_data(netuids)
+    data_dict = convert_to_dict(subnet_data)
+
+    print(f"\nWriting data to file: {json_file}")
+    with open(json_file, "w") as fd:
+        json.dump(data_dict, fd, indent=4)
+
+    total_time = time.time() - start_time
+    print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
+
+
+def write_timestamp(json_folder):
+    os.environ["TZ"] = LOCAL_TIMEZONE
+    time.tzset()
+
+    max_file_time = 0
+    json_base, json_ext = os.path.splitext(JSON_FILE_NAME)
+    for _file in os.listdir(json_folder):
+        file_base, file_ext = os.path.splitext(_file)
+        if not file_base.startswith(json_base) or file_ext != json_ext:
+            continue
+
+        json_file = os.path.join(json_folder, _file)
+        file_time = os.path.getmtime(json_file)
+        if file_time > max_file_time:
+            max_file_time = file_time
+    
+    timestamp = time.ctime(max_file_time)
+    timestamp_file = os.path.join(json_folder, TIMESTAMP_FILE_NAME)
+    print(f"\nWriting timestamp file: {timestamp_file}")
+    with open(timestamp_file, "w") as fd:
+            json.dump(timestamp, fd)
+
+
+def get_netuid_start_end_args(num_subnets, num_chunks):
+    chunk_size = int(numpy.ceil(num_subnets / num_chunks))
+    netuid_start = 1
+    while True:
+        netuid_end = netuid_start + chunk_size - 1
+        if netuid_end >= num_subnets:
+            yield netuid_start, None
+            break
+        yield netuid_start, netuid_end
+        netuid_start = netuid_end + 1
+
+
+def get_subtensor_network(local_subtensor, local_subtensor_index):
+    if local_subtensor is False:
+        return "finney"
+
+    network_name = (
+        local_subtensor or LOCAL_SUBTENSORS[local_subtensor_index]
+    )
+    return f"ws://subtensor-{network_name}.rizzo.network:9944"
+
+
+def run(options):
+    network = options.network
+    json_folder = options.json_folder
+
+    print("")
+    print("Gathering subnet price data.")
+    print(f"Connecting to network: {network}")
+    try:
+        with bittensor.subtensor(network=network) as subtensor:
+            all_subnets = subtensor.get_subnets()[1:]
+    except Exception as err:
+        print("")
+        print(f"ERROR: Subtensor connection failed on '{network}'")
+        print(f"{type(err).__name__}: {err}")
+        print("")
+        raise SubtensorConnectionError
+
+    tempdir = tempfile.mkdtemp(prefix="write_price_data_")
+
+    write_json_file(all_subnets, tempdir)
+
+    # Copy files over to relevant location
+    for file_name in os.listdir(json_folder):
+        json_file = os.path.join(json_folder, file_name)
+        if (
+            not os.path.isfile(json_file)
+            or os.path.splitext(json_file)[1] != ".json"
+        ):
+            continue
+        print(f"Removing {json_file}")
+        os.unlink(json_file)
+    for file_name in os.listdir(tempdir):
+        src_json_file = os.path.join(tempdir, file_name)
+        dest_json_file = os.path.join(json_folder, file_name)
+        print(f"Moving {src_json_file} to {dest_json_file}")
+        os.rename(src_json_file, dest_json_file)
+
+    os.rmdir(tempdir)
+
+    write_timestamp(json_folder)
+
+
+def main(options):
+    os.makedirs(options.json_folder, exist_ok=True)
+
+    local_subtensor_index = -1
+    interval_seconds = round(options.interval * 60)
+
+    while True:
+        start_time = time.time()
+        local_subtensor_index = (local_subtensor_index + 1) % len(LOCAL_SUBTENSORS)
+        options.network = get_subtensor_network(options.local_subtensor, local_subtensor_index)
+
+        try:
+            args = [options]
+            with multiprocessing.Pool(processes=1) as pool:
+                pool.apply(run, args)
+        except SubtensorConnectionError:
+            if options.local_subtensor is None:
+                print("Rotating subtensors and trying again.")
+                time.sleep(1)
+                continue
+
+        # Only gather the data once.
+        if not interval_seconds:
+            break
+
+        total_seconds = round(time.time() - start_time)
+        wait_seconds = interval_seconds - total_seconds
+        if wait_seconds > 0:
+            wait_time_formatted = format_time(wait_seconds)
+            print(f"Waiting {wait_time_formatted}.")
+            time.sleep(wait_seconds)
+        else:
+            print(
+                f"Processing took {total_seconds} seconds which is longer "
+                f"than {interval_seconds} seconds. Not waiting."
+            )
+
+
+if __name__ == "__main__":
+    options = _parse_args()
+
+    # bittensor import
+    import bittensor
+
+    main(options)
