@@ -24,7 +24,8 @@ LOCAL_SUBTENSORS = [
     "titan",
 ]
 
-TAOSTATS_API_KEY = "tao-55485724-3e43-4305-929f-0798dfbbd359:2e1ca609"
+#TAOSTATS_API_KEY = "tao-55485724-3e43-4305-929f-0798dfbbd359:2e1ca609"
+TAOSTATS_API_KEY = "tao-63801ee6-ceea-449d-beb3-1b5c1f10b0af:e3f08066"
 TAOSTATS_HEADERS = {
     "accept": "application/json",
     "Authorization": TAOSTATS_API_KEY
@@ -69,6 +70,16 @@ def _parse_args():
              "specified then the data is gathered only once."
     )
 
+    parser.add_argument(
+        "-t", "--seconds-between-queries",
+        type=int,
+        default=30,
+        help="The number of seconds between url queries. The higher the number, the "
+             "longer it takes to query all subnets (seconds-between-queries * total subnets) "
+             "but the less chance of getting rate limiting errors when querying taostats. "
+             "The default is 30 seconds."
+    )
+
     return parser.parse_args()
 
 
@@ -85,11 +96,11 @@ def format_time(total_time):
     return runtime_text
 
 
-def query_url(url):
+def query_url(url, sleep_time):
     num_attempts = 4
-    sleep_time = 10
 
     for attempt in range(1, num_attempts+1):
+        print(f"Sleeping for {sleep_time} seconds.")
         time.sleep(sleep_time)
 
         response = requests.get(url, headers=TAOSTATS_HEADERS, timeout=10)
@@ -103,13 +114,13 @@ def query_url(url):
 
 
 # Courtesy of gregbeard, thanks Greg!
-def get_price_from_url(netuid=None):
+def get_price_from_url(sleep_time, netuid=None):
     if netuid is None:
         url = "https://api.taostats.io/api/price/latest/v1?asset=tao"
     else:
         url = f"https://api.taostats.io/api/dtao/pool/latest/v1?netuid={netuid}"
 
-    response = query_url(url)
+    response = query_url(url, sleep_time)
     if response.status_code != 200:
         print(f"ERROR: Failed to obtain data from url: {url} ({response.reason})")
         return None
@@ -124,18 +135,18 @@ def get_price_from_url(netuid=None):
     return float(price)
 
 
-def gather_subnet_data(netuids):
+def gather_subnet_data(netuids, sleep_time):
     subnet_data = {}
 
     print("")
     print("Gathering tao price")
-    tao_price_usd = get_price_from_url()
+    tao_price_usd = get_price_from_url(sleep_time)
 
     for netuid in netuids:
         print("")
         print(f"Gathering subnet price for netuid {netuid}")
 
-        subnet_price_tao = get_price_from_url(netuid)
+        subnet_price_tao = get_price_from_url(sleep_time, netuid)
         if subnet_price_tao is None or tao_price_usd is None:
             subnet_price_usd = None
         else:
@@ -171,7 +182,7 @@ def convert_to_dict(subnet_data):
     return data_dict
 
 
-def write_json_file(netuids, json_folder):
+def write_json_file(netuids, json_folder, sleep_time):
     print("Gathering subnet data.")
     start_time = time.time()
 
@@ -180,7 +191,7 @@ def write_json_file(netuids, json_folder):
     json_file_name = f"{json_base}.{netuid_range}{json_ext}"
     json_file = os.path.join(json_folder, json_file_name)
 
-    subnet_data = gather_subnet_data(netuids)
+    subnet_data = gather_subnet_data(netuids, sleep_time)
     data_dict = convert_to_dict(subnet_data)
 
     print(f"\nWriting data to file: {json_file}")
@@ -239,6 +250,7 @@ def get_subtensor_network(local_subtensor, local_subtensor_index):
 def run(options):
     network = options.network
     json_folder = options.json_folder
+    sleep_time = options.seconds_between_queries
 
     print("")
     print("Gathering subnet price data.")
@@ -255,7 +267,7 @@ def run(options):
 
     tempdir = tempfile.mkdtemp(prefix="write_price_data_")
 
-    write_json_file(all_subnets, tempdir)
+    write_json_file(all_subnets, tempdir, sleep_time)
 
     # Copy files over to relevant location
     for file_name in os.listdir(json_folder):
