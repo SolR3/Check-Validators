@@ -2,6 +2,7 @@
 from rich.text import Text
 from rich.table import Table
 from rich.console import Console
+import time
 
 # Local imports
 from subnet_printer_base import RichPrinterBase
@@ -93,7 +94,7 @@ class TablePrinter(RichPrinter):
         if vali_name is None:
             vali_name = "Rizzo"
 
-        table_title = f"{vali_name} " + self._table_title_suffix
+        table_title = f"{vali_name} {self._table_title_suffix} - {time.ctime()}"
         self._table = Table(title=table_title)
         for column_header in self._get_column_headers():
             self._table.add_column(column_header, justify="left", no_wrap=True)

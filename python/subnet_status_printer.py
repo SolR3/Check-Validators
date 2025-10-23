@@ -2,6 +2,7 @@
 from rich.text import Text
 from rich.table import Table
 from rich.console import Console
+import time
 
 # Local imports
 from subnet_printer_base import RichPrinterBase
@@ -111,7 +112,8 @@ class TablePrinter(RichPrinter):
         if vali_name is None:
             vali_name = "Rizzo"
 
-        self._table = Table(title=f"{vali_name} Validators")
+        table_title = f"{vali_name} Validators - {time.ctime()}"
+        self._table = Table(title=table_title)
         self._table.add_column(
             "Subnet", justify="left", no_wrap=True
         )
