@@ -3,6 +3,7 @@
 # standard imports
 import argparse
 import json
+import multiprocessing
 import numpy
 import os
 import sys
@@ -54,12 +55,6 @@ def _parse_args():
         default=0,
         help="The number of chunks. Each chunk will write a different json file "
              "for a range of validators."
-    )
-
-    parser.add_argument(
-        "-p", "--subprocess",
-        action="store_true",
-        help="When specified, run everything in a subprocess."
     )
 
     parser.add_argument(
@@ -223,12 +218,9 @@ def main(options):
         options.network = get_subtensor_network(options.local_subtensor, local_subtensor_index)
 
         try:
-            if options.subprocess:
-                args = [options]
-                with multiprocessing.Pool(processes=1) as pool:
-                    pool.apply(run, args)
-            else:
-                run(options)
+            args = [options]
+            with multiprocessing.Pool(processes=1) as pool:
+                pool.apply(run, args)
         except SubtensorConnectionError:
             if options.local_subtensor is None:
                 print("Rotating subtensors and trying again.")
@@ -254,9 +246,6 @@ def main(options):
 
 if __name__ == "__main__":
     options = _parse_args()
-
-    if options.subprocess:
-        import multiprocessing
 
     # bittensor import
     import bittensor
