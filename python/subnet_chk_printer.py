@@ -141,23 +141,34 @@ class TablePrinter(RichPrinter):
             hotkey_updated_status = self._get_updated_status(
                 child_hotkey.updated, validator_data.avg_updated
             )
-            hotkey_take_status = (
-                2 if child_hotkey.take + epsilon >= 0.09
-                else (
-                    1 if child_hotkey.take - epsilon > 0.0
+            if (
+                child_hotkey.hotkey == validator_data.validator_hotkeys.Rizzo
+                or child_hotkey.hotkey == validator_data.rizzo_expected_hotkey
+            ):
+                hotkey_take_status = (
+                    2 if child_hotkey.take + epsilon < 0.09
                     else 0
                 )
-            )
+            else:
+                # If this is NOT the rizzo hotkey then the take should ideally be 0%
+                # but always 2% or less.
+                hotkey_take_status = (
+                    2 if child_hotkey.take + epsilon >= 0.09
+                    else (
+                        1 if child_hotkey.take - epsilon > 0.0
+                        else 0
+                    )
+                )
             # Don't add this one to the row status since it could be blue
             # and if it's red then the vtrust and updated statuses will also
-            # be red anyways
-            if child_hotkey.hotkey == validator_data.rizzo_expected_hotkey:
-                # If rizzo_expected_hotkey is not None then we're not registered
-                # so set the hotkey status to red.
-                child_hotkey_status = 2
-            elif child_hotkey.hotkey == validator_data.validator_hotkeys.Rizzo:
+            # be red anyways.
+            if (
+                child_hotkey.hotkey == validator_data.validator_hotkeys.Rizzo
+                or child_hotkey.hotkey == validator_data.rizzo_expected_hotkey
+            ):
                 # If validator_hotkeys.Rizzo is not None then we are registered
-                # so set the hotkey status to blue.
+                # If rizzo_expected_hotkey is not None then we're not registered
+                # Either way, set the hotkey status to blue.
                 child_hotkey_status = -2
             else:
                 # Set the hotkey status to white.
