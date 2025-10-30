@@ -11,7 +11,6 @@ import time
 
 # Local imports
 from subnet_constants import (
-    MIN_STAKE_THRESHOLD,
     MIN_VTRUST_THRESHOLD,
     MAX_U_THRESHOLD,
     COLDKEYS,
@@ -443,18 +442,16 @@ class SubnetData(SubnetDataBase):
                     )
                 )
 
-        # Get all validator uids that have valid stake amount
-        all_uids = [
-            i for (i, s) in enumerate(metagraph.S)
-            if i != rizzo_uid and s > MIN_STAKE_THRESHOLD
+        # Get all validator uids that have valid stake amount.
+        all_uids = metagraph.uids[
+            metagraph.validator_permit & (metagraph.uids != rizzo_uid)
         ]
         num_total_validators = len(all_uids)
 
         # Get all validators that have proper VT and U
-        valid_uids = [
-            i for i in all_uids
-            if (metagraph.Tv[i] > MIN_VTRUST_THRESHOLD)
-            & (current_block - metagraph.last_update[i] < MAX_U_THRESHOLD)
+        valid_uids = all_uids[
+            (metagraph.Tv[all_uids] > MIN_VTRUST_THRESHOLD)
+            & (current_block - metagraph.last_update[all_uids] < MAX_U_THRESHOLD)
         ]
         num_valid_validators = len(valid_uids)
 
@@ -497,7 +494,7 @@ class SubnetData(SubnetDataBase):
             yuma_vtrust_gap = yuma_vtrust - rizzo_vtrust
 
         # Get other validator data
-        if not valid_uids:
+        if not len(valid_uids):
             max_vtrust = None
             avg_vtrust = None
             min_vtrust = None
