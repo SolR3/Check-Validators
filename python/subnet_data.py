@@ -28,6 +28,7 @@ class SubnetDataBase:
             "subnet_tempo",
             "num_total_validators",
             "num_valid_validators",
+            "rizzo_stake_weight",
             "rizzo_stake_rank",
             "rizzo_emission",
             "rizzo_vtrust",
@@ -359,14 +360,15 @@ class SubnetData(SubnetDataBase):
             rizzo_emission = None
             rizzo_vtrust = None
             rizzo_updated = None
+            rizzo_stake_weight = None
             rizzo_stake_rank = None
         else:
             rizzo_emission = metagraph.E[rizzo_uid]
             rizzo_vtrust = metagraph.Tv[rizzo_uid]
             rizzo_updated = current_block - metagraph.last_update[rizzo_uid]
-            rizzo_stake = metagraph.S[rizzo_uid]
+            rizzo_stake_weight = metagraph.S[rizzo_uid]
             rizzo_stake_rank = (
-                len(metagraph.S) - sorted(metagraph.S).index(rizzo_stake)
+                len(metagraph.S) - sorted(metagraph.S).index(rizzo_stake_weight)
             )
 
         # Get child hotkey data
@@ -521,6 +523,7 @@ class SubnetData(SubnetDataBase):
             subnet_tempo=subnet_tempo,
             num_total_validators=num_total_validators,
             num_valid_validators=num_valid_validators,
+            rizzo_stake_weight=rizzo_stake_weight,
             rizzo_stake_rank=rizzo_stake_rank,
             rizzo_emission=rizzo_emission,
             rizzo_vtrust=rizzo_vtrust,
