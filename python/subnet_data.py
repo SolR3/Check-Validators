@@ -53,6 +53,7 @@ class SubnetDataBase:
             "pending_child_hotkey_data",
             "validator_hotkeys",
             "rizzo_expected_hotkey",
+            "rizzo_hotkey_chk_take",
         ]
     )
     ChildHotkeyData = namedtuple(
@@ -234,6 +235,21 @@ class SubnetData(SubnetDataBase):
                 subtensor, netuids, children_pending, True
             )
 
+            # Get the CHK take for all of our local swap hotkeys so we can ensure
+            # that only the hotkeys on subnets that we own have 0% take. These will
+            # be displayed next to the hotkeys in the Subnet Hotkeys tab on the
+            # ValidatorStatus web page.
+            chk_take_func_calls = []
+            for netuid in netuids:
+                hotkey = RIZZO_HOTKEYS.get(netuid)
+                chk_take_func_calls.append(
+                    subtensor.query_subtensor("ChildkeyTake", params=[hotkey, netuid])
+                )
+            rizzo_hotkey_chk_takes = [
+                u16_normalized_float(r.value)
+                for r in await asyncio.gather(*chk_take_func_calls)
+            ]
+
         # Get all of the rest of the data from the metagraph.
         for i, netuid in enumerate(netuids):
             metagraph = metagraphs[i]
@@ -242,9 +258,11 @@ class SubnetData(SubnetDataBase):
             swap_child_hotkey = swap_child_hotkeys[netuid]
             child_hotkeys_pending, chk_pending_block = children_pending[i]
             child_takes_pending = chk_takes_pending_dict.get(netuid, [])
-            self._get_data_from_metagraph(
+            rizzo_hotkey_chk_take = rizzo_hotkey_chk_takes[i]
+            self._populate_validator_data_for_subnet(
                 metagraph, netuid, child_hotkeys, child_takes, swap_child_hotkey,
-                child_hotkeys_pending, child_takes_pending, block, chk_pending_block
+                child_hotkeys_pending, child_takes_pending, block, chk_pending_block,
+                rizzo_hotkey_chk_take,
             )
 
         total_time = time.time() - start_time
@@ -317,9 +335,10 @@ class SubnetData(SubnetDataBase):
 
         return chk_takes_dict
 
-    def _get_data_from_metagraph(
+    def _populate_validator_data_for_subnet(
             self, metagraph, netuid, child_hotkeys, child_takes, swap_child_hotkey,
-            child_hotkeys_pending, child_takes_pending, current_block, chk_pending_block
+            child_hotkeys_pending, child_takes_pending, current_block, chk_pending_block,
+            rizzo_hotkey_chk_take,
     ):
         # Get the hotkeys that we care about (Rizzo, Rt21, etc.)
         vali_hotkeys = {}
@@ -547,6 +566,7 @@ class SubnetData(SubnetDataBase):
             pending_child_hotkey_data=pending_child_hotkey_data,
             validator_hotkeys=validator_hotkeys,
             rizzo_expected_hotkey=rizzo_expected_hotkey,
+            rizzo_hotkey_chk_take=rizzo_hotkey_chk_take,
         )
 
 
