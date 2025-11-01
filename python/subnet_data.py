@@ -298,9 +298,8 @@ class SubnetData(SubnetDataBase):
             chk_take_funcs_dict[netuid] = []
             for _, child_hotkey in child_hotkeys:
                 chk_take_func_calls.append(
-                    subtensor.substrate.query(
-                        module="SubtensorModule",
-                        storage_function="ChildkeyTake",
+                    subtensor.query_subtensor(
+                        "ChildkeyTake",
                         params=[child_hotkey, netuid]
                     )
                 )

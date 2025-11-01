@@ -76,11 +76,7 @@ async def get_hotkey_takes(network, hotkeys):
         for netuid in sorted(hotkeys):
             hotkey = hotkeys[netuid]
             chk_take_func_calls.append(
-                subtensor.substrate.query(
-                    module="SubtensorModule",
-                    storage_function="ChildkeyTake",
-                    params=[hotkey, netuid]
-                )
+                subtensor.query_subtensor("ChildkeyTake", params=[hotkey, netuid])
             )
         chk_takes = (
             [u16_normalized_float(r.value) for r in await asyncio.gather(*chk_take_func_calls)]
