@@ -69,7 +69,7 @@ def _parse_args():
         "-i", "--interval",
         type=float,
         default=0,
-        help="The number of minutes between validator data gathering. If 0 or not "
+        help="The number of hours between validator data gathering. If 0 or not "
              "specified then the data is gathered only once."
     )
 
@@ -305,7 +305,7 @@ def main(options):
     os.makedirs(options.json_folder, exist_ok=True)
 
     local_subtensor_index = -1
-    interval_seconds = round(options.interval * 60)
+    interval_seconds = round(options.interval * 60 * 60)
 
     while True:
         start_time = time.time()
