@@ -76,7 +76,7 @@ def _parse_args():
     parser.add_argument(
         "-t", "--seconds-between-queries",
         type=int,
-        default=30,
+        default=60,
         help="The number of seconds between url queries. The higher the number, the "
              "longer it takes to query all subnets (seconds-between-queries * total subnets) "
              "but the less chance of getting rate limiting errors when querying taostats. "
@@ -109,13 +109,15 @@ def query_url(url, sleep_time):
 
         response = requests.get(url, headers=TAOSTATS_HEADERS, timeout=10)
         if response.status_code != 429:
-            time.sleep(wait)  # post-success cooldown
             return response
 
         print(f"Attempt {attempt} failed due to rate limiting on url {url}")
-        time.sleep(wait * attempt)  # exponential backoff before next try
+        retry_wait = wait * attempt
+        print(f"Sleeping for {retry_wait:.1f} seconds after failed attempt.")
+        time.sleep(retry_wait)  # exponential backoff before next try
 
     return response
+
 
 # Courtesy of gregbeard, thanks Greg!
 def get_price_from_url(sleep_time, netuid=None):
