@@ -61,24 +61,13 @@ def _parse_args():
     return parser.parse_args()
 
 
-def format_time(total_time):
-    m = total_time/60
-    minutes = int(m)
-    seconds = round((m - minutes)*60)
-    
-    runtime_text = f"{minutes} minutes, " if minutes else ""
-    runtime_text += f"{seconds} seconds"
-    
-    return runtime_text
-
-
 def main(options):
     network = (
         f"ws://subtensor-{options.local_subtensor}.rizzo.network:9944"
         if options.local_subtensor
         else "finney"
     )
-    netuids = options.subnets or bittensor.subtensor(network=network).get_subnets()[1:]
+    netuids = options.subnets or utils.get_all_subnets(network)
     sort_subnets = not bool(options.subnets)
     print_total_emission = not (options.chk_only or options.missing_chk or bool(options.subnets))
 
@@ -93,17 +82,15 @@ def main(options):
     total_time = time.time() - start_time
 
     subnet_data_printer.print_validator_data()
-    print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
+    print(f"\nSubnet data gathering took {utils.format_time(round(total_time))}.\n")
 
 
 if __name__ == "__main__":
     options = _parse_args()
 
-    # bittensor import
-    import bittensor
-
     # Import local subnet_data module
     from subnet_data import SubnetData
     from subnet_status_printer import SubnetDataPrinter
+    import utils
 
     main(options)

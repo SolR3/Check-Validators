@@ -93,7 +93,7 @@ def write_json_file(
         else:
             netuids = all_subnets[netuid_start:]
     else:
-        netuids = all_subnets[1:]
+        netuids = all_subnets
 
     netuid_range = f"{netuids[0]}-{netuids[-1]}"
     json_base, json_ext = os.path.splitext(JSON_FILE_NAME)
@@ -135,7 +135,7 @@ def write_timestamp(json_folder):
 
 def get_netuid_start_end_args(num_subnets, num_chunks):
     chunk_size = int(numpy.ceil(num_subnets / num_chunks))
-    netuid_start = 1
+    netuid_start = 0
     while True:
         netuid_end = netuid_start + chunk_size - 1
         if netuid_end >= num_subnets:
@@ -161,8 +161,7 @@ def run(options):
     json_folder = options.json_folder
 
     try:
-        with bittensor.subtensor(network=network) as subtensor:
-            all_subnets = subtensor.get_subnets()
+        all_subnets = utils.get_all_subnets(network)
     except Exception as err:
         print("")
         print(f"ERROR: Subtensor connection failed on '{network}'")
@@ -173,7 +172,7 @@ def run(options):
     tempdir = tempfile.mkdtemp(prefix="write_vali_data_")
 
     if chunks:
-        num_subnets = len(all_subnets) - 1
+        num_subnets = len(all_subnets)
         for i, (netuid_start, netuid_end) in enumerate(
             get_netuid_start_end_args(num_subnets, chunks)
         ):
@@ -247,10 +246,8 @@ def main(options):
 if __name__ == "__main__":
     options = _parse_args()
 
-    # bittensor import
-    import bittensor
-
     # Import local subnet_data module
     from subnet_data import SubnetData
+    import utils
 
     main(options)

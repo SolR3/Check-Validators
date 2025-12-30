@@ -1,6 +1,5 @@
 # bittensor import
-from bittensor.core.async_subtensor import AsyncSubtensor
-from bittensor.utils import u16_normalized_float
+import bittensor
 
 # standart imports
 import asyncio
@@ -183,7 +182,7 @@ class SubnetData(SubnetDataBase):
         self._print_verbose(f"\nConnecting to subtensor network: {self._network}")
         self._print_verbose(f"Obtaining data for subnets: {netuids}\n")
 
-        async with AsyncSubtensor(network=self._network) as subtensor:
+        async with bittensor.AsyncSubtensor(network=self._network) as subtensor:
             # Get the block to pass to async calls so everything is in sync
             block = await subtensor.block
 
@@ -206,7 +205,7 @@ class SubnetData(SubnetDataBase):
                 # Get the list of child hotkeys for each netuid
                 children = await asyncio.gather(
                     *[
-                        subtensor.get_children(netuid=netuid, hotkey=self._get_chk_hotkey())
+                        subtensor.get_children(self._get_chk_hotkey(), netuid)
                         for netuid in netuids
                     ]
                 )
@@ -217,7 +216,7 @@ class SubnetData(SubnetDataBase):
                 # Get the list of pending child hotkeys for each netuid
                 children_pending = await asyncio.gather(
                     *[
-                        subtensor.get_children_pending(netuid=netuid, hotkey=self._get_chk_hotkey())
+                        subtensor.get_children_pending(self._get_chk_hotkey(), netuid)
                         for netuid in netuids
                     ]
                 )
@@ -246,7 +245,7 @@ class SubnetData(SubnetDataBase):
                     subtensor.query_subtensor("ChildkeyTake", params=[hotkey, netuid])
                 )
             rizzo_hotkey_chk_takes = [
-                u16_normalized_float(r.value)
+                bittensor.u16_normalized_float(r.value)
                 for r in await asyncio.gather(*chk_take_func_calls)
             ]
 
@@ -324,7 +323,10 @@ class SubnetData(SubnetDataBase):
                 chk_take_funcs_dict[netuid].append(func_call_index)
                 func_call_index += 1
         all_child_takes = (
-            [u16_normalized_float(r.value) for r in await asyncio.gather(*chk_take_func_calls)]
+            [
+                bittensor.u16_normalized_float(r.value)
+                for r in await asyncio.gather(*chk_take_func_calls)
+            ]
             if chk_take_func_calls else []
         )
 

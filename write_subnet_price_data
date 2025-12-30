@@ -11,7 +11,10 @@ import requests
 import tempfile
 import time
 import random
+import sys
 
+# Import local module
+sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 
 
 LOCAL_TIMEZONE = "MST7MDT"
@@ -267,8 +270,7 @@ def run(options):
     print("Gathering subnet price data.")
     print(f"Connecting to network: {network}")
     try:
-        with bittensor.subtensor(network=network) as subtensor:
-            all_subnets = subtensor.get_subnets()[1:]
+        all_subnets = utils.get_all_subnets(network)
     except Exception as err:
         print("")
         print(f"ERROR: Subtensor connection failed on '{network}'")
@@ -342,7 +344,7 @@ def main(options):
 if __name__ == "__main__":
     options = _parse_args()
 
-    # bittensor import
-    import bittensor
+    # Import local module
+    import utils
 
     main(options)
