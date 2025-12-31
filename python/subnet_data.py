@@ -19,6 +19,11 @@ from subnet_constants import (
 )
 
 
+async def dummy_chk_take_func():
+    DummyChkTake = namedtuple("DummyChkTake", ["value"])
+    return DummyChkTake(value=0)
+
+
 class SubnetDataBase:
     ValidatorData = namedtuple(
         "ValidatorData", [
@@ -242,9 +247,12 @@ class SubnetData(SubnetDataBase):
             chk_take_func_calls = []
             for netuid in netuids:
                 hotkey = RIZZO_HOTKEYS.get(netuid)
-                chk_take_func_calls.append(
-                    subtensor.query_subtensor("ChildkeyTake", params=[hotkey, netuid])
-                )
+                if hotkey:
+                    chk_take_func_calls.append(
+                        subtensor.query_subtensor("ChildkeyTake", params=[hotkey, netuid])
+                    )
+                else:
+                    chk_take_func_calls.append(dummy_chk_take_func())
             rizzo_hotkey_chk_takes = [
                 bittensor.u16_normalized_float(r.value)
                 for r in await asyncio.gather(*chk_take_func_calls)
