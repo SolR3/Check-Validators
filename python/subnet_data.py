@@ -201,6 +201,7 @@ class SubnetData(SubnetDataBase):
             if self._other_coldkey:
                 children = [(True, [], '') for _ in netuids]
                 children_pending = [([], 0) for _ in netuids]
+                swap_child_hotkeys = dict([(n, (0.0, "")) for n in netuids])
             else:
                 # Get the list of child hotkeys for each netuid
                 children = await asyncio.gather(
