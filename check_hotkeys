@@ -91,11 +91,7 @@ async def get_hotkey_takes(network, hotkeys):
 
 
 async def main(options):
-    network = (
-        f"ws://subtensor-{options.local_subtensor}.rizzo.network:9944"
-        if options.local_subtensor
-        else "finney"
-    )
+    network = utils.get_subtensor_network(options.local_subtensor)
     netuids = options.subnets 
 
     metagraphs = await get_metagraphs(network, netuids)
@@ -163,5 +159,8 @@ if __name__ == "__main__":
 
     # Bittensor import
     import bittensor
+
+    # Import local module
+    import utils
 
     asyncio.run(main(options))

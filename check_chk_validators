@@ -54,11 +54,7 @@ def _parse_args():
 
 
 def main(options):
-    network = (
-        f"ws://subtensor-{options.local_subtensor}.rizzo.network:9944"
-        if options.local_subtensor
-        else "finney"
-    )
+    network = utils.get_subtensor_network(options.local_subtensor)
     netuids = options.subnets or utils.get_all_subnets(network)
     # sort_subnets = not bool(options.subnets)
 

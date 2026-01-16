@@ -21,3 +21,9 @@ def get_all_subnets(network):
             all_subnets = subtensor.get_subnets()
 
         return all_subnets[1:]
+
+
+def get_subtensor_network(name):
+    if name:
+        return name if ":" in name else f"ws://subtensor-{name}.rizzo.network:9944"
+    return "finney"
