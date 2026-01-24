@@ -130,9 +130,12 @@ class SubnetData(SubnetDataBase):
         return data_dict
 
     def _get_uid(self, metagraph):
+        if self._other_coldkey:
+            return self._get_other_vali_uid(metagraph, self._other_coldkey)
+
         # This is a fix to handle the subnets on which we're registered on
         # multiple uids.
-        if not self._other_coldkey and metagraph.netuid in MULTI_UID_HOTKEYS:
+        if metagraph.netuid in MULTI_UID_HOTKEYS:
             hotkey = RIZZO_HOTKEYS[metagraph.netuid]
             try:
                 return metagraph.hotkeys.index(hotkey)
@@ -140,12 +143,30 @@ class SubnetData(SubnetDataBase):
                 # We're not registered
                 return None
 
-        coldkey = self._other_coldkey or COLDKEYS["Rizzo"]
         try:
-            return metagraph.coldkeys.index(coldkey)
+            return metagraph.coldkeys.index(COLDKEYS["Rizzo"])
         except ValueError:
             # We're not registered
             return None
+
+    @staticmethod
+    def _get_other_vali_uid(metagraph, vali_coldkey):
+        num_uids = metagraph.coldkeys.count(vali_coldkey)
+
+        # Not registered
+        if num_uids == 0:
+            return None
+
+        # Registered with one uid
+        if num_uids == 1:
+            return metagraph.coldkeys.index(vali_coldkey)
+
+        # Registered with multiple uids
+        uids = [i for i, c in enumerate(metagraph.coldkeys) if c == vali_coldkey]
+        for uid in uids:
+            if metagraph.validator_permit[uid]:
+                return uid
+        return uids[0]  # I don't know if its best to return first uid or nothing.
 
     def _get_chk_hotkey(self):
         return self._other_chk_hotkey or RIZZO_CHK_HOTKEY
@@ -278,13 +299,13 @@ class SubnetData(SubnetDataBase):
         for i, netuid_element in enumerate(children):
             metagraph = metagraphs[i]
             swap_child_hotkeys[metagraph.netuid] = (0.0, "")
-            
-            vali_index = self._get_uid(metagraph)
-            if vali_index is None:
+
+            uid = self._get_uid(metagraph)
+            if uid is None:
                 # Get our expected hotkey for the case in which we're not registered
                 hotkey = RIZZO_HOTKEYS.get(metagraph.netuid)
             else:
-                hotkey = metagraph.hotkeys[vali_index]
+                hotkey = metagraph.hotkeys[uid]
 
             if do_pending:
                 child_hotkeys = netuid_element[0]
@@ -351,20 +372,17 @@ class SubnetData(SubnetDataBase):
         rizzo_expected_hotkey = None
         for vali_name, vali_coldkey in COLDKEYS.items():
             if vali_name == "Rizzo":
-                vali_index = self._get_uid(metagraph)
-                if vali_index is None:
+                vali_uid = self._get_uid(metagraph)
+                if vali_uid is None:
                     # Get our expected hotkey for the case in which we're not registered
                     rizzo_expected_hotkey = RIZZO_HOTKEYS.get(metagraph.netuid)
             else:
-                try:
-                    vali_index = metagraph.coldkeys.index(vali_coldkey)
-                except ValueError:
-                    vali_index = None
+                vali_uid = self._get_other_vali_uid(metagraph, vali_coldkey)
 
-            if vali_index is None:
+            if vali_uid is None:
                 vali_hotkeys[vali_name] = None
             else:
-                vali_hotkeys[vali_name] = metagraph.hotkeys[vali_index]
+                vali_hotkeys[vali_name] = metagraph.hotkeys[vali_uid]
         validator_hotkeys = self.ValidatorHotkeys(**vali_hotkeys)
 
         # Get emission percentage for the subnet.
@@ -490,12 +508,8 @@ class SubnetData(SubnetDataBase):
                 num_valid_validators += 1
 
         # Get rt21 vTrust and gap between rizzo and rt21
-        try:
-            rt21_uid = metagraph.coldkeys.index(COLDKEYS["Rt21"])
-        except ValueError:
-            rt21_vtrust = None
-        else:
-            rt21_vtrust = metagraph.Tv[rt21_uid]
+        rt21_uid = self._get_other_vali_uid(metagraph, COLDKEYS["Rt21"])
+        rt21_vtrust = metagraph.Tv[rt21_uid] if rt21_uid is not None else None
 
         if rt21_vtrust is None:
             rt21_vtrust_gap = None
@@ -505,12 +519,8 @@ class SubnetData(SubnetDataBase):
             rt21_vtrust_gap = rt21_vtrust - rizzo_vtrust
 
         # Get yuma vTrust and gap between rizzo and yuma
-        try:
-            yuma_uid = metagraph.coldkeys.index(COLDKEYS["Yuma"])
-        except ValueError:
-            yuma_vtrust = None
-        else:
-            yuma_vtrust = metagraph.Tv[yuma_uid]
+        yuma_uid = self._get_other_vali_uid(metagraph, COLDKEYS["Yuma"])
+        yuma_vtrust = metagraph.Tv[yuma_uid] if yuma_uid is not None else None
 
         if yuma_vtrust is None:
             yuma_vtrust_gap = None
