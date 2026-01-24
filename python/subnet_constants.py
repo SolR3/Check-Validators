@@ -29,9 +29,9 @@ COLDKEYS = {
     "Rt21": "5DywxdtESjskgPZrDXL86qV44SpPgJuqs9X6noyJJwX9PaSD",
     "OTF": "5HBtpwxuGNL1gwzwomwR7sjwUt8WXYSuWcLYN6f9KpTZkP4k",
     "Yuma": "5E9fVY1jexCNVMjd2rdBsAxeamFGEMfzHcyTn2fHgdHeYc5p",
-    # "Kraken": "5FHxxe8ZKYaNmGcSLdG5ekxXeZDhQnk9cbpHdsJW8RunGpSs",
-    # "TAO.com": "5Cu7NFMULPDkaQkr3nciUVMADvCfqtnjeuYrZpuoMXo6H8MY",
-    # "MUV": "5CMUVyexHFz68M5wtuuD8iQCgEMb8e8U2FpvQfWmoYST6dQo",
+    "Kraken": "5FHxxe8ZKYaNmGcSLdG5ekxXeZDhQnk9cbpHdsJW8RunGpSs",
+    "TAO_com": "5Cu7NFMULPDkaQkr3nciUVMADvCfqtnjeuYrZpuoMXo6H8MY",
+    "MUV": "5CMUVyexHFz68M5wtuuD8iQCgEMb8e8U2FpvQfWmoYST6dQo",
 }
 
 # This is a fix to handle the subnets on which our coldkeys is

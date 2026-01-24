@@ -70,12 +70,7 @@ class SubnetDataBase:
         ]
     )
     ValidatorHotkeys = namedtuple(
-        "ValidatorHotkeys", [
-            "Rizzo",
-            "Rt21",
-            "OTF",
-            "Yuma",
-        ]
+        "ValidatorHotkeys", list(COLDKEYS)
     )
 
     def __init__(self, verbose):
