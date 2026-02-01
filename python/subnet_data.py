@@ -386,7 +386,8 @@ class SubnetData(SubnetDataBase):
         validator_hotkeys = self.ValidatorHotkeys(**vali_hotkeys)
 
         # Get emission percentage for the subnet.
-        subnet_emission = metagraph.emissions.tao_in_emission * 100
+        # Multiplying by 2 since tao has been halved?
+        subnet_emission = metagraph.emissions.tao_in_emission * 100 * 2
 
         # Get subnet tempo (used for determining bad Updated values)
         # subnet_tempo = subtensor.get_subnet_hyperparameters(netuid).tempo
