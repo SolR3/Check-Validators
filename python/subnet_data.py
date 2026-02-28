@@ -96,7 +96,7 @@ class SubnetData(SubnetDataBase):
         ):
         self._netuids = netuids
         self._network = network
-        self._other_coldkey = other_coldkey
+        self._other_coldkey = self._get_other_coldkey(other_coldkey)
         self._other_chk_hotkey = other_chk_hotkey
 
         super(SubnetData, self).__init__(verbose)
@@ -128,6 +128,15 @@ class SubnetData(SubnetDataBase):
                 [(f, serializable(getattr(data, f))) for f in data._fields]
             )
         return data_dict
+
+    @staticmethod
+    def _get_other_coldkey(other_coldkey):
+        if not other_coldkey:
+            return None
+        for vali_name in COLDKEYS:
+            if other_coldkey.lower().replace(".", "_") == vali_name.lower():
+                return COLDKEYS[vali_name]
+        return other_coldkey
 
     def _get_uid(self, metagraph):
         if self._other_coldkey:
