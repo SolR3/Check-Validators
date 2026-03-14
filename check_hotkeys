@@ -155,12 +155,18 @@ async def main(options):
 
 
 if __name__ == "__main__":
-    options = _parse_args()
+    try:
+        options = _parse_args()
 
-    # Bittensor import
-    import bittensor
+        # Bittensor import
+        import bittensor
 
-    # Import local module
-    import utils
+        # Import local module
+        import utils
 
-    asyncio.run(main(options))
+        asyncio.run(main(options))
+    except KeyboardInterrupt as exc:
+        import traceback
+        exc_list = traceback.format_exception_only(exc)
+        exc_text = "\n" + "".join(exc_list).strip("\n")
+        print(exc_text)
