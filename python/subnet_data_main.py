@@ -9,7 +9,7 @@ import numpy
 import time
 
 # Local imports
-from subnet_constants import (
+from constants import (
     MIN_VTRUST_THRESHOLD,
     MAX_U_THRESHOLD,
     COLDKEYS,
@@ -496,7 +496,7 @@ class SubnetData(SubnetDataBase):
                     )
                 )
 
-        # Get all validator uids that have valid stake amount.
+        # Get all validator uids that have validator permits.
         all_uids = metagraph.uids[
             metagraph.validator_permit & (metagraph.uids != rizzo_uid)
         ]

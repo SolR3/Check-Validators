@@ -1,5 +1,5 @@
 # Local imports
-from subnet_constants import (
+from constants import (
     VTRUST_ERROR_THRESHOLD,
     VTRUST_WARNING_THRESHOLD,
     UPDATED_ERROR_THRESHOLD,

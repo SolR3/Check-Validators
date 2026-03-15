@@ -1,15 +1,8 @@
 #############################
 # Subnet threshold constants
 #############################
-# This is the value used by the. taoyield site.
-# This is the Root Stake column on taostats, not the Stake Weight column.
-# metagraph.S returns the Stake Weight.
-# TODO: We need to figure out how to obtain the Root Stake in order to be
-# able to use this to filter validator neurons.
-MIN_STAKE_THRESHOLD = 4000 
-
 MIN_VTRUST_THRESHOLD = 0.01
-MAX_U_THRESHOLD = 100800 # 2 weeks
+MAX_U_THRESHOLD = 100800  # 2 weeks
 
 
 ####################################
