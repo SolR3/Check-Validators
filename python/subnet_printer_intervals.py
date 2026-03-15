@@ -4,7 +4,7 @@ from rich.table import Table
 from rich.text import Text
 
 # Local imports
-from subnet_constants import (
+from constants import (
     UPDATED_ERROR_THRESHOLD,
     UPDATED_WARNING_THRESHOLD,
     VTRUST_ERROR_THRESHOLD,
