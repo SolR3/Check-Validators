@@ -10,21 +10,16 @@ import sys
 import tempfile
 import time
 
-# Import local subnet_data module
+# Set path to import local modules
 sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 
-
-LOCAL_TIMEZONE = "MST7MDT"
-JSON_FILE_NAME = "validator_data.json"
-TIMESTAMP_FILE_NAME = "timestamp.json"
-LOCAL_SUBTENSORS = [
-    "cali",
-    "candyland",
-    "datacenter01",
-    "la",
-    "moonbase",
-    "titan",
-]
+# Import local constants
+from constants import (
+    LOCAL_LITE_SUBTENSORS,
+    LOCAL_TIMEZONE,
+    DATA_FILE_NAME,
+    TIMESTAMP_FILE_NAME,
+)
 
 
 class SubtensorConnectionError(Exception):
@@ -96,7 +91,7 @@ def write_json_file(
         netuids = all_subnets
 
     netuid_range = f"{netuids[0]}-{netuids[-1]}"
-    json_base, json_ext = os.path.splitext(JSON_FILE_NAME)
+    json_base, json_ext = os.path.splitext(DATA_FILE_NAME)
     json_file_name = f"{json_base}.{netuid_range}{json_ext}"
     json_file = os.path.join(json_folder, json_file_name)
 
@@ -115,7 +110,7 @@ def write_timestamp(json_folder):
     time.tzset()
 
     max_file_time = 0
-    json_base, json_ext = os.path.splitext(JSON_FILE_NAME)
+    json_base, json_ext = os.path.splitext(DATA_FILE_NAME)
     for _file in os.listdir(json_folder):
         file_base, file_ext = os.path.splitext(_file)
         if not file_base.startswith(json_base) or file_ext != json_ext:
@@ -133,7 +128,7 @@ def write_timestamp(json_folder):
     timestamp_file = os.path.join(json_folder, TIMESTAMP_FILE_NAME)
     print(f"\nWriting timestamp file: {timestamp_file}")
     with open(timestamp_file, "w") as fd:
-            json.dump(timestamp, fd)
+        json.dump(timestamp, fd)
 
 
 def get_netuid_start_end_args(num_subnets, num_chunks):
@@ -153,7 +148,7 @@ def get_subtensor_network(local_subtensor, local_subtensor_index):
         return "finney"
 
     network_name = (
-        local_subtensor or LOCAL_SUBTENSORS[local_subtensor_index]
+        local_subtensor or LOCAL_LITE_SUBTENSORS[local_subtensor_index]
     )
     return f"ws://subtensor-{network_name}.rizzo.network:9944"
 
@@ -216,7 +211,7 @@ def main(options):
 
     while True:
         start_time = time.time()
-        local_subtensor_index = (local_subtensor_index + 1) % len(LOCAL_SUBTENSORS)
+        local_subtensor_index = (local_subtensor_index + 1) % len(LOCAL_LITE_SUBTENSORS)
         options.network = get_subtensor_network(options.local_subtensor, local_subtensor_index)
 
         try:
@@ -249,8 +244,8 @@ def main(options):
 if __name__ == "__main__":
     options = _parse_args()
 
-    # Import local subnet_data module
-    from subnet_data import SubnetData
+    # Import local modules
+    from subnet_data_main import SubnetData
     import utils
 
     main(options)

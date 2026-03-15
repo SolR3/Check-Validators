@@ -10,7 +10,7 @@ import sys
 sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 
 # Local imports
-from subnet_constants import (
+from constants import (
     COLDKEYS,
     MULTI_UID_HOTKEYS,
     RIZZO_HOTKEYS,
@@ -165,6 +165,7 @@ if __name__ == "__main__":
         import utils
 
         asyncio.run(main(options))
+
     except KeyboardInterrupt as exc:
         import traceback
         exc_list = traceback.format_exception_only(exc)

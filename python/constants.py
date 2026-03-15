@@ -1,15 +1,8 @@
 #############################
 # Subnet threshold constants
 #############################
-# This is the value used by the. taoyield site.
-# This is the Root Stake column on taostats, not the Stake Weight column.
-# metagraph.S returns the Stake Weight.
-# TODO: We need to figure out how to obtain the Root Stake in order to be
-# able to use this to filter validator neurons.
-MIN_STAKE_THRESHOLD = 4000 
-
 MIN_VTRUST_THRESHOLD = 0.01
-MAX_U_THRESHOLD = 100800 # 2 weeks
+MAX_U_THRESHOLD = 100800  # 2 weeks
 
 
 ####################################
@@ -19,6 +12,24 @@ VTRUST_ERROR_THRESHOLD = 0.2
 VTRUST_WARNING_THRESHOLD = 0.1
 UPDATED_ERROR_THRESHOLD = 1080  # 3x normal subnet tempo (360 blocks)
 UPDATED_WARNING_THRESHOLD = 720  # 2x normal subnet tempo (360 blocks)
+
+
+##################
+# Misc. constants
+##################
+DEFAULT_NUM_INTERVALS_JSON = 30
+DEFAULT_NUM_INTERVALS_NO_JSON = 10
+DATA_FILE_NAME = "validator_data.json"
+TIMESTAMP_FILE_NAME = "timestamp.json"
+LOCAL_TIMEZONE = "MST7MDT"
+LOCAL_LITE_SUBTENSORS = [
+    "cali",
+    "candyland",
+    "datacenter01",
+    "la",
+    "moonbase",
+    "titan",
+]
 
 
 #######################
