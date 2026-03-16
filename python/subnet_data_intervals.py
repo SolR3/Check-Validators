@@ -91,11 +91,11 @@ class SubnetDataBase:
         raise NotImplementedError
 
 
-class SubnetData(SubnetDataBase):
+class SubnetDataIntervals(SubnetDataBase):
     def __init__(
             self, netuids, num_intervals, network, chunk_size=0,
             other_coldkey=None, existing_data=None, verbose=False
-        ):
+    ):
         self._netuids = netuids
         self._network = network
         self._chunk_size = chunk_size or len(self._netuids)
@@ -103,7 +103,7 @@ class SubnetData(SubnetDataBase):
         self._other_coldkey = self._get_other_coldkey(other_coldkey)
         self._existing_data = existing_data or {}
 
-        super(SubnetData, self).__init__(verbose)
+        super().__init__(verbose)
 
     @staticmethod
     def _get_other_coldkey(other_coldkey):
@@ -360,14 +360,14 @@ class SubnetData(SubnetDataBase):
         return None
 
 
-class SubnetDataFromJson(SubnetDataBase):
+class SubnetDataIntervalsFromJson(SubnetDataBase):
     def __init__(self, netuids, json_folder, num_intervals=None, verbose=False):
         self._netuids = netuids
         self._json_folder = json_folder
         self._num_intervals = num_intervals
         self._other_coldkey = None
 
-        super(SubnetDataFromJson, self).__init__(verbose)
+        super().__init__(verbose)
 
     @staticmethod
     def get_json_file_name(netuid):
@@ -436,4 +436,91 @@ class SubnetDataFromJson(SubnetDataBase):
                     subnet_emission=subnet_data["subnet_emission"],
                     blocks=subnet_data["blocks"],
                     block_data=block_data,
+                )
+
+
+class SubnetDataIntervalsFromMainData(SubnetDataBase):
+    def __init__(
+            self, netuids, validator_data_main, json_folder,
+            num_intervals=None, verbose=False
+    ):
+        self._netuids = netuids
+        self._validator_data_main = validator_data_main
+        self._json_folder = json_folder
+        self._num_intervals = num_intervals
+        self._other_coldkey = None
+
+        super().__init__(verbose)
+
+    def _get_subnet_data(self):
+        existing_intervals_data = SubnetDataIntervalsFromJson(
+            self._netuids, self._json_folder, verbose=self._verbose
+        ).validator_data
+
+        for netuid in self._netuids:
+            main_data = self._validator_data_main[netuid]
+            existing_intervals = existing_intervals_data[netuid]
+
+            self._validator_data[netuid] = self.ValidatorData(
+                subnet_emission=main_data["subnet_emission"],
+                blocks=[],
+                block_data=[],
+            )
+
+            last_weight_block = main_data["rizzo_last_update"]
+            if not last_weight_block:
+                continue
+
+            # The rizzo_emission, rizzo_vtrust, and avg_vtrust aren't 100% accurate.
+            # They're actually the current values rather than the values when weights
+            # were set. But the difference between those should never be more than
+            # 75 blocks and usually never more than 25 blocks so it's probably
+            # accurate enough.
+            #
+            # Interval defaults to None in case there is no existing intervals data.
+            block_data = self.BlockData(
+                rizzo_emission=main_data["rizzo_emission"],
+                rizzo_vtrust=main_data["rizzo_vtrust"],
+                avg_vtrust=main_data["avg_vtrust"],
+                rizzo_updated=None,
+            )
+
+            try:
+                last_written_block = existing_intervals.blocks[0]
+            except IndexError:
+                self._validator_data[netuid].blocks.append(last_weight_block)
+                self._validator_data[netuid].block_data.append(block_data)
+                continue
+
+            # Shouldn't ever be less, but just in case...
+            # No new weights were set. Just copy existing blocks and block data.
+            if last_weight_block <= last_written_block:
+                self._validator_data[netuid].blocks.extend(existing_intervals.blocks)
+                self._validator_data[netuid].block_data.extend(existing_intervals.block_data)
+                continue
+
+            # Set the actual interval.
+            interval = last_weight_block - last_written_block
+            block_data = self.BlockData(
+                rizzo_emission=main_data["rizzo_emission"],
+                rizzo_vtrust=main_data["rizzo_vtrust"],
+                avg_vtrust=main_data["avg_vtrust"],
+                rizzo_updated=interval,
+            )
+
+            # Set the new block and block data and add the existing ones.
+            self._validator_data[netuid].blocks.extend(
+                [last_weight_block] + existing_intervals.blocks
+            )
+            self._validator_data[netuid].block_data.extend(
+                [block_data] + existing_intervals.block_data
+            )
+
+            # If it's more than num_intervals then re-create it with the correct
+            # number of intervals.
+            if len(self._validator_data[netuid].blocks) > self._num_intervals:
+                self._validator_data[netuid] = self.ValidatorData(
+                    subnet_emission=self._validator_data[netuid].subnet_emission,
+                    blocks=self._validator_data[netuid].blocks[:self._num_intervals],
+                    block_data=self._validator_data[netuid].block_data[:self._num_intervals],
                 )

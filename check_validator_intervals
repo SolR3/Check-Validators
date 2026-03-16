@@ -92,7 +92,7 @@ def main(options):
 
     subnets = (
         options.subnets
-        or SubnetDataFromJson.get_netuids_from_json_folder(
+        or SubnetDataIntervalsFromJson.get_netuids_from_json_folder(
             options.json_folder
         )
     )
@@ -101,7 +101,7 @@ def main(options):
     start_time = time.time()
     if options.json_folder:
         num_intervals = options.num_intervals or DEFAULT_NUM_INTERVALS_JSON
-        validator_data = SubnetDataFromJson(
+        validator_data = SubnetDataIntervalsFromJson(
             subnets,
             options.json_folder,
             num_intervals=num_intervals,
@@ -118,7 +118,7 @@ def main(options):
             timestamp_msg = "\033[91mNO TIMESTAMP FILE!"
     else:
         num_intervals = options.num_intervals or DEFAULT_NUM_INTERVALS_NO_JSON
-        validator_data = SubnetData(
+        validator_data = SubnetDataIntervals(
             subnets,
             num_intervals,
             network,
@@ -146,7 +146,7 @@ if __name__ == "__main__":
 
         # Import local modules after parsing args to keep the
         # bittensor module from overriding the --help arg.
-        from subnet_data_intervals import SubnetData, SubnetDataFromJson
+        from subnet_data_intervals import SubnetDataIntervals, SubnetDataIntervalsFromJson
         from subnet_printer_intervals import RichPrinter
 
         main(options)

@@ -70,7 +70,7 @@ def main(options):
     print_total_emission = not (options.chk_only or options.missing_chk or bool(options.subnets))
 
     start_time = time.time()
-    validator_data = SubnetData(
+    validator_data = SubnetDataMain(
         netuids, network, verbose=options.verbose, other_coldkey=options.coldkey
     ).validator_data
     subnet_data_printer = SubnetDataPrinter(
@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
         # Import local modules after parsing args to keep the
         # bittensor module from overriding the --help arg.
-        from subnet_data_main import SubnetData
+        from subnet_data_main import SubnetDataMain
         from subnet_printer_status import SubnetDataPrinter
         import utils
 

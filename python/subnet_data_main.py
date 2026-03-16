@@ -27,6 +27,7 @@ async def dummy_chk_take_func():
 class SubnetDataBase:
     ValidatorData = namedtuple(
         "ValidatorData", [
+            "block",
             "netuid",
             "subnet_emission",
             "subnet_tempo",
@@ -35,6 +36,7 @@ class SubnetDataBase:
             "rizzo_stake_weight",
             "rizzo_stake_rank",
             "rizzo_emission",
+            "rizzo_last_update",
             "rizzo_vtrust",
             "rt21_vtrust",
             "rt21_vtrust_gap",
@@ -89,7 +91,7 @@ class SubnetDataBase:
             print(message)
 
 
-class SubnetData(SubnetDataBase):
+class SubnetDataMain(SubnetDataBase):
     def __init__(
             self, netuids, network, verbose=True,
             other_coldkey=None, other_chk_hotkey=None
@@ -99,7 +101,7 @@ class SubnetData(SubnetDataBase):
         self._other_coldkey = self._get_other_coldkey(other_coldkey)
         self._other_chk_hotkey = other_chk_hotkey
 
-        super(SubnetData, self).__init__(verbose)
+        super().__init__(verbose)
 
     def to_dict(self):
         def serializable(value):
@@ -412,12 +414,14 @@ class SubnetData(SubnetDataBase):
             rizzo_emission = None
             rizzo_vtrust = None
             rizzo_updated = None
+            rizzo_last_update = None
             rizzo_stake_weight = None
             rizzo_stake_rank = None
         else:
             rizzo_emission = metagraph.E[rizzo_uid]
             rizzo_vtrust = metagraph.Tv[rizzo_uid]
             rizzo_updated = current_block - metagraph.last_update[rizzo_uid]
+            rizzo_last_update = metagraph.last_update[rizzo_uid]
             rizzo_stake_weight = metagraph.S[rizzo_uid]
             rizzo_stake_rank = (
                 len(metagraph.S) - sorted(metagraph.S).index(rizzo_stake_weight)
@@ -562,6 +566,7 @@ class SubnetData(SubnetDataBase):
 
         # Store the data.
         self._validator_data[netuid] = self.ValidatorData(
+            block=current_block,
             netuid=netuid,
             subnet_emission=subnet_emission,
             subnet_tempo=subnet_tempo,
@@ -570,6 +575,7 @@ class SubnetData(SubnetDataBase):
             rizzo_stake_weight=rizzo_stake_weight,
             rizzo_stake_rank=rizzo_stake_rank,
             rizzo_emission=rizzo_emission,
+            rizzo_last_update=rizzo_last_update,
             rizzo_vtrust=rizzo_vtrust,
             rt21_vtrust=rt21_vtrust,
             rt21_vtrust_gap=rt21_vtrust_gap,
@@ -603,7 +609,7 @@ class SubnetData(SubnetDataBase):
 #         self._username = username
 #         self._password = password
 
-#         super(SubnetDataFromWebServer, self).__init__(verbose)
+#         super().__init__(verbose)
 
 #     def _get_subnet_data(self):
 #         from bs4 import BeautifulSoup
@@ -668,7 +674,7 @@ class SubnetData(SubnetDataBase):
 #         self._ssh_key_path = ssh_key_path
 #         self._password = password
 
-#         super(SubnetDataFromJson, self).__init__(verbose)
+#         super().__init__(verbose)
 
 #     def _get_subnet_data(self):
 #         import paramiko

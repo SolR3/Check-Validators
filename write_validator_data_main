@@ -16,6 +16,7 @@ sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 # Import local constants
 from constants import (
     LOCAL_LITE_SUBTENSORS,
+    DEFAULT_NUM_INTERVALS_JSON,
     LOCAL_TIMEZONE,
     DATA_FILE_NAME,
     TIMESTAMP_FILE_NAME,
@@ -30,9 +31,23 @@ def _parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "-j", "--json-folder",
+        "--json-main-folder",
         required=True,
-        help="The json folder in which to write the json files."
+        help="The json folder in which to write the main data json files."
+    )
+
+    parser.add_argument(
+        "--json-intervals-folder",
+        help="The json folder in which to write the intervals data json files. "
+             "If not specified then intervals data will not be written."
+    )
+
+    parser.add_argument(
+        "-n", "--num-weights-intervals",
+        type=int,
+        default=DEFAULT_NUM_INTERVALS_JSON,
+        help="The number of weight setting intervals to write if --json-intervals-folder "
+             f"was specified. The default is {DEFAULT_NUM_INTERVALS_JSON}."
     )
 
     parser.add_argument(
@@ -76,71 +91,160 @@ def format_time(total_time):
     return runtime_text
 
 
-def write_json_file(
-        network, all_subnets, json_folder, netuid_start=None, netuid_end=None
-    ):
-    print("Gathering subnet data.")
-    start_time = time.time()
+class WriteData:
+    def __init__(self, options):
+        self._network = options.network
+        self._chunks = options.chunks
+        self._num_weights_intervals = options.num_weights_intervals
+        self._json_main_folder = options.json_main_folder
+        self._json_intervals_folder = options.json_intervals_folder
 
-    if netuid_start is not None:
-        if netuid_end is not None:
-            netuids = all_subnets[netuid_start:netuid_end+1]
+        try:
+            self._all_subnets = utils.get_all_subnets(self._network)
+        except Exception as err:
+            print("")
+            print(f"ERROR: Subtensor connection failed on '{self._network}'")
+            print(f"{type(err).__name__}: {err}")
+            print("")
+            raise SubtensorConnectionError
+
+        self._tempdir_main = tempfile.mkdtemp(prefix="write_vali_data_main_")
+        if self._json_intervals_folder:
+            self._tempdir_intervals = tempfile.mkdtemp(prefix="write_vali_data_intervals_")
         else:
-            netuids = all_subnets[netuid_start:]
-    else:
-        netuids = all_subnets
+            self._tempdir_intervals = None
 
-    netuid_range = f"{netuids[0]}-{netuids[-1]}"
-    json_base, json_ext = os.path.splitext(DATA_FILE_NAME)
-    json_file_name = f"{json_base}.{netuid_range}{json_ext}"
-    json_file = os.path.join(json_folder, json_file_name)
+        self._run()
 
-    data_dict = SubnetData(netuids, network).to_dict()
+    def _run(self):
+        if self._chunks:
+            for netuid_start, netuid_end in self._get_netuid_start_end_args():
+                time.sleep(2)
+                self._write_json_files_to_tmp(netuid_start, netuid_end)
+        else:
+            self._write_json_files_to_tmp()
 
-    print(f"\nWriting data to file: {json_file}")
-    with open(json_file, "w") as fd:
-        json.dump(data_dict, fd, indent=4)
+        self._copy_tmp_to_final(self._tempdir_main, self._json_main_folder)
+        if self._json_intervals_folder:
+            self._copy_tmp_to_final(self._tempdir_intervals, self._json_intervals_folder)
 
-    total_time = time.time() - start_time
-    print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
+    def _get_netuid_start_end_args(self):
+        num_subnets = len(self._all_subnets)
+        chunk_size = int(numpy.ceil(num_subnets / self._chunks))
+        netuid_start = 0
+        while True:
+            netuid_end = netuid_start + chunk_size - 1
+            if netuid_end >= num_subnets:
+                yield netuid_start, None
+                break
+            yield netuid_start, netuid_end
+            netuid_start = netuid_end + 1
+
+    def _write_json_files_to_tmp(self, netuid_start=None, netuid_end=None):
+        print("Gathering subnet data.")
+        start_time = time.time()
+
+        if netuid_start is not None:
+            if netuid_end is not None:
+                netuids = self._all_subnets[netuid_start:netuid_end+1]
+            else:
+                netuids = self._all_subnets[netuid_start:]
+        else:
+            netuids = self._all_subnets
+
+        # TODO - Some refactoring is needed so we can get the data object
+        # from SubnetDataMain and then call to_dict() to get the main data
+        # and some new intervals calculation method to get the most recent
+        # interval.
+
+        # Gather subnet data
+        validator_data_main = SubnetDataMain(netuids, self._network).to_dict()
+
+        # Write main data json file
+        netuid_range = f"{netuids[0]}-{netuids[-1]}"
+        json_base, json_ext = os.path.splitext(DATA_FILE_NAME)
+        json_file_name_main = f"{json_base}.{netuid_range}{json_ext}"
+        json_file_main = os.path.join(self._tempdir_main, json_file_name_main)
+
+        print(f"\nWriting main data to file: {json_file_main}\n")
+        with open(json_file_main, "w") as fp:
+            json.dump(validator_data_main, fp, indent=4)
+
+        # If the --json-intervals-folder was specified then gather the intervals from
+        # the existing json files and add interval blocks as necessary.
+        if self._json_intervals_folder:
+            validator_data_intervals = SubnetDataIntervalsFromMainData(
+                netuids, validator_data_main, self._json_intervals_folder,
+                num_intervals=self._num_weights_intervals, verbose=True
+            ).to_dict()
+
+            for netuid in netuids:
+                json_file_name_intervals = \
+                    SubnetDataIntervalsFromJson.get_json_file_name(netuid)
+                json_file_intervals = os.path.join(
+                    self._tempdir_intervals, json_file_name_intervals)
+                print(f"\nWriting intervals data for netuid {netuid} to file: "
+                      f"{json_file_intervals}")
+                with open(json_file_intervals, "w") as fp:
+                    json.dump({netuid: validator_data_intervals[netuid]}, fp, indent=4)
+            print("")
+
+        total_time = time.time() - start_time
+        print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
+
+    def _copy_tmp_to_final(self, tempdir, finaldir):
+        # Remove files from final folder
+        for file_name in os.listdir(finaldir):
+            json_file = os.path.join(finaldir, file_name)
+            if (
+                not os.path.isfile(json_file)
+                or os.path.splitext(json_file)[1] != ".json"
+            ):
+                continue
+            print(f"Removing {json_file}")
+            os.unlink(json_file)
+
+        # Copy files from temp folder to final folder
+        for file_name in os.listdir(tempdir):
+            src_json_file = os.path.join(tempdir, file_name)
+            dest_json_file = os.path.join(finaldir, file_name)
+            print(f"Moving {src_json_file} to {dest_json_file}")
+            os.rename(src_json_file, dest_json_file)
+
+        # Remove temp folder
+        os.rmdir(tempdir)
+
+        # Write timestamp for final folder
+        self._write_timestamp(finaldir)
+
+    def _write_timestamp(self, json_folder):
+        os.environ["TZ"] = LOCAL_TIMEZONE
+        time.tzset()
+
+        max_file_time = 0
+        json_base, json_ext = os.path.splitext(DATA_FILE_NAME)
+        for _file in os.listdir(json_folder):
+            file_base, file_ext = os.path.splitext(_file)
+            if not file_base.startswith(json_base) or file_ext != json_ext:
+                continue
+
+            json_file = os.path.join(json_folder, _file)
+            file_time = os.path.getmtime(json_file)
+            if file_time > max_file_time:
+                max_file_time = file_time
+        
+        timestamp = {
+            "display_time": time.ctime(max_file_time),
+            "actual_time": int(max_file_time),
+        }
+        timestamp_file = os.path.join(json_folder, TIMESTAMP_FILE_NAME)
+        print(f"\nWriting timestamp file: {timestamp_file}")
+        with open(timestamp_file, "w") as fd:
+            json.dump(timestamp, fd)
 
 
-def write_timestamp(json_folder):
-    os.environ["TZ"] = LOCAL_TIMEZONE
-    time.tzset()
-
-    max_file_time = 0
-    json_base, json_ext = os.path.splitext(DATA_FILE_NAME)
-    for _file in os.listdir(json_folder):
-        file_base, file_ext = os.path.splitext(_file)
-        if not file_base.startswith(json_base) or file_ext != json_ext:
-            continue
-
-        json_file = os.path.join(json_folder, _file)
-        file_time = os.path.getmtime(json_file)
-        if file_time > max_file_time:
-            max_file_time = file_time
-    
-    timestamp = {
-        "display_time": time.ctime(max_file_time),
-        "actual_time": int(max_file_time),
-    }
-    timestamp_file = os.path.join(json_folder, TIMESTAMP_FILE_NAME)
-    print(f"\nWriting timestamp file: {timestamp_file}")
-    with open(timestamp_file, "w") as fd:
-        json.dump(timestamp, fd)
-
-
-def get_netuid_start_end_args(num_subnets, num_chunks):
-    chunk_size = int(numpy.ceil(num_subnets / num_chunks))
-    netuid_start = 0
-    while True:
-        netuid_end = netuid_start + chunk_size - 1
-        if netuid_end >= num_subnets:
-            yield netuid_start, None
-            break
-        yield netuid_start, netuid_end
-        netuid_start = netuid_end + 1
+def run(options):
+    WriteData(options)
 
 
 def get_subtensor_network(local_subtensor, local_subtensor_index):
@@ -153,58 +257,10 @@ def get_subtensor_network(local_subtensor, local_subtensor_index):
     return f"ws://subtensor-{network_name}.rizzo.network:9944"
 
 
-def run(options):
-    network = options.network
-    chunks = options.chunks
-    json_folder = options.json_folder
-
-    try:
-        all_subnets = utils.get_all_subnets(network)
-    except Exception as err:
-        print("")
-        print(f"ERROR: Subtensor connection failed on '{network}'")
-        print(f"{type(err).__name__}: {err}")
-        print("")
-        raise SubtensorConnectionError
-
-    tempdir = tempfile.mkdtemp(prefix="write_vali_data_")
-
-    if chunks:
-        num_subnets = len(all_subnets)
-        for i, (netuid_start, netuid_end) in enumerate(
-            get_netuid_start_end_args(num_subnets, chunks)
-        ):
-            if i > 0:
-                time.sleep(2)
-            write_json_file(
-                network, all_subnets, tempdir, netuid_start, netuid_end
-            )
-    else:
-        write_json_file(network, all_subnets, tempdir)
-
-    # Copy files over to relevant location
-    for file_name in os.listdir(json_folder):
-        json_file = os.path.join(json_folder, file_name)
-        if (
-            not os.path.isfile(json_file)
-            or os.path.splitext(json_file)[1] != ".json"
-        ):
-            continue
-        print(f"Removing {json_file}")
-        os.unlink(json_file)
-    for file_name in os.listdir(tempdir):
-        src_json_file = os.path.join(tempdir, file_name)
-        dest_json_file = os.path.join(json_folder, file_name)
-        print(f"Moving {src_json_file} to {dest_json_file}")
-        os.rename(src_json_file, dest_json_file)
-
-    os.rmdir(tempdir)
-
-    write_timestamp(json_folder)
-
-
 def main(options):
-    os.makedirs(options.json_folder, exist_ok=True)
+    os.makedirs(options.json_main_folder, exist_ok=True)
+    if options.json_intervals_folder:
+        os.makedirs(options.json_intervals_folder, exist_ok=True)
 
     local_subtensor_index = -1
     interval_seconds = round(options.interval * 60)
@@ -245,7 +301,11 @@ if __name__ == "__main__":
     options = _parse_args()
 
     # Import local modules
-    from subnet_data_main import SubnetData
+    from subnet_data_main import SubnetDataMain
+    from subnet_data_intervals import (
+        SubnetDataIntervalsFromJson,
+        SubnetDataIntervalsFromMainData
+    )
     import utils
 
     main(options)

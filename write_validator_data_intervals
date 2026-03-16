@@ -121,11 +121,11 @@ def write_json_files(
     else:
         netuids = all_subnets[1:]
 
-    existing_json_data = SubnetDataFromJson(
+    existing_json_data = SubnetDataIntervalsFromJson(
         netuids, read_json_folder, verbose=True
     ).validator_data
 
-    new_data_dict = SubnetData(
+    new_data_dict = SubnetDataIntervals(
         netuids,
         num_weights_intervals,
         network,
@@ -135,7 +135,7 @@ def write_json_files(
     ).to_dict()
 
     for netuid in netuids:
-        json_file_name = SubnetDataFromJson.get_json_file_name(netuid)
+        json_file_name = SubnetDataIntervalsFromJson.get_json_file_name(netuid)
         write_json_file = os.path.join(write_json_folder, json_file_name)
         print(f"\nWriting data to file: {write_json_file}")
         with open(write_json_file, "w") as fd:
@@ -330,6 +330,6 @@ if __name__ == "__main__":
     import bittensor
 
     # Import local modules
-    from subnet_data_intervals import SubnetData, SubnetDataFromJson
+    from subnet_data_intervals import SubnetDataIntervals, SubnetDataIntervalsFromJson
 
     main(options)
