@@ -19,6 +19,7 @@ from constants import (
     COLDKEYS,
     MULTI_UID_HOTKEYS,
     RIZZO_HOTKEYS,
+    DATA_FILE_NAME,
 )
 
 
@@ -360,8 +361,6 @@ class SubnetData(SubnetDataBase):
 
 
 class SubnetDataFromJson(SubnetDataBase):
-    json_file_name = "validator_data.json"
-
     def __init__(self, netuids, json_folder, num_intervals=None, verbose=False):
         self._netuids = netuids
         self._json_folder = json_folder
@@ -370,9 +369,9 @@ class SubnetDataFromJson(SubnetDataBase):
 
         super(SubnetDataFromJson, self).__init__(verbose)
 
-    @classmethod
-    def get_json_file_name(cls, netuid):
-        json_base, json_ext = os.path.splitext(cls.json_file_name)
+    @staticmethod
+    def get_json_file_name(netuid):
+        json_base, json_ext = os.path.splitext(DATA_FILE_NAME)
         return f"{json_base}.{netuid}{json_ext}"
 
     @classmethod

@@ -7,10 +7,15 @@ import os
 import sys
 import time
 
+# Set path to import local modules
+sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 
-TIMESTAMP_FILE_NAME = "timestamp.json"
-DEFAULT_NUM_INTERVALS_JSON = 30
-DEFAULT_NUM_INTERVALS_NO_JSON = 10
+# Import local constants
+from constants import (
+    DEFAULT_NUM_INTERVALS_JSON,
+    DEFAULT_NUM_INTERVALS_NO_JSON,
+    TIMESTAMP_FILE_NAME,
+)
 
 
 def parse_args():
@@ -139,14 +144,13 @@ if __name__ == "__main__":
     try:
         options = parse_args()
 
-        # Set path to import local modules
-        sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
-
-        # Import local modules
+        # Import local modules after parsing args to keep the
+        # bittensor module from overriding the --help arg.
         from subnet_data_intervals import SubnetData, SubnetDataFromJson
         from subnet_printer_intervals import RichPrinter
 
         main(options)
+
     except KeyboardInterrupt as exc:
         import traceback
         exc_list = traceback.format_exception_only(exc)

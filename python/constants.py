@@ -14,6 +14,24 @@ UPDATED_ERROR_THRESHOLD = 1080  # 3x normal subnet tempo (360 blocks)
 UPDATED_WARNING_THRESHOLD = 720  # 2x normal subnet tempo (360 blocks)
 
 
+##################
+# Misc. constants
+##################
+DEFAULT_NUM_INTERVALS_JSON = 30
+DEFAULT_NUM_INTERVALS_NO_JSON = 10
+DATA_FILE_NAME = "validator_data.json"
+TIMESTAMP_FILE_NAME = "timestamp.json"
+LOCAL_TIMEZONE = "MST7MDT"
+LOCAL_LITE_SUBTENSORS = [
+    "cali",
+    "candyland",
+    "datacenter01",
+    "la",
+    "moonbase",
+    "titan",
+]
+
+
 #######################
 # Hotkeys and Coldkeys
 #######################
