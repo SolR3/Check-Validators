@@ -40,6 +40,8 @@ class RichPrinter:
             return f"color({self._green})"
     
     def _get_blocks_status(self, blocks):
+        if blocks is None:
+            return 2
         if  blocks > UPDATED_ERROR_THRESHOLD:
             return 2
         if blocks > UPDATED_WARNING_THRESHOLD:
@@ -90,7 +92,7 @@ class RichTextPrinter(RichPrinter):
             for subnet_block in subnet_data.block_data:
                 blocks = subnet_block.rizzo_updated
                 blocks_status = self._get_blocks_status(blocks)
-                blocks = str(blocks)
+                blocks = "---" if blocks is None else str(blocks)
 
                 vtrust = subnet_block.rizzo_vtrust
                 avg_vtrust = subnet_block.avg_vtrust

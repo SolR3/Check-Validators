@@ -305,11 +305,10 @@ class SubnetDataIntervals(SubnetDataBase):
                     self._existing_data[netuid].block_data
                 )
                 if len(self._validator_data[netuid].blocks) > self._num_intervals:
-                    self._validator_data[netuid] = self.ValidatorData(
-                        subnet_emission=self._validator_data[netuid].subnet_emission,
-                        blocks=self._validator_data[netuid].blocks[:self._num_intervals],
-                        block_data=self._validator_data[netuid].block_data[:self._num_intervals],
-                    )
+                    self._validator_data[netuid].blocks = \
+                        self._validator_data[netuid].blocks[:self._num_intervals]
+                    self._validator_data[netuid].block_data = \
+                        self._validator_data[netuid].block_data[:self._num_intervals]
 
         total_time = time.time() - start_time
         self._print_verbose(
@@ -406,18 +405,14 @@ class SubnetDataIntervalsFromJson(SubnetDataBase):
                         rizzo_updated=subnet_block_data["rizzo_updated"],
                     )
                 )
+
+            self._validator_data[netuid].subnet_emission = subnet_data["subnet_emission"]
             if self._num_intervals:
-                self._validator_data[netuid] = self.ValidatorData(
-                    subnet_emission=subnet_data["subnet_emission"],
-                    blocks=subnet_data["blocks"][:self._num_intervals],
-                    block_data=block_data[:self._num_intervals],
-                )
+                self._validator_data[netuid].blocks = subnet_data["blocks"][:self._num_intervals]
+                self._validator_data[netuid].block_data = block_data[:self._num_intervals]
             else:
-                self._validator_data[netuid] = self.ValidatorData(
-                    subnet_emission=subnet_data["subnet_emission"],
-                    blocks=subnet_data["blocks"],
-                    block_data=block_data,
-                )
+                self._validator_data[netuid].blocks = subnet_data["blocks"]
+                self._validator_data[netuid].block_data = block_data
 
 
 class SubnetDataIntervalsFromMainData(SubnetDataBase):
@@ -482,12 +477,7 @@ class SubnetDataIntervalsFromMainData(SubnetDataBase):
 
             # Set the actual interval.
             interval = last_weight_block - last_written_block
-            block_data = self.BlockData(
-                rizzo_emission=main_data["rizzo_emission"],
-                rizzo_vtrust=main_data["rizzo_vtrust"],
-                avg_vtrust=main_data["avg_vtrust"],
-                rizzo_updated=interval,
-            )
+            block_data.rizzo_updated = interval
 
             # Set the new block and block data and add the existing ones.
             self._validator_data[netuid].blocks.extend(
@@ -500,8 +490,7 @@ class SubnetDataIntervalsFromMainData(SubnetDataBase):
             # If it's more than num_intervals then re-create it with the correct
             # number of intervals.
             if len(self._validator_data[netuid].blocks) > self._num_intervals:
-                self._validator_data[netuid] = self.ValidatorData(
-                    subnet_emission=self._validator_data[netuid].subnet_emission,
-                    blocks=self._validator_data[netuid].blocks[:self._num_intervals],
-                    block_data=self._validator_data[netuid].block_data[:self._num_intervals],
-                )
+                self._validator_data[netuid].blocks = \
+                    self._validator_data[netuid].blocks[:self._num_intervals]
+                self._validator_data[netuid].block_data = \
+                    self._validator_data[netuid].block_data[:self._num_intervals]
