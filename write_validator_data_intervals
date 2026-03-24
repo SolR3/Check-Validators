@@ -132,7 +132,7 @@ def write_json_files(
         chunk_size=chunk_size,
         existing_data=existing_json_data,
         verbose=True
-    ).to_dict()
+    ).as_dict()
 
     for netuid in netuids:
         json_file_name = SubnetDataIntervalsFromJson.get_json_file_name(netuid)

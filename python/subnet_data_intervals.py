@@ -1,11 +1,12 @@
-#!/usr/bin/env python3
+# Future imports
+from __future__ import annotations
 
 # bittensor import
 import bittensor
 
 # standart imports
 import asyncio
-from collections import namedtuple
+from dataclasses import dataclass, asdict
 import json
 import numpy
 import os
@@ -24,21 +25,18 @@ from constants import (
 
 
 class SubnetDataBase:
-    ValidatorData = namedtuple(
-        "ValidatorData", [
-            "subnet_emission",
-            "blocks",
-            "block_data",
-        ]
-    )
-    BlockData = namedtuple(
-        "BlockData", [
-            "rizzo_emission",
-            "rizzo_vtrust",
-            "avg_vtrust",
-            "rizzo_updated",
-        ]
-    )
+    @dataclass
+    class ValidatorData:
+        subnet_emission: float
+        blocks: list[int]
+        block_data: list[SubnetDataBase.BlockData]
+
+    @dataclass
+    class BlockData:
+        rizzo_emission: float
+        rizzo_vtrust: float
+        avg_vtrust: float | None
+        rizzo_updated: int | None
 
     def __init__(self, verbose):
         self._verbose = verbose
@@ -64,28 +62,11 @@ class SubnetDataBase:
         if self._verbose:
             print(message)
 
-    def to_dict(self):
-        def serializable(value):
-            if isinstance(value, self.BlockData):
-                return namedtuple_to_dict(value)
-            if isinstance(value, list):
-                return [serializable(v) for v in value]
-            if isinstance(value, numpy.float32):
-                return float(value)
-            if isinstance(value, numpy.int64):
-                return int(value)
-            return value
-
-        def namedtuple_to_dict(data):
-            return dict(
-                [(f, serializable(getattr(data, f))) for f in data._fields]
-            )
-
-        data_dict = {}
-        for key in self._validator_data:
-            data = self._validator_data[key]
-            data_dict[key] = namedtuple_to_dict(data)
-        return data_dict
+    def as_dict(self):
+        return {
+            netuid: asdict(self._validator_data[netuid])
+            for netuid in self._validator_data
+        }
 
     def _get_subnet_data(self):
         raise NotImplementedError
@@ -189,7 +170,7 @@ class SubnetDataIntervals(SubnetDataBase):
                 )
                 continue
 
-            last_weight_set_block[netuid] = metagraph.last_update[rizzo_uid]
+            last_weight_set_block[netuid] = int(metagraph.last_update[rizzo_uid])
 
             if self._existing_data.get(netuid):
                 block_to_stop[netuid] = (
@@ -225,7 +206,7 @@ class SubnetDataIntervals(SubnetDataBase):
                 mgs = await asyncio.gather(
                     *[
                         self.get_metagraph_for_netuid_at_block(
-                            subtensor, netuid, int(last_weight_set_block[netuid]) - 1
+                            subtensor, netuid, last_weight_set_block[netuid] - 1
                         )
                         for netuid in netuids_remaining
                     ]
@@ -271,10 +252,10 @@ class SubnetDataIntervals(SubnetDataBase):
 
                 # There's some weirdness going on with sn72. Catching it here.
                 try:
-                    prev_weight_set_block = metagraph.last_update[rizzo_uid]
+                    prev_weight_set_block = int(metagraph.last_update[rizzo_uid])
                     interval = last_weight_set_block[netuid] - prev_weight_set_block
-                    rizzo_vtrust = metagraph.Tv[rizzo_uid]
-                    rizzo_emission = metagraph.E[rizzo_uid]
+                    rizzo_vtrust = float(metagraph.Tv[rizzo_uid])
+                    rizzo_emission = float(metagraph.E[rizzo_uid])
 
                     # Get all validator uids that have validator permits.
                     all_uids = metagraph.uids[
@@ -295,7 +276,7 @@ class SubnetDataIntervals(SubnetDataBase):
                     else:
                         # Get min/max/average vTrust values.
                         # vtrusts = [metagraph.Tv[uid] for uid in valid_uids]
-                        avg_vtrust = numpy.average(metagraph.Tv[valid_uids])
+                        avg_vtrust = float(numpy.average(metagraph.Tv[valid_uids]))
                 except IndexError:
                     self._print_verbose(
                         f"Unable to obtain all {self._num_intervals} "

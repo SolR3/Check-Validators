@@ -1,9 +1,12 @@
+# Future imports
+from __future__ import annotations
+
 # bittensor import
 import bittensor
 
 # standart imports
 import asyncio
-from collections import namedtuple
+from dataclasses import dataclass, make_dataclass, asdict
 # import json
 import numpy
 import time
@@ -20,59 +23,58 @@ from constants import (
 
 
 async def dummy_chk_take_func():
-    DummyChkTake = namedtuple("DummyChkTake", ["value"])
-    return DummyChkTake(value=0)
+    class DummyChkTake:
+        value = 0
+    return DummyChkTake()
 
 
 class SubnetDataBase:
-    ValidatorData = namedtuple(
-        "ValidatorData", [
-            "block",
-            "netuid",
-            "subnet_emission",
-            "subnet_tempo",
-            "num_total_validators",
-            "num_valid_validators",
-            "rizzo_stake_weight",
-            "rizzo_stake_rank",
-            "rizzo_emission",
-            "rizzo_last_update",
-            "rizzo_vtrust",
-            "rt21_vtrust",
-            "rt21_vtrust_gap",
-            "yuma_vtrust",
-            "yuma_vtrust_gap",
-            "max_vtrust",
-            "avg_vtrust",
-            "min_vtrust",
-            "rizzo_updated",
-            "min_updated",
-            "avg_updated",
-            "max_updated",
-            "chk_fraction",
-            "chk_vtrust",
-            "chk_updated",
-            "missing_chk",
-            "chk_pending_block",
-            "chk_pending_time",
-            "child_hotkey_data",
-            "pending_child_hotkey_data",
-            "validator_hotkeys",
-            "rizzo_expected_hotkey",
-            "rizzo_hotkey_chk_take",
-        ]
-    )
-    ChildHotkeyData = namedtuple(
-        "ChildHotkeyData", [
-            "fraction",
-            "hotkey",
-            "take",
-            "vtrust",
-            "updated",
-        ]
-    )
-    ValidatorHotkeys = namedtuple(
-        "ValidatorHotkeys", list(COLDKEYS)
+    @dataclass
+    class ValidatorData:
+        block: int
+        netuid: int
+        subnet_emission: float
+        subnet_tempo: int
+        num_total_validators: int
+        num_valid_validators: int
+        rizzo_stake_weight: float
+        rizzo_stake_rank: int | None
+        rizzo_emission: float | None
+        rizzo_last_update: int | None
+        rizzo_vtrust: float | None
+        rt21_vtrust: float | None
+        rt21_vtrust_gap: float | None
+        yuma_vtrust: float | None
+        yuma_vtrust_gap: float | None
+        max_vtrust: float | None
+        avg_vtrust: float | None
+        min_vtrust: float | None
+        rizzo_updated: int | None
+        min_updated: int | None
+        avg_updated: int | None
+        max_updated: int | None
+        chk_fraction: float
+        chk_vtrust: float | None
+        chk_updated: int | None
+        missing_chk: float
+        chk_pending_block: int | None
+        chk_pending_time: int | None
+        child_hotkey_data: list[SubnetDataBase.ChildHotkeyData]
+        pending_child_hotkey_data: list[SubnetDataBase.ChildHotkeyData]
+        validator_hotkeys: SubnetDataBase.ValidatorHotkeys
+        rizzo_expected_hotkey: str | None
+        rizzo_hotkey_chk_take: float
+
+    @dataclass
+    class ChildHotkeyData:
+        fraction: float
+        hotkey: str
+        take: float
+        vtrust: float
+        updated: int
+
+    ValidatorHotkeys = make_dataclass(
+        "ValidatorHotkeys", [(k, str) for k in COLDKEYS]
     )
 
     def __init__(self, verbose):
@@ -103,33 +105,11 @@ class SubnetDataMain(SubnetDataBase):
 
         super().__init__(verbose)
 
-    def to_dict(self):
-        def serializable(value):
-            if (
-                isinstance(value, self.ChildHotkeyData)
-                or isinstance(value, self.ValidatorHotkeys)
-            ):
-                return namedtuple_to_dict(value)
-            if isinstance(value, list):
-                return [serializable(v) for v in value]
-            if isinstance(value, numpy.float32):
-                return float(value)
-            if isinstance(value, numpy.int64):
-                return int(value)
-            return value
-
-        def namedtuple_to_dict(data):
-            return dict(
-                [(f, serializable(getattr(data, f))) for f in data._fields]
-            )
-
-        data_dict = {}
-        for netuid in self._validator_data:
-            data = self._validator_data[netuid]
-            data_dict[netuid] = dict(
-                [(f, serializable(getattr(data, f))) for f in data._fields]
-            )
-        return data_dict
+    def as_dict(self):
+        return {
+            netuid: asdict(self._validator_data[netuid])
+            for netuid in self._validator_data
+        }
 
     @staticmethod
     def _get_other_coldkey(other_coldkey):
@@ -418,11 +398,11 @@ class SubnetDataMain(SubnetDataBase):
             rizzo_stake_weight = None
             rizzo_stake_rank = None
         else:
-            rizzo_emission = metagraph.E[rizzo_uid]
-            rizzo_vtrust = metagraph.Tv[rizzo_uid]
-            rizzo_updated = current_block - metagraph.last_update[rizzo_uid]
-            rizzo_last_update = metagraph.last_update[rizzo_uid]
-            rizzo_stake_weight = metagraph.S[rizzo_uid]
+            rizzo_emission = float(metagraph.E[rizzo_uid])
+            rizzo_vtrust = float(metagraph.Tv[rizzo_uid])
+            rizzo_updated = int(current_block - metagraph.last_update[rizzo_uid])
+            rizzo_last_update = int(metagraph.last_update[rizzo_uid])
+            rizzo_stake_weight = float(metagraph.S[rizzo_uid])
             rizzo_stake_rank = (
                 len(metagraph.S) - sorted(metagraph.S).index(rizzo_stake_weight)
             )
@@ -444,8 +424,8 @@ class SubnetDataMain(SubnetDataBase):
                     child_vtrust = None
                     child_updated = None
                 else:
-                    child_vtrust = metagraph.Tv[child_uid]
-                    child_updated = current_block - metagraph.last_update[child_uid]
+                    child_vtrust = float(metagraph.Tv[child_uid])
+                    child_updated = int(current_block - metagraph.last_update[child_uid])
 
                 child_hotkey_data.append(
                     self.ChildHotkeyData(
@@ -487,8 +467,8 @@ class SubnetDataMain(SubnetDataBase):
                     child_vtrust = None
                     child_updated = None
                 else:
-                    child_vtrust = metagraph.Tv[child_uid]
-                    child_updated = current_block - metagraph.last_update[child_uid]
+                    child_vtrust = float(metagraph.Tv[child_uid])
+                    child_updated = int(current_block - metagraph.last_update[child_uid])
 
                 pending_child_hotkey_data.append(
                     self.ChildHotkeyData(
@@ -523,7 +503,7 @@ class SubnetDataMain(SubnetDataBase):
 
         # Get rt21 vTrust and gap between rizzo and rt21
         rt21_uid = self._get_other_vali_uid(metagraph, COLDKEYS["Rt21"])
-        rt21_vtrust = metagraph.Tv[rt21_uid] if rt21_uid is not None else None
+        rt21_vtrust = float(metagraph.Tv[rt21_uid]) if rt21_uid is not None else None
 
         if rt21_vtrust is None:
             rt21_vtrust_gap = None
@@ -534,7 +514,7 @@ class SubnetDataMain(SubnetDataBase):
 
         # Get yuma vTrust and gap between rizzo and yuma
         yuma_uid = self._get_other_vali_uid(metagraph, COLDKEYS["Yuma"])
-        yuma_vtrust = metagraph.Tv[yuma_uid] if yuma_uid is not None else None
+        yuma_vtrust = float(metagraph.Tv[yuma_uid]) if yuma_uid is not None else None
 
         if yuma_vtrust is None:
             yuma_vtrust_gap = None
@@ -554,15 +534,15 @@ class SubnetDataMain(SubnetDataBase):
         else:
             # Get min/max/average vTrust values.
             vtrusts = metagraph.Tv[valid_uids]
-            max_vtrust = numpy.max(vtrusts)
-            avg_vtrust = numpy.average(vtrusts)
-            min_vtrust = numpy.min(vtrusts)
+            max_vtrust = float(numpy.max(vtrusts))
+            avg_vtrust = float(numpy.average(vtrusts))
+            min_vtrust = float(numpy.min(vtrusts))
 
             # Get min/max/average Updated values.
             updateds = current_block - metagraph.last_update[valid_uids]
-            min_updated = numpy.min(updateds)
+            min_updated = int(numpy.min(updateds))
             avg_updated = int(numpy.round(numpy.average(updateds)))
-            max_updated = numpy.max(updateds)
+            max_updated = int(numpy.max(updateds))
 
         # Store the data.
         self._validator_data[netuid] = self.ValidatorData(
@@ -600,125 +580,3 @@ class SubnetDataMain(SubnetDataBase):
             rizzo_expected_hotkey=rizzo_expected_hotkey,
             rizzo_hotkey_chk_take=rizzo_hotkey_chk_take,
         )
-
-
-# class SubnetDataFromWebServer(SubnetDataBase):
-#     def __init__(self, public_ip, port, username, password, verbose):
-#         self._public_ip = public_ip
-#         self._port = port
-#         self._username = username
-#         self._password = password
-
-#         super().__init__(verbose)
-
-#     def _get_subnet_data(self):
-#         from bs4 import BeautifulSoup
-#         import requests
-
-#         subnets_data = {}
-
-#         main_url = f"http://{self._public_ip}:{self._port}"
-#         self._print_verbose(f"Obtaining validator json data from: {main_url}")
-#         response = requests.get(main_url, auth=(self._username, self._password))
-#         if response.status_code != 200:
-#             self._print_verbose("\nERROR: Failed to obtain validator json data."
-#                               f"\nurl: {main_url}"
-#                               f"\nstatus code: {response.status_code}"
-#                               f"\nreason: {response.reason}")
-#             return
-
-#         html_content = BeautifulSoup(response.content.decode(), features="html.parser")
-#         for li_tag in html_content.findAll("li"):
-#             json_file = li_tag.find("a").get("href")
-#             json_url = f"http://{self._public_ip}:{self._port}/{json_file}"
-#             self._print_verbose(f"Updating validator json data with: {json_url}")
-#             response = requests.get(json_url, auth=(self._username, self._password))
-#             if response.status_code != 200:
-#                 self._print_verbose("\nERROR: Failed to obtain validator json data."
-#                                   f"\nurl: {json_url}"
-#                                   f"\nstatus code: {response.status_code}"
-#                                   f"\nreason: {response.reason}")
-#                 return
-            
-#             subnets_data.update(response.json())
-
-#         for subnet in subnets_data.values():
-#             self._validator_data[subnet["netuid"]] = self.ValidatorData(
-#                 netuid=subnet["netuid"],
-#                 subnet_emission=subnet["subnet_emission"],
-#                 subnet_tempo=subnet["subnet_tempo"],
-#                 num_total_validators=subnet["num_total_validators"],
-#                 num_valid_validators=subnet["num_valid_validators"],
-#                 rizzo_stake_rank=subnet["rizzo_stake_rank"],
-#                 rizzo_emission=subnet["rizzo_emission"],
-#                 rizzo_vtrust=subnet["rizzo_vtrust"],
-#                 max_vtrust=subnet["max_vtrust"],
-#                 avg_vtrust=subnet["avg_vtrust"],
-#                 min_vtrust=subnet["min_vtrust"],
-#                 rizzo_updated=subnet["rizzo_updated"],
-#                 min_updated=subnet["min_updated"],
-#                 avg_updated=subnet["avg_updated"],
-#                 max_updated=subnet["max_updated"],
-#                 chk_fraction=subnet["chk_fraction"],
-#                 chk_vtrust=subnet["chk_vtrust"],
-#                 chk_updated=subnet["chk_updated"],
-#                 child_hotkey_data=subnet["child_hotkey_data"])
-
-
-# class SubnetDataFromJson(SubnetDataBase):
-#     def __init__(self, json_file, host, port, username, ssh_key_path, password, verbose):
-#         self._json_file = json_file
-#         self._host = host
-#         self._port = port
-#         self._username = username
-#         self._ssh_key_path = ssh_key_path
-#         self._password = password
-
-#         super().__init__(verbose)
-
-#     def _get_subnet_data(self):
-#         import paramiko
-
-#         client = paramiko.SSHClient()
-#         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-#         if self._ssh_key_path:
-#             ssh_key = paramiko.RSAKey.from_private_key_file(self._ssh_key_path)
-#             auth_arg = {"pkey": ssh_key}
-#         else:
-#             auth_arg = {"password": self._password}
-#         client.connect(
-#             self._host,
-#             port=self._port,
-#             username=self._username,
-#             **auth_arg)
-
-#         stdin, stdout, stderr = client.exec_command(f"cat {self._json_file}")
-#         json_str = stdout.read().decode()
-
-#         stdin.close()
-#         stdout.close()
-#         stderr.close()
-#         client.close()
-#         subnets_data = json.loads(json_str)
-#         for subnet in subnets_data.values():
-#             self._validator_data[subnet["netuid"]] = self.ValidatorData(
-#                 netuid=subnet["netuid"],
-#                 subnet_emission=subnet["subnet_emission"],
-#                 subnet_tempo=subnet["subnet_tempo"],
-#                 num_total_validators=subnet["num_total_validators"],
-#                 num_valid_validators=subnet["num_valid_validators"],
-#                 rizzo_stake_rank=subnet["rizzo_stake_rank"],
-#                 rizzo_emission=subnet["rizzo_emission"],
-#                 rizzo_vtrust=subnet["rizzo_vtrust"],
-#                 max_vtrust=subnet["max_vtrust"],
-#                 avg_vtrust=subnet["avg_vtrust"],
-#                 min_vtrust=subnet["min_vtrust"],
-#                 rizzo_updated=subnet["rizzo_updated"],
-#                 min_updated=subnet["min_updated"],
-#                 avg_updated=subnet["avg_updated"],
-#                 max_updated=subnet["max_updated"],
-#                 chk_fraction=subnet["chk_fraction"],
-#                 chk_vtrust=subnet["chk_vtrust"],
-#                 chk_updated=subnet["chk_updated"],
-#                 child_hotkey_data=subnet["child_hotkey_data"])

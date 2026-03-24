@@ -153,12 +153,12 @@ class WriteData:
             netuids = self._all_subnets
 
         # TODO - Some refactoring is needed so we can get the data object
-        # from SubnetDataMain and then call to_dict() to get the main data
+        # from SubnetDataMain and then call as_dict() to get the main data
         # and some new intervals calculation method to get the most recent
         # interval.
 
         # Gather subnet data
-        validator_data_main = SubnetDataMain(netuids, self._network).to_dict()
+        validator_data_main = SubnetDataMain(netuids, self._network).as_dict()
 
         # Write main data json file
         netuid_range = f"{netuids[0]}-{netuids[-1]}"
@@ -176,7 +176,7 @@ class WriteData:
             validator_data_intervals = SubnetDataIntervalsFromMainData(
                 netuids, validator_data_main, self._json_intervals_folder,
                 num_intervals=self._num_weights_intervals, verbose=True
-            ).to_dict()
+            ).as_dict()
 
             for netuid in netuids:
                 json_file_name_intervals = \
