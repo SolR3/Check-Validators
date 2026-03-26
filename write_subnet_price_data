@@ -2,7 +2,7 @@
 
 # standard imports
 import argparse
-from collections import namedtuple
+from dataclasses import dataclass, asdict
 import json
 import multiprocessing
 import numpy
@@ -37,14 +37,14 @@ TAOSTATS_HEADERS = {
     "Authorization": TAOSTATS_API_KEY
 }
 
-SubnetPriceData = namedtuple(
-    "SubnetPriceData", [
-        "netuid",
-        "tao_price_usd",
-        "subnet_price_tao",
-        "subnet_price_usd",
-    ]
-)
+
+@dataclass
+class SubnetPriceData:
+    netuid: int
+    tao_price_usd: float | None
+    subnet_price_tao: float | None
+    subnet_price_usd: float | None
+
 
 class SubtensorConnectionError(Exception):
     pass
@@ -90,7 +90,10 @@ def _parse_args():
 
 
 def format_time(total_time):
-    m = total_time/60
+    h = total_time/60/60
+    hours = int(h)
+    remainder = round((h - hours)*60*60)
+    m = remainder/60
     minutes = int(m)
     seconds = round((m - minutes)*60)
 
@@ -176,26 +179,6 @@ def gather_subnet_data(netuids, sleep_time):
     return subnet_data
 
 
-def convert_to_dict(subnet_data):
-    def serializable(value):
-        if isinstance(value, list):
-            return [serializable(v) for v in value]
-        if isinstance(value, numpy.float32):
-            return float(value)
-        if isinstance(value, numpy.int64):
-            return int(value)
-        return value
-
-    data_dict = {}
-    for netuid in subnet_data:
-        data = subnet_data[netuid]
-        data_dict[netuid] = dict(
-            [(f, serializable(getattr(data, f))) for f in data._fields]
-        )
-
-    return data_dict
-
-
 def write_json_file(netuids, json_folder, sleep_time):
     print("Gathering subnet data.")
     start_time = time.time()
@@ -206,7 +189,7 @@ def write_json_file(netuids, json_folder, sleep_time):
     json_file = os.path.join(json_folder, json_file_name)
 
     subnet_data = gather_subnet_data(netuids, sleep_time)
-    data_dict = convert_to_dict(subnet_data)
+    data_dict = asdict(subnet_data)
 
     print(f"\nWriting data to file: {json_file}")
     with open(json_file, "w") as fd:
