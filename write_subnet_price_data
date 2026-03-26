@@ -192,7 +192,10 @@ def write_json_file(netuids, json_folder, sleep_time):
     json_file = os.path.join(json_folder, json_file_name)
 
     subnet_data = gather_subnet_data(netuids, sleep_time)
-    data_dict = asdict(subnet_data)
+    data_dict = {
+        netuid: asdict(subnet_data[netuid])
+        for netuid in subnet_data
+    }
 
     print(f"\nWriting data to file: {json_file}")
     with open(json_file, "w") as fd:
