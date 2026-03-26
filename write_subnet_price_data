@@ -97,7 +97,10 @@ def format_time(total_time):
     minutes = int(m)
     seconds = round((m - minutes)*60)
 
-    runtime_text = [f"{minutes} minutes"] if minutes else []
+    runtime_text = [f"{hours} hours"] if hours else []
+    if minutes:
+        runtime_text += [f"{minutes} minutes"]
+
     if seconds:
         runtime_text += [f"{seconds} seconds"]
     runtime_text = ", ".join(runtime_text)
