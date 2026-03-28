@@ -90,19 +90,6 @@ def _parse_args():
     return parser.parse_args()
 
 
-def format_time(total_time):
-    m = total_time/60
-    minutes = int(m)
-    seconds = round((m - minutes)*60)
-
-    runtime_text = [f"{minutes} minutes"] if minutes else []
-    if seconds:
-        runtime_text += [f"{seconds} seconds"]
-    runtime_text = ", ".join(runtime_text)
-
-    return runtime_text
-
-
 def write_json_files(
     all_subnets, network, num_weights_intervals, read_json_folder, write_json_folder,
     netuid_start=None, netuid_end=None, chunk_size=0, sleep_time=0,
@@ -119,7 +106,7 @@ def write_json_files(
         else:
             netuids = all_subnets[netuid_start:]
     else:
-        netuids = all_subnets[1:]
+        netuids = all_subnets
 
     existing_json_data = SubnetDataIntervalsFromJson(
         netuids, read_json_folder
@@ -140,9 +127,9 @@ def write_json_files(
         with open(write_json_file, "w") as fd:
             json.dump({netuid: new_data_dict[netuid]}, fd, indent=4)
 
-    total_time = time.time() - start_time
+    total_time = round(time.time() - start_time)
     bittensor.logging.info(
-        f"Subnet data gathering took {format_time(round(total_time))} "
+        f"Subnet data gathering took {utils.get_formatted_time(total_time)} "
         f"for subnets {netuids}."
     )
 
@@ -178,10 +165,10 @@ def get_process_args(
     read_json_folder, write_json_folder,
     chunk_size_arg, num_processes
 ):
-    num_subnets = len(all_subnets) - 1
+    num_subnets = len(all_subnets)
     process_chunk_size = int(numpy.ceil(num_subnets / num_processes))
     process_args = []
-    netuid_start = 1
+    netuid_start = 0
     sleep_time = 0
     while True:
         netuid_end = netuid_start + process_chunk_size - 1
@@ -207,11 +194,7 @@ def get_process_args(
 def get_all_subnets(network):
     bittensor.logging.info(f"Connecting to subtensor network: {network}")
     try:
-        with bittensor.Subtensor(network=network) as subtensor:
-            try:
-                all_subnets = subtensor.get_all_subnets_netuid()
-            except AttributeError:
-                all_subnets = subtensor.get_subnets()
+        all_subnets = utils.get_all_subnets(network)
     except Exception as err:
         bittensor.logging.error(f"Subtensor connection failed on '{network}'")
         bittensor.logging.error(f"{type(err).__name__}: {err}")
@@ -255,7 +238,7 @@ def main(options):
                 bittensor.logging.error("Rotating subtensors and trying again.")
                 time.sleep(1)
             else:
-                interval_time_formatted = format_time(interval_seconds)
+                interval_time_formatted = utils.get_formatted_time(interval_seconds)
                 bittensor.logging.error(f"Waiting {interval_time_formatted}.")
                 time.sleep(interval_seconds)
             continue
@@ -303,7 +286,7 @@ def main(options):
         total_seconds = round(time.time() - start_time)
         bittensor.logging.info(
             "Total subnet data gathering took "
-            f"{format_time(round(total_seconds))}."
+            f"{utils.get_formatted_time(total_seconds)}."
         )
 
         # Only gather the data once.
@@ -312,7 +295,7 @@ def main(options):
 
         wait_seconds = interval_seconds - total_seconds
         if wait_seconds > 0:
-            wait_time_formatted = format_time(wait_seconds)
+            wait_time_formatted = utils.get_formatted_time(wait_seconds)
             bittensor.logging.info(f"Waiting {wait_time_formatted}.")
             time.sleep(wait_seconds)
         else:
@@ -328,6 +311,10 @@ if __name__ == "__main__":
     # Import bittensor and local modules after parsing args to keep the
     # bittensor module from overriding the --help arg.
     import bittensor
-    from subnet_data_intervals import SubnetDataIntervals, SubnetDataIntervalsFromJson
+    from subnet_data_intervals import (
+        SubnetDataIntervals,
+        SubnetDataIntervalsFromJson
+    )
+    import utils
 
     main(options)

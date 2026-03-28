@@ -89,40 +89,21 @@ def _parse_args():
     return parser.parse_args()
 
 
-def format_time(total_time):
-    h = total_time/60/60
-    hours = int(h)
-    remainder = round((h - hours)*60*60)
-    m = remainder/60
-    minutes = int(m)
-    seconds = round((m - minutes)*60)
-
-    runtime_text = [f"{hours} hours"] if hours else []
-    if minutes:
-        runtime_text += [f"{minutes} minutes"]
-
-    if seconds:
-        runtime_text += [f"{seconds} seconds"]
-    runtime_text = ", ".join(runtime_text)
-
-    return runtime_text
-
-
 def query_url(url, sleep_time):
     num_attempts = 4
 
     for attempt in range(1, num_attempts + 1):
         wait = sleep_time + random.uniform(0, 5)
-        print(f"Sleeping for {wait:.1f} seconds before attempt {attempt}.")
+        bittensor.logging.info(f"Sleeping for {wait:.1f} seconds before attempt {attempt}.")
         time.sleep(wait)
 
         response = requests.get(url, headers=TAOSTATS_HEADERS, timeout=10)
         if response.status_code != 429:
             return response
 
-        print(f"Attempt {attempt} failed due to rate limiting on url {url}")
+        bittensor.logging.error(f"Attempt {attempt} failed due to rate limiting on url {url}")
         retry_wait = wait * attempt
-        print(f"Sleeping for {retry_wait:.1f} seconds after failed attempt.")
+        bittensor.logging.error(f"Sleeping for {retry_wait:.1f} seconds after failed attempt.")
         time.sleep(retry_wait)  # exponential backoff before next try
 
     return response
@@ -137,14 +118,14 @@ def get_price_from_url(sleep_time, netuid=None):
 
     response = query_url(url, sleep_time)
     if response.status_code != 200:
-        print(f"ERROR: Failed to obtain data from url: {url} ({response.reason})")
+        bittensor.logging.error(f"Failed to obtain data from url: {url} ({response.reason})")
         return None
 
     data = response.json()
     price = data.get("data", [{}])[0].get("price")
 
     if price is None:
-        print(f"ERROR: No price data found on url: {url}")
+        bittensor.logging.error(f"No price data found on url: {url}")
         return None
 
     return float(price)
@@ -153,18 +134,16 @@ def get_price_from_url(sleep_time, netuid=None):
 def gather_subnet_data(netuids, sleep_time):
     subnet_data = {}
 
-    print("")
-    print("Gathering tao price")
+    bittensor.logging.info("Gathering tao price")
     tao_price_usd = get_price_from_url(sleep_time)
 
     for netuid in netuids:
-        print("")
-        print(f"Gathering subnet price for netuid {netuid}")
+        bittensor.logging.info(f"Gathering subnet price for netuid {netuid}")
 
         try:
             subnet_price_tao = get_price_from_url(sleep_time, netuid)
         except Exception as e:
-            print(f"ERROR: Exception while fetching subnet {netuid}: {e}")
+            bittensor.logging.error(f"Exception while fetching subnet {netuid}: {e}")
             subnet_price_tao = None
 
         if subnet_price_tao is None or tao_price_usd is None:
@@ -183,7 +162,7 @@ def gather_subnet_data(netuids, sleep_time):
 
 
 def write_json_file(netuids, json_folder, sleep_time):
-    print("Gathering subnet data.")
+    bittensor.logging.info("Gathering subnet data.")
     start_time = time.time()
 
     netuid_range = f"{netuids[0]}-{netuids[-1]}"
@@ -197,12 +176,14 @@ def write_json_file(netuids, json_folder, sleep_time):
         for netuid in subnet_data
     }
 
-    print(f"\nWriting data to file: {json_file}")
+    bittensor.logging.info(f"Writing data to file: {json_file}")
     with open(json_file, "w") as fd:
         json.dump(data_dict, fd, indent=4)
 
-    total_time = time.time() - start_time
-    print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
+    total_time = round(time.time() - start_time)
+    bittensor.logging.info(
+        f"Subnet data gathering took {utils.get_formatted_time(total_time)}."
+    )
 
 
 def write_timestamp(json_folder):
@@ -223,7 +204,7 @@ def write_timestamp(json_folder):
     
     timestamp = time.ctime(max_file_time)
     timestamp_file = os.path.join(json_folder, TIMESTAMP_FILE_NAME)
-    print(f"\nWriting timestamp file: {timestamp_file}")
+    bittensor.logging.info(f"Writing timestamp file: {timestamp_file}")
     with open(timestamp_file, "w") as fd:
             json.dump(timestamp, fd)
 
@@ -255,16 +236,13 @@ def run(options):
     json_folder = options.json_folder
     sleep_time = options.seconds_between_queries
 
-    print("")
-    print("Gathering subnet price data.")
-    print(f"Connecting to network: {network}")
+    bittensor.logging.info("Gathering subnet price data.")
+    bittensor.logging.info(f"Connecting to network: {network}")
     try:
         all_subnets = utils.get_all_subnets(network)
     except Exception as err:
-        print("")
-        print(f"ERROR: Subtensor connection failed on '{network}'")
-        print(f"{type(err).__name__}: {err}")
-        print("")
+        bittensor.logging.error(f"Subtensor connection failed on '{network}'")
+        bittensor.logging.error(f"{type(err).__name__}: {err}")
         raise SubtensorConnectionError
 
     tempdir = tempfile.mkdtemp(prefix="write_price_data_")
@@ -279,12 +257,12 @@ def run(options):
             or os.path.splitext(json_file)[1] != ".json"
         ):
             continue
-        print(f"Removing {json_file}")
+        bittensor.logging.info(f"Removing {json_file}")
         os.unlink(json_file)
     for file_name in os.listdir(tempdir):
         src_json_file = os.path.join(tempdir, file_name)
         dest_json_file = os.path.join(json_folder, file_name)
-        print(f"Moving {src_json_file} to {dest_json_file}")
+        bittensor.logging.info(f"Moving {src_json_file} to {dest_json_file}")
         os.rename(src_json_file, dest_json_file)
 
     os.rmdir(tempdir)
@@ -293,6 +271,8 @@ def run(options):
 
 
 def main(options):
+    bittensor.logging.enable_info()
+
     os.makedirs(options.json_folder, exist_ok=True)
 
     local_subtensor_index = -1
@@ -309,7 +289,7 @@ def main(options):
                 pool.apply(run, args)
         except SubtensorConnectionError:
             if options.local_subtensor is None:
-                print("Rotating subtensors and trying again.")
+                bittensor.logging.error("Rotating subtensors and trying again.")
                 time.sleep(1)
                 continue
 
@@ -320,11 +300,11 @@ def main(options):
         total_seconds = round(time.time() - start_time)
         wait_seconds = interval_seconds - total_seconds
         if wait_seconds > 0:
-            wait_time_formatted = format_time(wait_seconds)
-            print(f"Waiting {wait_time_formatted}.")
+            wait_time_formatted = utils.get_formatted_time(wait_seconds)
+            bittensor.logging.info(f"Waiting {wait_time_formatted}.")
             time.sleep(wait_seconds)
         else:
-            print(
+            bittensor.logging.warning(
                 f"Processing took {total_seconds} seconds which is longer "
                 f"than {interval_seconds} seconds. Not waiting."
             )
@@ -333,7 +313,9 @@ def main(options):
 if __name__ == "__main__":
     options = _parse_args()
 
-    # Import local module
+    # Import bittensor and local modules after parsing args to keep the
+    # bittensor module from overriding the --help arg.
+    import bittensor
     import utils
 
     main(options)

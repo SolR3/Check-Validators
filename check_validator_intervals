@@ -74,17 +74,6 @@ def parse_args():
     return parser.parse_args()
 
 
-def format_time(total_time):
-    m = total_time/60
-    minutes = int(m)
-    seconds = round((m - minutes)*60)
-
-    runtime_text = f"{minutes} minutes, " if minutes else ""
-    runtime_text += f"{seconds} seconds"
-
-    return runtime_text
-
-
 def main(options):
     if options.verbose:
         bittensor.logging.enable_info()
@@ -129,8 +118,8 @@ def main(options):
             network,
             other_coldkey=options.coldkey
         ).validator_data
-    total_time = time.time() - start_time
-    print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
+    total_time = round(time.time() - start_time)
+    print(f"\nSubnet data gathering took {utils.get_formatted_time(total_time)}.\n")
 
     RichPrinter(
         netuids=subnets,
@@ -149,8 +138,12 @@ if __name__ == "__main__":
         # Import bittensor and local modules after parsing args to keep the
         # bittensor module from overriding the --help arg.
         import bittensor
-        from subnet_data_intervals import SubnetDataIntervals, SubnetDataIntervalsFromJson
+        from subnet_data_intervals import (
+            SubnetDataIntervals,
+            SubnetDataIntervalsFromJson
+        )
         from subnet_printer_intervals import RichPrinter
+        import utils
 
         main(options)
 

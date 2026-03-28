@@ -22,6 +22,7 @@ from constants import (
     RIZZO_HOTKEYS,
     DATA_FILE_NAME,
 )
+import utils
 
 
 class SubnetDataBase:
@@ -305,9 +306,9 @@ class SubnetDataIntervals(SubnetDataBase):
                     self._validator_data[netuid].block_data = \
                         self._validator_data[netuid].block_data[:self._num_intervals]
 
-        total_time = time.time() - start_time
+        total_time = round(time.time() - start_time)
         bittensor.logging.info(
-            f"Subnet data gathered in {int(total_time)} seconds."
+            f"Subnet data gathered in {utils.get_formatted_time(total_time)}."
         )
 
     async def get_metagraph_for_netuid_at_block(self, subtensor, netuid, block):

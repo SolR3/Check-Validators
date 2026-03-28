@@ -78,19 +78,6 @@ def _parse_args():
     return parser.parse_args()
 
 
-def format_time(total_time):
-    m = total_time/60
-    minutes = int(m)
-    seconds = round((m - minutes)*60)
-
-    runtime_text = [f"{minutes} minutes"] if minutes else []
-    if seconds:
-        runtime_text += [f"{seconds} seconds"]
-    runtime_text = ", ".join(runtime_text)
-
-    return runtime_text
-
-
 class WriteData:
     def __init__(self, options):
         self._network = options.network
@@ -186,8 +173,10 @@ class WriteData:
                 with open(json_file_intervals, "w") as fp:
                     json.dump({netuid: validator_data_intervals[netuid]}, fp, indent=4)
 
-        total_time = time.time() - start_time
-        bittensor.logging.info(f"Subnet data gathering took {format_time(round(total_time))}.")
+        total_time = round(time.time() - start_time)
+        bittensor.logging.info(
+            f"Subnet data gathering took {utils.get_formatted_time(total_time)}."
+        )
 
     def _copy_tmp_to_final(self, tempdir, finaldir):
         # Remove files from final folder
@@ -286,7 +275,7 @@ def main(options):
         total_seconds = round(time.time() - start_time)
         wait_seconds = interval_seconds - total_seconds
         if wait_seconds > 0:
-            wait_time_formatted = format_time(wait_seconds)
+            wait_time_formatted = utils.get_formatted_time(wait_seconds)
             bittensor.logging.info(f"Waiting {wait_time_formatted}.")
             time.sleep(wait_seconds)
         else:

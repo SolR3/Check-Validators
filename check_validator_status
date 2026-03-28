@@ -80,10 +80,10 @@ def main(options):
         validator_data, netuids, options.chk_only, options.missing_chk,
          sort_subnets, print_total_emission, options.vali_name
     )
-    total_time = time.time() - start_time
+    total_time = round(time.time() - start_time)
 
     subnet_data_printer.print_validator_data()
-    print(f"\nSubnet data gathering took {utils.format_time(round(total_time))}.\n")
+    print(f"\nSubnet data gathering took {utils.get_formatted_time(total_time)}.\n")
 
 
 if __name__ == "__main__":
