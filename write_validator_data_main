@@ -102,10 +102,8 @@ class WriteData:
         try:
             self._all_subnets = utils.get_all_subnets(self._network)
         except Exception as err:
-            print("")
-            print(f"ERROR: Subtensor connection failed on '{self._network}'")
-            print(f"{type(err).__name__}: {err}")
-            print("")
+            bittensor.logging.error(f"Subtensor connection failed on '{self._network}'")
+            bittensor.logging.error(f"{type(err).__name__}: {err}")
             raise SubtensorConnectionError
 
         self._tempdir_main = tempfile.mkdtemp(prefix="write_vali_data_main_")
@@ -141,7 +139,7 @@ class WriteData:
             netuid_start = netuid_end + 1
 
     def _write_json_files_to_tmp(self, netuid_start=None, netuid_end=None):
-        print("Gathering subnet data.")
+        bittensor.logging.info("Gathering subnet data.")
         start_time = time.time()
 
         if netuid_start is not None:
@@ -166,7 +164,7 @@ class WriteData:
         json_file_name_main = f"{json_base}.{netuid_range}{json_ext}"
         json_file_main = os.path.join(self._tempdir_main, json_file_name_main)
 
-        print(f"\nWriting main data to file: {json_file_main}\n")
+        bittensor.logging.info(f"Writing main data to file: {json_file_main}")
         with open(json_file_main, "w") as fp:
             json.dump(validator_data_main, fp, indent=4)
 
@@ -175,7 +173,7 @@ class WriteData:
         if self._json_intervals_folder:
             validator_data_intervals = SubnetDataIntervalsFromMainData(
                 netuids, validator_data_main, self._json_intervals_folder,
-                num_intervals=self._num_weights_intervals, verbose=True
+                num_intervals=self._num_weights_intervals
             ).as_dict()
 
             for netuid in netuids:
@@ -183,14 +181,13 @@ class WriteData:
                     SubnetDataIntervalsFromJson.get_json_file_name(netuid)
                 json_file_intervals = os.path.join(
                     self._tempdir_intervals, json_file_name_intervals)
-                print(f"\nWriting intervals data for netuid {netuid} to file: "
+                bittensor.logging.info(f"Writing intervals data for netuid {netuid} to file: "
                       f"{json_file_intervals}")
                 with open(json_file_intervals, "w") as fp:
                     json.dump({netuid: validator_data_intervals[netuid]}, fp, indent=4)
-            print("")
 
         total_time = time.time() - start_time
-        print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
+        bittensor.logging.info(f"Subnet data gathering took {format_time(round(total_time))}.")
 
     def _copy_tmp_to_final(self, tempdir, finaldir):
         # Remove files from final folder
@@ -201,14 +198,14 @@ class WriteData:
                 or os.path.splitext(json_file)[1] != ".json"
             ):
                 continue
-            print(f"Removing {json_file}")
+            bittensor.logging.info(f"Removing {json_file}")
             os.unlink(json_file)
 
         # Copy files from temp folder to final folder
         for file_name in os.listdir(tempdir):
             src_json_file = os.path.join(tempdir, file_name)
             dest_json_file = os.path.join(finaldir, file_name)
-            print(f"Moving {src_json_file} to {dest_json_file}")
+            bittensor.logging.info(f"Moving {src_json_file} to {dest_json_file}")
             os.rename(src_json_file, dest_json_file)
 
         # Remove temp folder
@@ -238,7 +235,7 @@ class WriteData:
             "actual_time": int(max_file_time),
         }
         timestamp_file = os.path.join(json_folder, TIMESTAMP_FILE_NAME)
-        print(f"\nWriting timestamp file: {timestamp_file}")
+        bittensor.logging.info(f"Writing timestamp file: {timestamp_file}")
         with open(timestamp_file, "w") as fd:
             json.dump(timestamp, fd)
 
@@ -258,6 +255,8 @@ def get_subtensor_network(local_subtensor, local_subtensor_index):
 
 
 def main(options):
+    bittensor.logging.enable_info()
+
     os.makedirs(options.json_main_folder, exist_ok=True)
     if options.json_intervals_folder:
         os.makedirs(options.json_intervals_folder, exist_ok=True)
@@ -276,7 +275,7 @@ def main(options):
                 pool.apply(run, args)
         except SubtensorConnectionError:
             if options.local_subtensor is None:
-                print("Rotating subtensors and trying again.")
+                bittensor.logging.error("Rotating subtensors and trying again.")
                 time.sleep(1)
                 continue
 
@@ -288,10 +287,10 @@ def main(options):
         wait_seconds = interval_seconds - total_seconds
         if wait_seconds > 0:
             wait_time_formatted = format_time(wait_seconds)
-            print(f"Waiting {wait_time_formatted}.")
+            bittensor.logging.info(f"Waiting {wait_time_formatted}.")
             time.sleep(wait_seconds)
         else:
-            print(
+            bittensor.logging.warning(
                 f"Processing took {total_seconds} seconds which is longer "
                 f"than {interval_seconds} seconds. Not waiting."
             )
@@ -300,7 +299,9 @@ def main(options):
 if __name__ == "__main__":
     options = _parse_args()
 
-    # Import local modules
+    # Import bittensor and local modules after parsing args to keep the
+    # bittensor module from overriding the --help arg.
+    import bittensor
     from subnet_data_main import SubnetDataMain
     from subnet_data_intervals import (
         SubnetDataIntervalsFromJson,

@@ -54,13 +54,16 @@ def _parse_args():
 
 
 def main(options):
+    if options.verbose:
+        bittensor.logging.enable_info()
+
     network = utils.get_subtensor_network(options.local_subtensor)
     netuids = options.subnets or utils.get_all_subnets(network)
     # sort_subnets = not bool(options.subnets)
 
     start_time = time.time()
     validator_data = SubnetDataMain(
-        netuids, network, verbose=options.verbose, other_chk_hotkey=options.hotkey
+        netuids, network, other_chk_hotkey=options.hotkey
     ).validator_data
     subnet_data_printer = SubnetDataPrinter(
         validator_data, netuids, options.pending, options.vali_name,
@@ -75,8 +78,9 @@ if __name__ == "__main__":
     try:
         options = _parse_args()
 
-        # Import local modules after parsing args to keep the
+        # Import bittensor and local modules after parsing args to keep the
         # bittensor module from overriding the --help arg.
+        import bittensor
         from subnet_data_main import SubnetDataMain
         from subnet_printer_chk import SubnetDataPrinter
         import utils

@@ -77,8 +77,7 @@ class SubnetDataBase:
         "ValidatorHotkeys", [(k, str) for k in COLDKEYS]
     )
 
-    def __init__(self, verbose):
-        self._verbose = verbose
+    def __init__(self):
         self._validator_data = {}
 
         # Gather the data for all given subnets
@@ -88,14 +87,10 @@ class SubnetDataBase:
     def validator_data(self):
         return self._validator_data
 
-    def _print_verbose(self, message):
-        if self._verbose:
-            print(message)
-
 
 class SubnetDataMain(SubnetDataBase):
     def __init__(
-            self, netuids, network, verbose=True,
+            self, netuids, network,
             other_coldkey=None, other_chk_hotkey=None
         ):
         self._netuids = netuids
@@ -103,7 +98,7 @@ class SubnetDataMain(SubnetDataBase):
         self._other_coldkey = self._get_other_coldkey(other_coldkey)
         self._other_chk_hotkey = other_chk_hotkey
 
-        super().__init__(verbose)
+        super().__init__()
 
     def as_dict(self):
         return {
@@ -163,12 +158,12 @@ class SubnetDataMain(SubnetDataBase):
         return self._other_chk_hotkey or RIZZO_CHK_HOTKEY
 
     def _get_subnet_data(self):
-        self._print_verbose("\nGathering data")
+        bittensor.logging.info("Gathering data")
 
         max_attempts = 5
         netuids = self._netuids
         for attempt in range(1, max_attempts+1):
-            self._print_verbose(f"\nAttempt {attempt} of {max_attempts}")
+            bittensor.logging.info(f"Attempt {attempt} of {max_attempts}")
             self._get_validator_data(netuids)
 
             # Get netuids missing data
@@ -176,8 +171,8 @@ class SubnetDataMain(SubnetDataBase):
             # just in case.
             netuids = list(set(netuids).difference(set(self._validator_data)))
             if netuids:
-                self._print_verbose(
-                    "\nFailed to gather data for subnets: "
+                bittensor.logging.error(
+                    "Failed to gather data for subnets: "
                     f"{', '.join([str(n) for n in netuids])}."
                 )
             else:
@@ -191,8 +186,8 @@ class SubnetDataMain(SubnetDataBase):
             netuids = [netuids]
 
         start_time = time.time()
-        self._print_verbose(f"\nConnecting to subtensor network: {self._network}")
-        self._print_verbose(f"Obtaining data for subnets: {netuids}\n")
+        bittensor.logging.info(f"Connecting to subtensor network: {self._network}")
+        bittensor.logging.info(f"Obtaining data for subnets: {netuids}")
 
         async with bittensor.AsyncSubtensor(network=self._network) as subtensor:
             # Get the block to pass to async calls so everything is in sync
@@ -281,8 +276,8 @@ class SubnetDataMain(SubnetDataBase):
             )
 
         total_time = time.time() - start_time
-        self._print_verbose(
-            f"\nData gathered in {int(total_time)} seconds for subnets: {netuids}."
+        bittensor.logging.info(
+            f"Data gathered in {int(total_time)} seconds for subnets: {netuids}."
         )
 
     def _filter_swap_hotkeys(self, metagraphs, children, do_pending):
@@ -324,7 +319,7 @@ class SubnetDataMain(SubnetDataBase):
             else:
                 success, child_hotkeys, msg = children[i]
                 if not success:
-                    self._print_verbose(
+                     bittensor.logging.error(
                         f"Failed to obtain child hotkeys from netuid {netuid}: {msg}"
                     )
 
@@ -387,9 +382,8 @@ class SubnetDataMain(SubnetDataBase):
         # Get Rizzo validator data
         rizzo_uid = self._get_uid(metagraph)
         if rizzo_uid is None:
-            self._print_verbose(
-                "\nWARNING: Rizzo validator not running on subnet "
-                f"{netuid}"
+            bittensor.logging.warning(
+                f"Rizzo validator not running on subnet {netuid}"
             )
             rizzo_emission = None
             rizzo_vtrust = None

@@ -31,13 +31,14 @@ class RichPrinter:
 
         self._print_data()
 
-    def _get_style(self, status):
+    @classmethod
+    def get_style(cls, status):
         if status == 2:
-            return f"color({self._red})"
+            return f"color({cls._red})"
         elif status == 1:
-                return f"color({self._yellow})"
+                return f"color({cls._yellow})"
         else:
-            return f"color({self._green})"
+            return f"color({cls._green})"
     
     def _get_blocks_status(self, blocks):
         if blocks is None:
@@ -70,7 +71,7 @@ class RichTextPrinter(RichPrinter):
             if netuid not in self._validator_data:
                 text.append(
                     f"\nFailed to obtain data for subnet {netuid}",
-                    style=self._get_style(2)
+                    style=self.get_style(2)
                 )
                 text.append("\n")
                 continue
@@ -80,7 +81,7 @@ class RichTextPrinter(RichPrinter):
             if not subnet_data.blocks:
                 text.append(
                     f"\nRizzo validator not running on subnet {netuid}",
-                    style=self._get_style(2)
+                    style=self.get_style(2)
                 )
                 text.append("\n")
                 continue
@@ -105,11 +106,11 @@ class RichTextPrinter(RichPrinter):
 
             text.append("\nUpdated Blocks:")
             for blocks, blocks_status in reversed(interval_blocks):
-                text.append(f"  {blocks}", style=self._get_style(blocks_status))
+                text.append(f"  {blocks}", style=self.get_style(blocks_status))
             
             text.append("\nVtrust Values: ")
             for vtrust, vtrust_status in reversed(interval_vtrusts):
-                text.append(f"  {vtrust}", style=self._get_style(vtrust_status))
+                text.append(f"  {vtrust}", style=self.get_style(vtrust_status))
 
             text.append("\n")
         
@@ -124,7 +125,7 @@ class RichTablePrinter(RichPrinter):
             if netuid not in self._validator_data:
                 failed_text.append(
                     f"\nFailed to obtain data for subnet {netuid}\n",
-                    style=self._get_style(2)
+                    style=self.get_style(2)
                 )
                 continue
 
@@ -138,20 +139,20 @@ class RichTablePrinter(RichPrinter):
 
             if not subnet_data.blocks:
                 table.add_column("", justify="center", no_wrap=True)
-                blocks_row.append(Text("---", style=self._get_style(2)))
-                vtrusts_row.append(Text("---", style=self._get_style(2)))
+                blocks_row.append(Text("---", style=self.get_style(2)))
+                vtrusts_row.append(Text("---", style=self.get_style(2)))
             else:
                 for subnet_block in reversed(subnet_data.block_data):
                     table.add_column("", justify="center", no_wrap=True)
 
                     blocks = subnet_block.rizzo_updated
                     blocks_status = self._get_blocks_status(blocks)
-                    blocks_row.append(Text(str(blocks), style=self._get_style(blocks_status)))
+                    blocks_row.append(Text(str(blocks), style=self.get_style(blocks_status)))
 
                     vtrust = subnet_block.rizzo_vtrust
                     avg_vtrust = subnet_block.avg_vtrust
                     vtrust_status = self._get_vtrust_status(vtrust, avg_vtrust)
-                    vtrusts_row.append(Text(f"{vtrust:.3f}", style=self._get_style(vtrust_status)))
+                    vtrusts_row.append(Text(f"{vtrust:.3f}", style=self.get_style(vtrust_status)))
 
             table.add_row(*blocks_row)
             table.add_row(*vtrusts_row)

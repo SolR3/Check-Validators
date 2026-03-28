@@ -4,6 +4,8 @@
 import argparse
 import json
 import os
+from rich.console import Console
+from rich.text import Text
 import sys
 import time
 
@@ -84,10 +86,13 @@ def format_time(total_time):
 
 
 def main(options):
+    if options.verbose:
+        bittensor.logging.enable_info()
+
     network = options.local_subtensor or "archive"
 
     if not options.subnets and not options.json_folder:
-        print("Either --subnets or --json-folder or both must be specified.")
+        print("ERROR: Either --subnets or --json-folder or both must be specified.")
         return
 
     subnets = (
@@ -104,29 +109,28 @@ def main(options):
         validator_data = SubnetDataIntervalsFromJson(
             subnets,
             options.json_folder,
-            num_intervals=num_intervals,
-            verbose=options.verbose
+            num_intervals=num_intervals
         ).validator_data
         timestamp_file = os.path.join(options.json_folder, TIMESTAMP_FILE_NAME)
         if os.path.isfile(timestamp_file):
             with open(timestamp_file, "r") as fd:
-                timestamp = json.load(fd)
-                timestamp_msg = (
-                    f"\033[92mLast update: {timestamp} (US Mountain Time)"
+                timestamp = json.load(fd)["display_time"]
+                timestamp_msg = Text(
+                    f"Last update: {timestamp} (US Mountain Time)",
+                    style=RichPrinter.get_style(0)
                 )
         else:
-            timestamp_msg = "\033[91mNO TIMESTAMP FILE!"
+            timestamp_msg = Text("NO TIMESTAMP FILE!", style=RichPrinter.get_style(2))
     else:
         num_intervals = options.num_intervals or DEFAULT_NUM_INTERVALS_NO_JSON
         validator_data = SubnetDataIntervals(
             subnets,
             num_intervals,
             network,
-            other_coldkey=options.coldkey,
-            verbose=options.verbose
+            other_coldkey=options.coldkey
         ).validator_data
     total_time = time.time() - start_time
-    print(f"\nSubnet data gathering took {format_time(round(total_time))}.")
+    print(f"\nSubnet data gathering took {format_time(round(total_time))}.\n")
 
     RichPrinter(
         netuids=subnets,
@@ -135,17 +139,16 @@ def main(options):
     )
 
     if timestamp_msg:
-        print()
-        print(timestamp_msg)
-        print()
+        Console().print(timestamp_msg)
 
 
 if __name__ == "__main__":
     try:
         options = parse_args()
 
-        # Import local modules after parsing args to keep the
+        # Import bittensor and local modules after parsing args to keep the
         # bittensor module from overriding the --help arg.
+        import bittensor
         from subnet_data_intervals import SubnetDataIntervals, SubnetDataIntervalsFromJson
         from subnet_printer_intervals import RichPrinter
 
