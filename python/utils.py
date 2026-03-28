@@ -1,5 +1,16 @@
+# standard imports
+import json
+import os
+import time
+
 # bittensor import
 import bittensor
+
+# Import local constants
+from constants import (
+    LOCAL_TIMEZONE,
+    TIMESTAMP_FILE_NAME,
+)
 
 
 def get_formatted_time(total_time):
@@ -25,6 +36,7 @@ def get_formatted_time(total_time):
 
     return formatted_time
 
+
 def get_all_subnets(network):
     with bittensor.Subtensor(network=network) as subtensor:
         try:
@@ -39,3 +51,43 @@ def get_subtensor_network(name):
     if name:
         return name if ":" in name else f"ws://subtensor-{name}.rizzo.network:9944"
     return "finney"
+
+
+def write_timestamp(
+        json_folder, data_file_name,
+        write_display_time=True, write_actual_time=True
+):
+    os.environ["TZ"] = LOCAL_TIMEZONE
+    time.tzset()
+
+    max_file_time = 0
+    json_base, json_ext = os.path.splitext(data_file_name)
+    for _file in os.listdir(json_folder):
+        file_base, file_ext = os.path.splitext(_file)
+        if not file_base.startswith(json_base) or file_ext != json_ext:
+            continue
+
+        json_file = os.path.join(json_folder, _file)
+        file_time = os.path.getmtime(json_file)
+        if file_time > max_file_time:
+            max_file_time = file_time
+    
+    display_time = time.ctime(max_file_time)
+    actual_time = int(max_file_time)
+
+    if write_display_time and write_actual_time:
+        timestamp = {
+            "display_time": display_time,
+            "actual_time": actual_time,
+        }
+    elif write_display_time:
+        timestamp = display_time
+    elif write_actual_time:
+        timestamp = actual_time
+    else:
+        timestamp = None
+
+    timestamp_file = os.path.join(json_folder, TIMESTAMP_FILE_NAME)
+    bittensor.logging.info(f"Writing timestamp file: {timestamp_file}")
+    with open(timestamp_file, "w") as fp:
+        json.dump(timestamp, fp)

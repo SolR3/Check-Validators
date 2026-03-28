@@ -17,9 +17,7 @@ sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 from constants import (
     LOCAL_LITE_SUBTENSORS,
     DEFAULT_NUM_INTERVALS_JSON,
-    LOCAL_TIMEZONE,
     DATA_FILE_NAME,
-    TIMESTAMP_FILE_NAME,
 )
 
 
@@ -201,32 +199,7 @@ class WriteData:
         os.rmdir(tempdir)
 
         # Write timestamp for final folder
-        self._write_timestamp(finaldir)
-
-    def _write_timestamp(self, json_folder):
-        os.environ["TZ"] = LOCAL_TIMEZONE
-        time.tzset()
-
-        max_file_time = 0
-        json_base, json_ext = os.path.splitext(DATA_FILE_NAME)
-        for _file in os.listdir(json_folder):
-            file_base, file_ext = os.path.splitext(_file)
-            if not file_base.startswith(json_base) or file_ext != json_ext:
-                continue
-
-            json_file = os.path.join(json_folder, _file)
-            file_time = os.path.getmtime(json_file)
-            if file_time > max_file_time:
-                max_file_time = file_time
-        
-        timestamp = {
-            "display_time": time.ctime(max_file_time),
-            "actual_time": int(max_file_time),
-        }
-        timestamp_file = os.path.join(json_folder, TIMESTAMP_FILE_NAME)
-        bittensor.logging.info(f"Writing timestamp file: {timestamp_file}")
-        with open(timestamp_file, "w") as fd:
-            json.dump(timestamp, fd)
+        utils.write_timestamp(finaldir, DATA_FILE_NAME)
 
 
 def run(options):

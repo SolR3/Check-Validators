@@ -17,7 +17,6 @@ sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 from constants import (
     DEFAULT_NUM_INTERVALS_JSON,
     LOCAL_LITE_SUBTENSORS,
-    LOCAL_TIMEZONE,
     DATA_FILE_NAME,
     TIMESTAMP_FILE_NAME
 )
@@ -132,32 +131,6 @@ def write_json_files(
         f"Subnet data gathering took {utils.get_formatted_time(total_time)} "
         f"for subnets {netuids}."
     )
-
-
-def write_timestamp(json_folder):
-    os.environ["TZ"] = LOCAL_TIMEZONE
-    time.tzset()
-
-    max_file_time = 0
-    json_base, json_ext = os.path.splitext(DATA_FILE_NAME)
-    for _file in os.listdir(json_folder):
-        file_base, file_ext = os.path.splitext(_file)
-        if not file_base.startswith(json_base) or file_ext != json_ext:
-            continue
-
-        json_file = os.path.join(json_folder, _file)
-        file_time = os.path.getmtime(json_file)
-        if file_time > max_file_time:
-            max_file_time = file_time
-    
-    timestamp = {
-        "display_time": time.ctime(max_file_time),
-        "actual_time": int(max_file_time),
-    }
-    timestamp_file = os.path.join(json_folder, TIMESTAMP_FILE_NAME)
-    bittensor.logging.info(f"Writing timestamp file: {timestamp_file}")
-    with open(timestamp_file, "w") as fd:
-        json.dump(timestamp, fd)
 
 
 def get_process_args(
@@ -281,7 +254,7 @@ def main(options):
 
         os.rmdir(tempdir)
 
-        write_timestamp(options.json_folder)
+        utils.write_timestamp(options.json_folder, DATA_FILE_NAME)
 
         total_seconds = round(time.time() - start_time)
         bittensor.logging.info(

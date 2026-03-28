@@ -16,18 +16,11 @@ import sys
 # Import local module
 sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 
+# Import local constants
+from constants import LOCAL_LITE_SUBTENSORS
 
-LOCAL_TIMEZONE = "MST7MDT"
+
 JSON_FILE_NAME = "subnet_price_data.json"
-TIMESTAMP_FILE_NAME = "timestamp.json"
-LOCAL_SUBTENSORS = [
-    "cali",
-    "candyland",
-    "datacenter01",
-    "la",
-    "moonbase",
-    "titan",
-]
 
 #TAOSTATS_API_KEY = "tao-55485724-3e43-4305-929f-0798dfbbd359:2e1ca609"
 #TAOSTATS_API_KEY = "tao-63801ee6-ceea-449d-beb3-1b5c1f10b0af:e3f08066"
@@ -186,29 +179,6 @@ def write_json_file(netuids, json_folder, sleep_time):
     )
 
 
-def write_timestamp(json_folder):
-    os.environ["TZ"] = LOCAL_TIMEZONE
-    time.tzset()
-
-    max_file_time = 0
-    json_base, json_ext = os.path.splitext(JSON_FILE_NAME)
-    for _file in os.listdir(json_folder):
-        file_base, file_ext = os.path.splitext(_file)
-        if not file_base.startswith(json_base) or file_ext != json_ext:
-            continue
-
-        json_file = os.path.join(json_folder, _file)
-        file_time = os.path.getmtime(json_file)
-        if file_time > max_file_time:
-            max_file_time = file_time
-    
-    timestamp = time.ctime(max_file_time)
-    timestamp_file = os.path.join(json_folder, TIMESTAMP_FILE_NAME)
-    bittensor.logging.info(f"Writing timestamp file: {timestamp_file}")
-    with open(timestamp_file, "w") as fd:
-            json.dump(timestamp, fd)
-
-
 def get_netuid_start_end_args(num_subnets, num_chunks):
     chunk_size = int(numpy.ceil(num_subnets / num_chunks))
     netuid_start = 1
@@ -226,7 +196,7 @@ def get_subtensor_network(local_subtensor, local_subtensor_index):
         return "finney"
 
     network_name = (
-        local_subtensor or LOCAL_SUBTENSORS[local_subtensor_index]
+        local_subtensor or LOCAL_LITE_SUBTENSORS[local_subtensor_index]
     )
     return f"ws://subtensor-{network_name}.rizzo.network:9944"
 
@@ -267,7 +237,7 @@ def run(options):
 
     os.rmdir(tempdir)
 
-    write_timestamp(json_folder)
+    utils.write_timestamp(json_folder, JSON_FILE_NAME, write_actual_time=False)
 
 
 def main(options):
@@ -280,7 +250,7 @@ def main(options):
 
     while True:
         start_time = time.time()
-        local_subtensor_index = (local_subtensor_index + 1) % len(LOCAL_SUBTENSORS)
+        local_subtensor_index = (local_subtensor_index + 1) % len(LOCAL_LITE_SUBTENSORS)
         options.network = get_subtensor_network(options.local_subtensor, local_subtensor_index)
 
         try:
