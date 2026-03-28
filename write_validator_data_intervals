@@ -18,7 +18,6 @@ from constants import (
     DEFAULT_NUM_INTERVALS_JSON,
     LOCAL_LITE_SUBTENSORS,
     DATA_FILE_NAME,
-    TIMESTAMP_FILE_NAME
 )
 
 
@@ -233,27 +232,8 @@ def main(options):
                 options.json_folder, tempdir, chunk_size=options.chunk_size
             )
 
-        # Copy files over to relevant location
-        for file_name in os.listdir(options.json_folder):
-            if (
-                file_name == TIMESTAMP_FILE_NAME
-                or os.path.splitext(file_name)[1] != ".json"
-            ):
-                continue
-
-            json_file = os.path.join(options.json_folder, file_name)
-            json_file_bkup = json_file + ".bkup"
-            bittensor.logging.info(f"Moving {json_file} to {json_file_bkup}")
-            os.rename(json_file, json_file_bkup)
-
-        for file_name in os.listdir(tempdir):
-            src_json_file = os.path.join(tempdir, file_name)
-            dest_json_file = os.path.join(options.json_folder, file_name)
-            bittensor.logging.info(f"Moving {src_json_file} to {dest_json_file}")
-            os.rename(src_json_file, dest_json_file)
-
-        os.rmdir(tempdir)
-
+        # Move files over to final location and write timestamp.
+        utils.move_json_files_to_final_dir(tempdir, options.json_folder)
         utils.write_timestamp(options.json_folder, DATA_FILE_NAME)
 
         total_seconds = round(time.time() - start_time)

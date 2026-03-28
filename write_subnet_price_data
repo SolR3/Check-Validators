@@ -219,24 +219,8 @@ def run(options):
 
     write_json_file(all_subnets, tempdir, sleep_time)
 
-    # Copy files over to relevant location
-    for file_name in os.listdir(json_folder):
-        json_file = os.path.join(json_folder, file_name)
-        if (
-            not os.path.isfile(json_file)
-            or os.path.splitext(json_file)[1] != ".json"
-        ):
-            continue
-        bittensor.logging.info(f"Removing {json_file}")
-        os.unlink(json_file)
-    for file_name in os.listdir(tempdir):
-        src_json_file = os.path.join(tempdir, file_name)
-        dest_json_file = os.path.join(json_folder, file_name)
-        bittensor.logging.info(f"Moving {src_json_file} to {dest_json_file}")
-        os.rename(src_json_file, dest_json_file)
-
-    os.rmdir(tempdir)
-
+    # Move files over to final location and write timestamp.
+    utils.move_json_files_to_final_dir(tempdir, json_folder)
     utils.write_timestamp(json_folder, JSON_FILE_NAME, write_actual_time=False)
 
 

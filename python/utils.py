@@ -53,6 +53,29 @@ def get_subtensor_network(name):
     return "finney"
 
 
+def move_json_files_to_final_dir(temp_dir, final_dir):
+    # Remove old files from final folder
+    for file_name in os.listdir(final_dir):
+        file_path = os.path.join(final_dir, file_name)
+        if (
+            not os.path.isfile(file_path)
+            or os.path.splitext(file_path)[1] != ".json"
+        ):
+            continue
+        bittensor.logging.info(f"Removing {file_path}")
+        os.unlink(file_path)
+
+    # Copy files from temp folder to final folder
+    for file_name in os.listdir(temp_dir):
+        src_file_path = os.path.join(temp_dir, file_name)
+        dest_file_path = os.path.join(final_dir, file_name)
+        bittensor.logging.info(f"Moving {src_file_path} to {dest_file_path}")
+        os.rename(src_file_path, dest_file_path)
+
+    # Remove temp folder
+    os.rmdir(temp_dir)
+
+
 def write_timestamp(
         json_folder, data_file_name,
         write_display_time=True, write_actual_time=True
@@ -60,7 +83,7 @@ def write_timestamp(
     os.environ["TZ"] = LOCAL_TIMEZONE
     time.tzset()
 
-    max_file_time = 0
+    min_file_time = 0
     json_base, json_ext = os.path.splitext(data_file_name)
     for _file in os.listdir(json_folder):
         file_base, file_ext = os.path.splitext(_file)
@@ -69,11 +92,11 @@ def write_timestamp(
 
         json_file = os.path.join(json_folder, _file)
         file_time = os.path.getmtime(json_file)
-        if file_time > max_file_time:
-            max_file_time = file_time
+        if min_file_time == 0 or file_time < min_file_time:
+            min_file_time = file_time
     
-    display_time = time.ctime(max_file_time)
-    actual_time = int(max_file_time)
+    display_time = time.ctime(min_file_time)
+    actual_time = int(min_file_time)
 
     if write_display_time and write_actual_time:
         timestamp = {

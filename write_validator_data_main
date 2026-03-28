@@ -107,9 +107,9 @@ class WriteData:
         else:
             self._write_json_files_to_tmp()
 
-        self._copy_tmp_to_final(self._tempdir_main, self._json_main_folder)
+        self._mv_tmp_to_final(self._tempdir_main, self._json_main_folder)
         if self._json_intervals_folder:
-            self._copy_tmp_to_final(self._tempdir_intervals, self._json_intervals_folder)
+            self._mv_tmp_to_final(self._tempdir_intervals, self._json_intervals_folder)
 
     def _get_netuid_start_end_args(self):
         num_subnets = len(self._all_subnets)
@@ -176,29 +176,9 @@ class WriteData:
             f"Subnet data gathering took {utils.get_formatted_time(total_time)}."
         )
 
-    def _copy_tmp_to_final(self, tempdir, finaldir):
-        # Remove files from final folder
-        for file_name in os.listdir(finaldir):
-            json_file = os.path.join(finaldir, file_name)
-            if (
-                not os.path.isfile(json_file)
-                or os.path.splitext(json_file)[1] != ".json"
-            ):
-                continue
-            bittensor.logging.info(f"Removing {json_file}")
-            os.unlink(json_file)
-
-        # Copy files from temp folder to final folder
-        for file_name in os.listdir(tempdir):
-            src_json_file = os.path.join(tempdir, file_name)
-            dest_json_file = os.path.join(finaldir, file_name)
-            bittensor.logging.info(f"Moving {src_json_file} to {dest_json_file}")
-            os.rename(src_json_file, dest_json_file)
-
-        # Remove temp folder
-        os.rmdir(tempdir)
-
-        # Write timestamp for final folder
+    def _mv_tmp_to_final(self, tempdir, finaldir):
+        # Move files over to final location and write timestamp.
+        utils.move_json_files_to_final_dir(tempdir, finaldir)
         utils.write_timestamp(finaldir, DATA_FILE_NAME)
 
 
