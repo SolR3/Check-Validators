@@ -4,7 +4,6 @@
 import argparse
 import json
 import multiprocessing
-import numpy
 import os
 import sys
 import tempfile
@@ -58,11 +57,10 @@ def _parse_args():
     )
 
     parser.add_argument(
-        "-c", "--chunks",
+        "-c", "--chunk-size",
         type=int,
         default=0,
-        help="The number of chunks. Each chunk will write a different json file "
-             "for a range of validators."
+        help="The number of netuids to gather in each chunk when connecting to the subetnsor."
     )
 
     parser.add_argument(
@@ -79,13 +77,13 @@ def _parse_args():
 class WriteData:
     def __init__(self, options):
         self._network = options.network
-        self._chunks = options.chunks
+        self._chunk_size = options.chunk_size
         self._num_weights_intervals = options.num_weights_intervals
         self._json_main_folder = options.json_main_folder
         self._json_intervals_folder = options.json_intervals_folder
 
         try:
-            self._all_subnets = utils.get_all_subnets(self._network)
+            self._netuids = utils.get_all_subnets(self._network)
         except Exception as err:
             bittensor.logging.error(f"Subtensor connection failed on '{self._network}'")
             bittensor.logging.error(f"{type(err).__name__}: {err}")
@@ -100,40 +98,15 @@ class WriteData:
         self._run()
 
     def _run(self):
-        if self._chunks:
-            for netuid_start, netuid_end in self._get_netuid_start_end_args():
-                time.sleep(2)
-                self._write_json_files_to_tmp(netuid_start, netuid_end)
-        else:
-            self._write_json_files_to_tmp()
+        self._write_json_files_to_tmp()
 
         self._mv_tmp_to_final(self._tempdir_main, self._json_main_folder)
         if self._json_intervals_folder:
             self._mv_tmp_to_final(self._tempdir_intervals, self._json_intervals_folder)
 
-    def _get_netuid_start_end_args(self):
-        num_subnets = len(self._all_subnets)
-        chunk_size = int(numpy.ceil(num_subnets / self._chunks))
-        netuid_start = 0
-        while True:
-            netuid_end = netuid_start + chunk_size - 1
-            if netuid_end >= num_subnets:
-                yield netuid_start, None
-                break
-            yield netuid_start, netuid_end
-            netuid_start = netuid_end + 1
-
-    def _write_json_files_to_tmp(self, netuid_start=None, netuid_end=None):
+    def _write_json_files_to_tmp(self):
         bittensor.logging.info("Gathering subnet data.")
         start_time = time.time()
-
-        if netuid_start is not None:
-            if netuid_end is not None:
-                netuids = self._all_subnets[netuid_start:netuid_end+1]
-            else:
-                netuids = self._all_subnets[netuid_start:]
-        else:
-            netuids = self._all_subnets
 
         # TODO - Some refactoring is needed so we can get the data object
         # from SubnetDataMain and then call as_dict() to get the main data
@@ -141,10 +114,14 @@ class WriteData:
         # interval.
 
         # Gather subnet data
-        validator_data_main = SubnetDataMain(netuids, self._network).as_dict()
+        validator_data_main = SubnetDataMain(
+            self._netuids,
+            self._network,
+            chunk_size=self._chunk_size,
+        ).as_dict()
 
         # Write main data json file
-        netuid_range = f"{netuids[0]}-{netuids[-1]}"
+        netuid_range = f"{self._netuids[0]}-{self._netuids[-1]}"
         json_base, json_ext = os.path.splitext(DATA_FILE_NAME)
         json_file_name_main = f"{json_base}.{netuid_range}{json_ext}"
         json_file_main = os.path.join(self._tempdir_main, json_file_name_main)
@@ -157,11 +134,11 @@ class WriteData:
         # the existing json files and add interval blocks as necessary.
         if self._json_intervals_folder:
             validator_data_intervals = SubnetDataIntervalsFromMainData(
-                netuids, validator_data_main, self._json_intervals_folder,
+                self._netuids, validator_data_main, self._json_intervals_folder,
                 num_intervals=self._num_weights_intervals
             ).as_dict()
 
-            for netuid in netuids:
+            for netuid in self._netuids:
                 json_file_name_intervals = \
                     SubnetDataIntervalsFromJson.get_json_file_name(netuid)
                 json_file_intervals = os.path.join(

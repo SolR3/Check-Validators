@@ -4,7 +4,6 @@
 import argparse
 import json
 import multiprocessing
-import numpy
 import os
 import sys
 import tempfile
@@ -25,10 +24,6 @@ class SubtensorConnectionError(Exception):
     pass
 
 
-# Create Mulitprocessing queue for obtaining the list of subnets
-mp_queue = multiprocessing.Queue()
-
-
 def _parse_args():
     parser = argparse.ArgumentParser()
 
@@ -44,13 +39,6 @@ def _parse_args():
         default=DEFAULT_NUM_INTERVALS_JSON,
         help="The number of weight setting intervals to write. "
              f"The default is {DEFAULT_NUM_INTERVALS_JSON}."
-    )
-
-    parser.add_argument(
-        "-p", "--processes",
-        type=int,
-        default=0,
-        help="The number of processes used to write the json files."
     )
 
     parser.add_argument(
@@ -89,22 +77,11 @@ def _parse_args():
 
 
 def write_json_files(
-    all_subnets, network, num_weights_intervals, read_json_folder, write_json_folder,
-    netuid_start=None, netuid_end=None, chunk_size=0, sleep_time=0,
+    netuids, network, num_weights_intervals,
+    read_json_folder, write_json_folder, chunk_size
 ):
-    if sleep_time:
-        time.sleep(sleep_time)
-
     bittensor.logging.info("Gathering subnet data.")
     start_time = time.time()
-
-    if netuid_start is not None:
-        if netuid_end is not None:
-            netuids = all_subnets[netuid_start:netuid_end+1]
-        else:
-            netuids = all_subnets[netuid_start:]
-    else:
-        netuids = all_subnets
 
     existing_json_data = SubnetDataIntervalsFromJson(
         netuids, read_json_folder
@@ -132,47 +109,14 @@ def write_json_files(
     )
 
 
-def get_process_args(
-    all_subnets, network, num_weights_intervals,
-    read_json_folder, write_json_folder,
-    chunk_size_arg, num_processes
-):
-    num_subnets = len(all_subnets)
-    process_chunk_size = int(numpy.ceil(num_subnets / num_processes))
-    process_args = []
-    netuid_start = 0
-    sleep_time = 0
-    while True:
-        netuid_end = netuid_start + process_chunk_size - 1
-        if netuid_end >= num_subnets:
-            process_args.append(
-                (all_subnets, network, num_weights_intervals,
-                 read_json_folder, write_json_folder,
-                 netuid_start, None, chunk_size_arg, sleep_time)
-            )
-            break
-        else:
-            process_args.append(
-                (all_subnets, network, num_weights_intervals,
-                 read_json_folder, write_json_folder,
-                 netuid_start, netuid_end, chunk_size_arg, sleep_time)
-            )
-            netuid_start = netuid_end + 1
-            sleep_time += 1
-
-    return process_args
-
-
 def get_all_subnets(network):
     bittensor.logging.info(f"Connecting to subtensor network: {network}")
     try:
-        all_subnets = utils.get_all_subnets(network)
+        return utils.get_all_subnets(network)
     except Exception as err:
         bittensor.logging.error(f"Subtensor connection failed on '{network}'")
         bittensor.logging.error(f"{type(err).__name__}: {err}")
         raise SubtensorConnectionError
-
-    mp_queue.put(all_subnets)
 
 
 def get_lite_subtensor_network(local_subtensor, local_subtensor_index):
@@ -185,67 +129,52 @@ def get_lite_subtensor_network(local_subtensor, local_subtensor_index):
     return f"ws://subtensor-{network_name}.rizzo.network:9944"
 
 
+def run(options):
+    # Get all Subnets.
+    all_subnets = get_all_subnets(options.lite_network)
+
+    # Write subnet data for all subnets to temp location.
+    tempdir = tempfile.mkdtemp(prefix="write_interval_data_")
+    write_json_files(
+        all_subnets, options.archive_network, options.num_weights_intervals,
+        options.json_folder, tempdir, options.chunk_size
+    )
+
+    # Move files over to final location and write timestamp.
+    utils.move_json_files_to_final_dir(tempdir, options.json_folder)
+    utils.write_timestamp(options.json_folder, DATA_FILE_NAME)
+
+
 def main(options):
     bittensor.logging.enable_info()
 
     os.makedirs(options.json_folder, exist_ok=True)
 
-    archive_network = options.local_archive_subtensor or "archive"
+    options.archive_network = options.local_archive_subtensor or "archive"
     interval_seconds = round(options.interval * 60)
     local_subtensor_index = -1
 
     while True:
         start_time = time.time()
         local_subtensor_index = (local_subtensor_index + 1) % len(LOCAL_LITE_SUBTENSORS)
-        lite_network = get_lite_subtensor_network(
+        options.lite_network = get_lite_subtensor_network(
             options.local_lite_subtensor, local_subtensor_index)
 
         # Get all subnets
-        args = [lite_network]
+        args = [options]
         try:
             with multiprocessing.Pool(processes=1) as pool:
-                pool.apply(get_all_subnets, args)
+                pool.apply(run, args)        
         except SubtensorConnectionError:
             if options.local_lite_subtensor is None:
                 bittensor.logging.error("Rotating subtensors and trying again.")
                 time.sleep(1)
-            else:
-                interval_time_formatted = utils.get_formatted_time(interval_seconds)
-                bittensor.logging.error(f"Waiting {interval_time_formatted}.")
-                time.sleep(interval_seconds)
-            continue
-
-        all_subnets = mp_queue.get()
-
-        tempdir = tempfile.mkdtemp(prefix="write_interval_data_")
-
-        if options.processes:
-            process_args = get_process_args(
-                all_subnets, archive_network, options.num_weights_intervals,
-                options.json_folder, tempdir, options.chunk_size, options.processes
-            )
-            with multiprocessing.Pool(processes=options.processes) as pool:
-                pool.starmap(write_json_files, process_args)
-        else:
-            write_json_files(
-                all_subnets, archive_network, options.num_weights_intervals,
-                options.json_folder, tempdir, chunk_size=options.chunk_size
-            )
-
-        # Move files over to final location and write timestamp.
-        utils.move_json_files_to_final_dir(tempdir, options.json_folder)
-        utils.write_timestamp(options.json_folder, DATA_FILE_NAME)
-
-        total_seconds = round(time.time() - start_time)
-        bittensor.logging.info(
-            "Total subnet data gathering took "
-            f"{utils.get_formatted_time(total_seconds)}."
-        )
 
         # Only gather the data once.
         if not interval_seconds:
             break
 
+        total_seconds = round(time.time() - start_time)
         wait_seconds = interval_seconds - total_seconds
         if wait_seconds > 0:
             wait_time_formatted = utils.get_formatted_time(wait_seconds)

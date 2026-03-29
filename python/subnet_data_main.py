@@ -87,14 +87,18 @@ class SubnetDataBase:
     def validator_data(self):
         return self._validator_data
 
+    def _get_subnet_data(self):
+        raise NotImplementedError
+
 
 class SubnetDataMain(SubnetDataBase):
     def __init__(
-            self, netuids, network,
+            self, netuids, network, chunk_size=0,
             other_coldkey=None, other_chk_hotkey=None
         ):
         self._netuids = netuids
         self._network = network
+        self._chunk_size = chunk_size or len(self._netuids)
         self._other_coldkey = self._get_other_coldkey(other_coldkey)
         self._other_chk_hotkey = other_chk_hotkey
 
@@ -158,107 +162,119 @@ class SubnetDataMain(SubnetDataBase):
         return self._other_chk_hotkey or RIZZO_CHK_HOTKEY
 
     def _get_subnet_data(self):
-        bittensor.logging.info("Gathering data")
+        asyncio.run(self._async_get_subnet_data())
 
-        max_attempts = 5
-        netuids = self._netuids
-        for attempt in range(1, max_attempts+1):
-            bittensor.logging.info(f"Attempt {attempt} of {max_attempts}")
-            self._get_validator_data(netuids)
+    async def _async_get_subnet_data(self):
+        bittensor.logging.info(f"Gathering data in chunks of {self._chunk_size}")
 
-            # Get netuids missing data
-            # I don't think this is needed anymore but keeping it around
-            # just in case.
-            netuids = list(set(netuids).difference(set(self._validator_data)))
-            if netuids:
-                bittensor.logging.error(
-                    "Failed to gather data for subnets: "
-                    f"{', '.join([str(n) for n in netuids])}."
-                )
-            else:
+        bittensor.logging.info(f"Connecting to subtensor network: {self._network}")
+        async with bittensor.AsyncSubtensor(network=self._network) as subtensor:
+            max_attempts = 5
+            for netuids in self._get_chunks():
+                for attempt in range(1, max_attempts+1):
+                    bittensor.logging.info(f"Attempt {attempt} of {max_attempts}")
+                    await self._get_validator_data(subtensor, netuids)
+
+                    # Get netuids missing data
+                    # I don't think this is needed anymore but keeping it around
+                    # just in case.
+                    netuids = list(set(netuids).difference(set(self._validator_data)))
+                    if netuids:
+                        bittensor.logging.error(
+                            "Failed to gather data for subnets: "
+                            f"{', '.join([str(n) for n in netuids])}."
+                        )
+                    else:
+                        break
+
+    def _get_chunks(self):
+        num_netuids = len(self._netuids)
+        netuid_start = 0
+        while True:
+            netuid_end = netuid_start + self._chunk_size
+            if netuid_end >= num_netuids:
+                yield self._netuids[netuid_start:]
                 break
+            else:
+                yield self._netuids[netuid_start:netuid_end]
+                netuid_start = netuid_end
 
-    def _get_validator_data(self, netuids):
-        asyncio.run(self._async_get_validator_data(netuids))
-
-    async def _async_get_validator_data(self, netuids):
+    async def _get_validator_data(self, subtensor, netuids):
         if type(netuids) != list:
             netuids = [netuids]
 
         start_time = time.time()
-        bittensor.logging.info(f"Connecting to subtensor network: {self._network}")
         bittensor.logging.info(f"Obtaining data for subnets: {netuids}")
 
-        async with bittensor.AsyncSubtensor(network=self._network) as subtensor:
-            # Get the block to pass to async calls so everything is in sync
-            block = await subtensor.block
+        # Get the block to pass to async calls so everything is in sync
+        block = await subtensor.block
 
-            # Get the metagraph for each netuid
-            metagraphs = await asyncio.gather(
+        # Get the metagraph for each netuid
+        metagraphs = await asyncio.gather(
+            *[
+                subtensor.metagraph(netuid=netuid, block=block)
+                for netuid in netuids
+            ]
+        )
+
+        # No point in printing CHK column when checking a different
+        # coldkey until we figure out exactly how the CHK'ing is going
+        # to work for us vs. rt21 and others and the code is updated
+        # accordingly.
+        if self._other_coldkey:
+            children = [(True, [], '') for _ in netuids]
+            children_pending = [([], 0) for _ in netuids]
+            swap_child_hotkeys = dict([(n, (0.0, "")) for n in netuids])
+        else:
+            # Get the list of child hotkeys for each netuid
+            children = await asyncio.gather(
                 *[
-                    subtensor.metagraph(netuid=netuid, block=block)
+                    subtensor.get_children(self._get_chk_hotkey(), netuid)
                     for netuid in netuids
                 ]
             )
+            swap_child_hotkeys = self._filter_swap_hotkeys(
+                metagraphs, children, False
+            )
 
-            # No point in printing CHK column when checking a different
-            # coldkey until we figure out exactly how the CHK'ing is going
-            # to work for us vs. rt21 and others and the code is updated
-            # accordingly.
-            if self._other_coldkey:
-                children = [(True, [], '') for _ in netuids]
-                children_pending = [([], 0) for _ in netuids]
-                swap_child_hotkeys = dict([(n, (0.0, "")) for n in netuids])
+            # Get the list of pending child hotkeys for each netuid
+            children_pending = await asyncio.gather(
+                *[
+                    subtensor.get_children_pending(self._get_chk_hotkey(), netuid)
+                    for netuid in netuids
+                ]
+            )
+            # self._filter_swap_hotkeys(
+            #     metagraphs, children_pending, True
+            # )
+
+        # Get the take for each child hotkey on each netuid.
+        chk_takes_dict = await self._get_child_hotkey_take_data(
+            subtensor, netuids, children, False
+        )
+
+        # Get the take for each pending child hotkey on each netuid.
+        chk_takes_pending_dict = await self._get_child_hotkey_take_data(
+            subtensor, netuids, children_pending, True
+        )
+
+        # Get the CHK take for all of our local swap hotkeys so we can ensure
+        # that only the hotkeys on subnets that we own have 0% take. These will
+        # be displayed next to the hotkeys in the Subnet Hotkeys tab on the
+        # ValidatorStatus web page.
+        chk_take_func_calls = []
+        for netuid in netuids:
+            hotkey = RIZZO_HOTKEYS.get(netuid)
+            if hotkey:
+                chk_take_func_calls.append(
+                    subtensor.query_subtensor("ChildkeyTake", params=[hotkey, netuid])
+                )
             else:
-                # Get the list of child hotkeys for each netuid
-                children = await asyncio.gather(
-                    *[
-                        subtensor.get_children(self._get_chk_hotkey(), netuid)
-                        for netuid in netuids
-                    ]
-                )
-                swap_child_hotkeys = self._filter_swap_hotkeys(
-                    metagraphs, children, False
-                )
-
-                # Get the list of pending child hotkeys for each netuid
-                children_pending = await asyncio.gather(
-                    *[
-                        subtensor.get_children_pending(self._get_chk_hotkey(), netuid)
-                        for netuid in netuids
-                    ]
-                )
-                # self._filter_swap_hotkeys(
-                #     metagraphs, children_pending, True
-                # )
-
-            # Get the take for each child hotkey on each netuid.
-            chk_takes_dict = await self._get_child_hotkey_take_data(
-                subtensor, netuids, children, False
-            )
-
-            # Get the take for each pending child hotkey on each netuid.
-            chk_takes_pending_dict = await self._get_child_hotkey_take_data(
-                subtensor, netuids, children_pending, True
-            )
-
-            # Get the CHK take for all of our local swap hotkeys so we can ensure
-            # that only the hotkeys on subnets that we own have 0% take. These will
-            # be displayed next to the hotkeys in the Subnet Hotkeys tab on the
-            # ValidatorStatus web page.
-            chk_take_func_calls = []
-            for netuid in netuids:
-                hotkey = RIZZO_HOTKEYS.get(netuid)
-                if hotkey:
-                    chk_take_func_calls.append(
-                        subtensor.query_subtensor("ChildkeyTake", params=[hotkey, netuid])
-                    )
-                else:
-                    chk_take_func_calls.append(dummy_chk_take_func())
-            rizzo_hotkey_chk_takes = [
-                bittensor.u16_normalized_float(r.value)
-                for r in await asyncio.gather(*chk_take_func_calls)
-            ]
+                chk_take_func_calls.append(dummy_chk_take_func())
+        rizzo_hotkey_chk_takes = [
+            bittensor.u16_normalized_float(r.value)
+            for r in await asyncio.gather(*chk_take_func_calls)
+        ]
 
         # Get all of the rest of the data from the metagraph.
         for i, netuid in enumerate(netuids):

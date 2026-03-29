@@ -49,15 +49,6 @@ class SubnetDataBase:
     def validator_data(self):
         return self._validator_data
 
-    def _get_rizzo_uid(self, metagraph):
-        if not self._other_coldkey and metagraph.netuid in MULTI_UID_HOTKEYS:
-            return metagraph.hotkeys.index(
-                RIZZO_HOTKEYS[metagraph.netuid]
-            )
-
-        coldkey = self._other_coldkey or COLDKEYS["Rizzo"]
-        return metagraph.coldkeys.index(coldkey)
-
     def as_dict(self):
         return {
             netuid: asdict(self._validator_data[netuid])
@@ -97,7 +88,6 @@ class SubnetDataIntervals(SubnetDataBase):
     async def _async_get_subnet_data(self):
         bittensor.logging.info(f"Gathering data in chunks of {self._chunk_size}")
 
-        # Get subtensor.
         bittensor.logging.info(f"Connecting to subtensor network: {self._network}")
         async with bittensor.AsyncSubtensor(network=self._network) as subtensor:
             max_attempts = 5
@@ -310,6 +300,15 @@ class SubnetDataIntervals(SubnetDataBase):
         bittensor.logging.info(
             f"Subnet data gathered in {utils.get_formatted_time(total_time)}."
         )
+
+    def _get_rizzo_uid(self, metagraph):
+        if not self._other_coldkey and metagraph.netuid in MULTI_UID_HOTKEYS:
+            return metagraph.hotkeys.index(
+                RIZZO_HOTKEYS[metagraph.netuid]
+            )
+
+        coldkey = self._other_coldkey or COLDKEYS["Rizzo"]
+        return metagraph.coldkeys.index(coldkey)
 
     async def get_metagraph_for_netuid_at_block(self, subtensor, netuid, block):
         #
