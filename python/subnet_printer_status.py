@@ -1,11 +1,8 @@
 # standard imports
 from rich.text import Text
-from rich.table import Table
-from rich.console import Console
-import time
 
 # Local imports
-from subnet_printer_base import RichPrinterBase
+from subnet_printer_base import TablePrinterBase
 
 
 class SubnetDataPrinter:
@@ -75,104 +72,31 @@ class SubnetDataPrinter:
         printer.print_everything()
 
 
-class RichPrinter(RichPrinterBase):
-    def __init__(self):
-        self._console = Console()
-        self._extra_printout = []
+class TablePrinter(TablePrinterBase):
+    _table_title_suffix = "Validators"
 
-    def add_extra_printout(self, missing_data, total_emission):
-        
-        if total_emission is not None:
-            self._extra_printout.append(
-                Text(f"\nTotal Emission = {total_emission:.5f}")
-            )
+    def _get_column_headers(self):
+        column_headers = [
+            "Subnet",
+            "Subnet E",
+            "# Valis",
+            "CHK vT",
+            "CHK ?",
+            f"{self._vali_name} vT",
+            "Rt21 vT Gap",
+            "Yuma vT Gap",
+            "Max vT",
+            "Avg vT",
+            "Min vT",
+            "CHK U",
+            f"{self._vali_name} U",
+            "Min U",
+            "Avg U",
+            "Max U",
+        ]
+        return column_headers
 
-        if missing_data:
-            self._extra_printout.append(
-                Text(
-                    "\nFailed to obtain data from the following subnets."
-                    "\n(Try running these separately)"
-                    "\n===================="
-                    f"\n{self._tab}{', '.join(sorted(missing_data))}",
-                    style=self._get_style(2)
-                )
-            )
-
-    def print_everything(self):
-        for text in self._extra_printout:
-            self._console.print(text)
-
-
-class TablePrinter(RichPrinter):
-    reverse_sort = True
-
-    def __init__(self, vali_name):
-        super().__init__()
-
-        if vali_name is None:
-            vali_name = "Rizzo"
-
-        table_title = f"{vali_name} Validators - {time.ctime()}"
-        self._table = Table(title=table_title)
-        self._table.add_column(
-            "Subnet", justify="left", no_wrap=True
-        )
-        self._table.add_column(
-            "Subnet E", justify="left", no_wrap=True
-        )
-        # self._table.add_column(
-        #     f"{vali_name} Rank", justify="left", no_wrap=True
-        # )
-        # self._table.add_column(
-        #     f"{vali_name} E", justify="left", no_wrap=True
-        # )
-        self._table.add_column(
-            "# Valis", justify="left", no_wrap=True
-        )
-        # self._table.add_column(
-        #     f"{vali_name} %", justify="left", no_wrap=True
-        # )
-        self._table.add_column(
-            "CHK vT", justify="left", no_wrap=True
-        )
-        self._table.add_column(
-            "CHK ?", justify="left", no_wrap=True  # CHK Missing
-        )
-        self._table.add_column(
-            f"{vali_name} vT", justify="left", no_wrap=True
-        )
-        self._table.add_column(
-            "Rt21 vT Gap", justify="left", no_wrap=True
-        )
-        self._table.add_column(
-            "Yuma vT Gap", justify="left", no_wrap=True
-        )
-        self._table.add_column(
-            "Max vT", justify="left", no_wrap=True
-        )
-        self._table.add_column(
-            "Avg vT", justify="left", no_wrap=True
-        )
-        self._table.add_column(
-            "Min vT", justify="left", no_wrap=True
-        )
-        self._table.add_column(
-            "CHK U", justify="left", no_wrap=True
-        )
-        self._table.add_column(
-            f"{vali_name} U", justify="left", no_wrap=True
-        )
-        self._table.add_column(
-            "Min U", justify="left", no_wrap=True
-        )
-        self._table.add_column(
-            "Avg U", justify="left", no_wrap=True
-        )
-        self._table.add_column(
-            "Max U", justify="left", no_wrap=True
-        )
-
-    def update_printout(self, validator_data):
+    def _get_row(self, validator_data):
         epsilon = 1e-5
 
         rizzo_vtrust_status = self._get_vtrust_status(
@@ -201,14 +125,6 @@ class TablePrinter(RichPrinter):
             validator_data.yuma_vtrust_gap
         )
 
-        # if validator_data.rizzo_stake_rank is None:
-        #     rizzo_stake_rank = "---"
-        # else:
-        #     rizzo_stake_rank = (
-        #         f"{validator_data.rizzo_stake_rank}/"
-        #         f"{validator_data.num_validators}"
-        #     )
-
         rizzo_vtrust_value = self._get_float_value(validator_data.rizzo_vtrust, True)
         chk_vtrust_value = self._get_float_value(validator_data.chk_vtrust, False)
 
@@ -236,7 +152,7 @@ class TablePrinter(RichPrinter):
             yuma_vtrust_value = self._get_float_value(validator_data.yuma_vtrust, False)
             yuma_vtrust_gap_value = f"{yuma_vtrust_gap_value:>6} ({yuma_vtrust_value})"
 
-        columns = [
+        row_columns = [
             Text(
                 str(validator_data.netuid),
                 style=self._get_style(
@@ -248,8 +164,6 @@ class TablePrinter(RichPrinter):
                 )
             ),
             Text(f"{validator_data.subnet_emission:.2f}%"),
-            # Text(rizzo_stake_rank),
-            # Text(self._get_float_value(validator_data.rizzo_emission, True)),
             Text(
                 f"{validator_data.num_valid_validators:>2}  "
                 f"({validator_data.num_total_validators})"
@@ -289,8 +203,14 @@ class TablePrinter(RichPrinter):
             Text(self._get_int_value(validator_data.avg_updated, True)),
             Text(self._get_int_value(validator_data.max_updated, True)),
         ]
-        self._table.add_row(*columns)
+    
+        return row_columns
 
-    def print_everything(self):
-        self._console.print(self._table)
-        super().print_everything()
+    def add_extra_printout(self, missing_data, total_emission):
+        
+        if total_emission is not None:
+            self._extra_printout.append(
+                Text(f"\nTotal Emission = {total_emission:.5f}")
+            )
+
+        super().add_extra_printout(missing_data)

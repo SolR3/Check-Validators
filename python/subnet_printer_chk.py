@@ -1,11 +1,8 @@
 # standard imports
 from rich.text import Text
-from rich.table import Table
-from rich.console import Console
-import time
 
 # Local imports
-from subnet_printer_base import RichPrinterBase
+from subnet_printer_base import TablePrinterBase
 
 
 class SubnetDataPrinter:
@@ -51,53 +48,8 @@ class SubnetDataPrinter:
         printer.print_everything()
 
 
-class RichPrinter(RichPrinterBase):
-    def __init__(self):
-        self._console = Console()
-        self._extra_printout = []
-
-    def add_extra_printout(self, missing_data, no_chk_subntets):
-        if missing_data:
-            self._extra_printout.append(
-                Text(
-                    "\nFailed to obtain data from the following subnets."
-                    "\n(Try running these separately)"
-                    "\n===================="
-                    f"\n{self._tab}{', '.join(sorted(missing_data))}",
-                    style=self._get_style(2)
-                )
-            )
-
-        if no_chk_subntets:
-            self._extra_printout.append(
-                Text(
-                    "\nThe following subnets do not have child hotkeys."
-                    "\n===================="
-                    f"\n{self._tab}{', '.join(sorted(no_chk_subntets))}",
-                    style=self._get_style(1)
-                )
-            )
-
-    def print_everything(self):
-        for text in self._extra_printout:
-            self._console.print(text)
-
-
-class TablePrinter(RichPrinter):
-    _table_title_suffix = None  # This is defined in subclassess
+class TablePrinter(TablePrinterBase):
     _child_hotkey_attr = None  # This is defined in subclassess
-    reverse_sort = True
-
-    def __init__(self, vali_name):
-        super().__init__()
-
-        if vali_name is None:
-            vali_name = "Rizzo"
-
-        table_title = f"{vali_name} {self._table_title_suffix} - {time.ctime()}"
-        self._table = Table(title=table_title)
-        for column_header in self._get_column_headers():
-            self._table.add_column(column_header, justify="left", no_wrap=True)
 
     def _get_column_headers(self):
         column_headers = [
@@ -109,12 +61,7 @@ class TablePrinter(RichPrinter):
             "Updated",
             "Hotkey",
         ]
-
         return column_headers
-
-    def update_printout(self, validator_data):
-        row_columns = self._get_row(validator_data)
-        self._table.add_row(*row_columns)
 
     def _get_row(self, validator_data):
         row_status = 0
@@ -224,9 +171,18 @@ class TablePrinter(RichPrinter):
         
         return row_columns
 
-    def print_everything(self):
-        self._console.print(self._table)
-        super().print_everything()
+    def add_extra_printout(self, missing_data, no_chk_subntets):
+        if no_chk_subntets:
+            self._extra_printout.append(
+                Text(
+                    "\nThe following subnets do not have child hotkeys."
+                    "\n===================="
+                    f"\n{self._tab}{', '.join(sorted(no_chk_subntets))}",
+                    style=self._get_style(1)
+                )
+            )
+
+        super().add_extra_printout(missing_data)
 
 
 class CHKTablePrinter(TablePrinter):
@@ -241,7 +197,6 @@ class PendingCHKTablePrinter(TablePrinter):
     def _get_column_headers(self):
         column_headers = super()._get_column_headers()
         column_headers.insert(-1, "Pending Time")
-
         return column_headers
 
     def _get_row(self, validator_data):
