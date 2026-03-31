@@ -47,7 +47,7 @@ COLDKEYS = {
 
 # This is a fix to handle the subnets on which our coldkeys is
 # registered on multiple uids.
-MULTI_UID_HOTKEYS = (20, 39,) # Temporarily adding 39 during the hotkey swap transition. Remove this once the old hotkey de-registers.
+MULTI_UID_HOTKEYS = (20, 39, 59,) # Temporarily adding 39 and 59 during the hotkey swap transition. Remove this once the old hotkeys de-register.
 
 RIZZO_CHK_HOTKEY = "5FtBncJvGhxjBs4aFn2pid6aur9tBUuo9QR7sHe5DkoRizzo"
 
@@ -112,7 +112,7 @@ RIZZO_HOTKEYS = {
     56: "5GWksn9hpS3LWSSn6mzAqQwQtjyBQqXwK1Lq9ghK4Z84Ds56",
     57: "5CnjBb99HrEwEAav3WW9TH99fLKvi51EpEcwpokJAA9JRs57",
     58: "5D8GfQFmkCc8V434p5RLwZrWVCTGJfqaYUT9oGzugvGc9s58",
-    59: "5ChTYCkTrJ5bsR2mh3HtVZqpvmZvLuSF1UpuA1okgwBsws59",
+    59: "5EJShjU6gLWPj83sniu4iB25VNR5DWy7PPw4uoi3EAZGks59",
     60: "5E4Grhiu6gNb1KJ38zpYr9dwwYpViDXMksNYxDeppv84js6o",
     61: "5ECKL59gbSMghFSYqsBJEQ2HGa3zCm56A2mRX46yGxBv7s61",
     62: "5GuRsre3hqm6WKWRCqVxXdM4UtGs457nDhPo9F5wvJ16Ys62",
