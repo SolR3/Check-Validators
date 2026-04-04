@@ -9,10 +9,7 @@ import bittensor
 
 # Local imports
 from json_writer_base import JsonWriterBase, LoopRunnerBase
-from subnet_data_intervals import (
-    SubnetDataIntervals,
-    SubnetDataIntervalsFromJson
-)
+from subnet_data_intervals import SubnetDataIntervals
 from constants import DATA_FILE_NAME
 import utils
 
@@ -43,16 +40,12 @@ class JsonWriterIntervals(JsonWriterBase):
         bittensor.logging.info("Gathering subnet intervals data.")
         start_time = time.time()
 
-        existing_json_data = SubnetDataIntervalsFromJson(
-            self._netuids, self._json_folder
-        ).validator_data
-
         new_data_dict = SubnetDataIntervals(
             self._netuids,
             self._num_weights_intervals,
             self._archive_network,
             chunk_size=self._chunk_size,
-            existing_data=existing_json_data
+            existing_json_data_folder=self._json_folder
         ).as_dict()
 
         for netuid in self._netuids:

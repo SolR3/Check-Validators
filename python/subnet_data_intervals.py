@@ -62,14 +62,14 @@ class SubnetDataBase:
 class SubnetDataIntervals(SubnetDataBase):
     def __init__(
             self, netuids, num_intervals, network, chunk_size=0,
-            other_coldkey=None, existing_data=None
+            other_coldkey=None, existing_json_data_folder=None
     ):
         self._netuids = netuids
         self._network = network
         self._chunk_size = chunk_size or len(self._netuids)
         self._num_intervals = num_intervals
         self._other_coldkey = self._get_other_coldkey(other_coldkey)
-        self._existing_data = existing_data or {}
+        self._existing_json_data_folder = existing_json_data_folder
 
         super().__init__()
 
@@ -83,7 +83,16 @@ class SubnetDataIntervals(SubnetDataBase):
         return other_coldkey
 
     def _get_subnet_data(self):
+        self._get_existing_subnet_data_from_json()
         asyncio.run(self._async_get_subnet_data())
+
+    def _get_existing_subnet_data_from_json(self):
+        if self._existing_json_data_folder:
+            self._existing_data = SubnetDataIntervalsFromJson(
+            self._netuids, self._existing_json_data_folder
+        ).validator_data
+        else:
+            self._existing_data = {}
 
     async def _async_get_subnet_data(self):
         bittensor.logging.info(f"Gathering data in chunks of {self._chunk_size}")
@@ -406,12 +415,12 @@ class SubnetDataIntervalsFromJson(SubnetDataBase):
 
 class SubnetDataIntervalsFromMainData(SubnetDataBase):
     def __init__(
-            self, netuids, validator_data_main, json_folder,
+            self, netuids, validator_data_main, json_intervals_folder,
             num_intervals=None
     ):
         self._netuids = netuids
         self._validator_data_main = validator_data_main
-        self._json_folder = json_folder
+        self._json_intervals_folder = json_intervals_folder
         self._num_intervals = num_intervals
         self._other_coldkey = None
 
@@ -419,7 +428,7 @@ class SubnetDataIntervalsFromMainData(SubnetDataBase):
 
     def _get_subnet_data(self):
         existing_intervals_data = SubnetDataIntervalsFromJson(
-            self._netuids, self._json_folder
+            self._netuids, self._json_intervals_folder
         ).validator_data
 
         for netuid in self._netuids:
