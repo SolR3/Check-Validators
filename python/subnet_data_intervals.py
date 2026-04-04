@@ -345,14 +345,9 @@ class SubnetDataIntervalsFromJson(SubnetDataBase):
         super().__init__()
 
     @staticmethod
-    def get_json_file_name(netuid):
-        json_base, json_ext = os.path.splitext(DATA_FILE_NAME)
-        return f"{json_base}.{netuid}{json_ext}"
-
-    @classmethod
-    def get_netuids_from_json_folder(cls, json_folder):
+    def get_netuids_from_json_folder(json_folder):
         netuids = []
-        json_file_pattern = cls.get_json_file_name(r"(?P<netuid>\d+)")
+        json_file_pattern = utils.get_json_file_name(DATA_FILE_NAME, r"(?P<netuid>\d+)")
         json_file_pattern = json_file_pattern.replace(".", r"\.")
         json_file_regex = re.compile(rf"^{json_file_pattern}$")
         for _file in os.listdir(json_folder):
@@ -371,7 +366,7 @@ class SubnetDataIntervalsFromJson(SubnetDataBase):
             )
 
             json_file = os.path.join(
-                self._json_folder, self.get_json_file_name(netuid)
+                self._json_folder, utils.get_json_file_name(DATA_FILE_NAME, netuid)
             )
             if not os.path.isfile(json_file):
                 bittensor.logging.info(

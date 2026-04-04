@@ -54,6 +54,7 @@ def parse_args():
 
     parser.add_argument(
         "-l", "--local-subtensor",
+        dest="local_archive_subtensor",
         help="Use the specified local subtensor (i.e. subtensor-lite-archive). "
              "When not specified, use the 'archive' network subtensor."
     )
@@ -78,7 +79,7 @@ def main(options):
     if options.verbose:
         bittensor.logging.enable_info()
 
-    network = options.local_subtensor or "archive"
+    network = options.local_archive_subtensor or "archive"
 
     if not options.subnets and not options.json_folder:
         print("ERROR: Either --subnets or --json-folder or both must be specified.")

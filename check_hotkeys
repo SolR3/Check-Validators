@@ -43,6 +43,8 @@ def _parse_args():
 
     parser.add_argument(
         "-l", "--local-subtensor",
+        dest="local_lite_subtensor",
+        default=False,
         help="Use the specified local subtensor (i.e. la, cali, titan, etc.). "
              "When not specified, use the 'finney' network subtensor."
     )
@@ -91,7 +93,7 @@ async def get_hotkey_takes(network, hotkeys):
 
 
 async def main(options):
-    network = utils.get_subtensor_network(options.local_subtensor)
+    network = utils.get_lite_subtensor_network(options.local_lite_subtensor)
     netuids = options.subnets 
 
     metagraphs = await get_metagraphs(network, netuids)

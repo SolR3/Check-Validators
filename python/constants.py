@@ -32,6 +32,17 @@ LOCAL_LITE_SUBTENSORS = [
 ]
 
 
+#########################
+# Subnet price constants
+#########################
+SUBNET_PRICE_FILE_NAME = "subnet_price_data.json"
+TAOSTATS_API_KEY = "tao-1ef77da6-7e39-4c05-a131-c14f788a0cf2:73df7545"
+TAOSTATS_HEADERS = {
+    "accept": "application/json",
+    "Authorization": TAOSTATS_API_KEY
+}
+
+
 #######################
 # Hotkeys and Coldkeys
 #######################

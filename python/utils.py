@@ -1,16 +1,12 @@
 # standard imports
-import json
 import os
-import time
+import random
 
 # bittensor import
 import bittensor
 
 # Import local constants
-from constants import (
-    LOCAL_TIMEZONE,
-    TIMESTAMP_FILE_NAME,
-)
+from constants import LOCAL_LITE_SUBTENSORS
 
 
 def get_formatted_time(total_time):
@@ -38,6 +34,8 @@ def get_formatted_time(total_time):
 
 
 def get_all_subnets(network):
+    bittensor.logging.info(f"Connecting to subtensor network: {network}")
+    bittensor.logging.info("Obtaining the list of subnets.")
     with bittensor.Subtensor(network=network) as subtensor:
         try:
             all_subnets = subtensor.get_all_subnets_netuid()
@@ -47,70 +45,31 @@ def get_all_subnets(network):
         return all_subnets[1:]
 
 
-def get_subtensor_network(name):
-    if name:
-        return name if ":" in name else f"ws://subtensor-{name}.rizzo.network:9944"
-    return "finney"
+def _create_get_lite_subtensor_network():
+    # Randomize local subtensor.
+    random.seed()
+    local_subtensor_index = random.randint(0, len(LOCAL_LITE_SUBTENSORS) - 1)
 
+    def get_network(name=None):
 
-def move_json_files_to_final_dir(temp_dir, final_dir):
-    # Remove old files from final folder
-    for file_name in os.listdir(final_dir):
-        file_path = os.path.join(final_dir, file_name)
-        if (
-            not os.path.isfile(file_path)
-            or os.path.splitext(file_path)[1] != ".json"
-        ):
-            continue
-        bittensor.logging.info(f"Removing {file_path}")
-        os.unlink(file_path)
+        def get_network_from_name(name):
+            return name if ":" in name else f"ws://subtensor-{name}.rizzo.network:9944"
+        
+        if name is False:
+            return "finney"
 
-    # Copy files from temp folder to final folder
-    for file_name in os.listdir(temp_dir):
-        src_file_path = os.path.join(temp_dir, file_name)
-        dest_file_path = os.path.join(final_dir, file_name)
-        bittensor.logging.info(f"Moving {src_file_path} to {dest_file_path}")
-        os.rename(src_file_path, dest_file_path)
+        if name is None:
+            nonlocal local_subtensor_index
+            local_subtensor_index = (local_subtensor_index + 1) % len(LOCAL_LITE_SUBTENSORS)
+            name = LOCAL_LITE_SUBTENSORS[local_subtensor_index]
 
-    # Remove temp folder
-    os.rmdir(temp_dir)
-
-
-def write_timestamp(
-        json_folder, data_file_name,
-        write_display_time=True, write_actual_time=True
-):
-    os.environ["TZ"] = LOCAL_TIMEZONE
-    time.tzset()
-
-    min_file_time = 0
-    json_base, json_ext = os.path.splitext(data_file_name)
-    for _file in os.listdir(json_folder):
-        file_base, file_ext = os.path.splitext(_file)
-        if not file_base.startswith(json_base) or file_ext != json_ext:
-            continue
-
-        json_file = os.path.join(json_folder, _file)
-        file_time = os.path.getmtime(json_file)
-        if min_file_time == 0 or file_time < min_file_time:
-            min_file_time = file_time
+        return get_network_from_name(name)
     
-    display_time = time.ctime(min_file_time)
-    actual_time = int(min_file_time)
+    return get_network
 
-    if write_display_time and write_actual_time:
-        timestamp = {
-            "display_time": display_time,
-            "actual_time": actual_time,
-        }
-    elif write_display_time:
-        timestamp = display_time
-    elif write_actual_time:
-        timestamp = actual_time
-    else:
-        timestamp = None
+get_lite_subtensor_network = _create_get_lite_subtensor_network()
 
-    timestamp_file = os.path.join(json_folder, TIMESTAMP_FILE_NAME)
-    bittensor.logging.info(f"Writing timestamp file: {timestamp_file}")
-    with open(timestamp_file, "w") as fp:
-        json.dump(timestamp, fp)
+
+def get_json_file_name(json_file_name, netuid):
+    json_base, json_ext = os.path.splitext(json_file_name)
+    return f"{json_base}.{netuid}{json_ext}"

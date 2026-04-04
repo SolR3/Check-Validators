@@ -2,48 +2,19 @@
 
 # standard imports
 import argparse
-from dataclasses import dataclass, asdict
-import json
-import multiprocessing
-import numpy
 import os
-import requests
-import tempfile
-import time
-import random
 import sys
 
 # Import local module
 sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 
-# Import local constants
-from constants import LOCAL_LITE_SUBTENSORS
-
-
-JSON_FILE_NAME = "subnet_price_data.json"
-
-#TAOSTATS_API_KEY = "tao-55485724-3e43-4305-929f-0798dfbbd359:2e1ca609"
-#TAOSTATS_API_KEY = "tao-63801ee6-ceea-449d-beb3-1b5c1f10b0af:e3f08066"
-TAOSTATS_API_KEY = "tao-1ef77da6-7e39-4c05-a131-c14f788a0cf2:73df7545"
-TAOSTATS_HEADERS = {
-    "accept": "application/json",
-    "Authorization": TAOSTATS_API_KEY
-}
-
-
-@dataclass
-class SubnetPriceData:
-    netuid: int
-    tao_price_usd: float | None
-    subnet_price_tao: float | None
-    subnet_price_usd: float | None
-
-
-class SubtensorConnectionError(Exception):
-    pass
-
 
 def _parse_args():
+    class IntervalTimeAction(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+            seconds = round(values * 3600)
+            setattr(namespace, self.dest, seconds)
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -54,6 +25,7 @@ def _parse_args():
 
     parser.add_argument(
         "-l", "--local-subtensor",
+        dest="local_lite_subtensor",
         nargs="?",
         default=False,
         help="Use the specified local subtensor (i.e. la, cali, titan, etc.). "
@@ -63,8 +35,10 @@ def _parse_args():
 
     parser.add_argument(
         "-i", "--interval",
+        dest="interval_seconds",
         type=float,
         default=0,
+        action=IntervalTimeAction,
         help="The number of hours between validator data gathering. If 0 or not "
              "specified then the data is gathered only once."
     )
@@ -82,186 +56,12 @@ def _parse_args():
     return parser.parse_args()
 
 
-def query_url(url, sleep_time):
-    num_attempts = 4
-
-    for attempt in range(1, num_attempts + 1):
-        wait = sleep_time + random.uniform(0, 5)
-        bittensor.logging.info(f"Sleeping for {wait:.1f} seconds before attempt {attempt}.")
-        time.sleep(wait)
-
-        response = requests.get(url, headers=TAOSTATS_HEADERS, timeout=10)
-        if response.status_code != 429:
-            return response
-
-        bittensor.logging.error(f"Attempt {attempt} failed due to rate limiting on url {url}")
-        retry_wait = wait * attempt
-        bittensor.logging.error(f"Sleeping for {retry_wait:.1f} seconds after failed attempt.")
-        time.sleep(retry_wait)  # exponential backoff before next try
-
-    return response
-
-
-# Courtesy of gregbeard, thanks Greg!
-def get_price_from_url(sleep_time, netuid=None):
-    if netuid is None:
-        url = "https://api.taostats.io/api/price/latest/v1?asset=tao"
-    else:
-        url = f"https://api.taostats.io/api/dtao/pool/latest/v1?netuid={netuid}"
-
-    response = query_url(url, sleep_time)
-    if response.status_code != 200:
-        bittensor.logging.error(f"Failed to obtain data from url: {url} ({response.reason})")
-        return None
-
-    data = response.json()
-    price = data.get("data", [{}])[0].get("price")
-
-    if price is None:
-        bittensor.logging.error(f"No price data found on url: {url}")
-        return None
-
-    return float(price)
-
-
-def gather_subnet_data(netuids, sleep_time):
-    subnet_data = {}
-
-    bittensor.logging.info("Gathering tao price")
-    tao_price_usd = get_price_from_url(sleep_time)
-
-    for netuid in netuids:
-        bittensor.logging.info(f"Gathering subnet price for netuid {netuid}")
-
-        try:
-            subnet_price_tao = get_price_from_url(sleep_time, netuid)
-        except Exception as e:
-            bittensor.logging.error(f"Exception while fetching subnet {netuid}: {e}")
-            subnet_price_tao = None
-
-        if subnet_price_tao is None or tao_price_usd is None:
-            subnet_price_usd = None
-        else:
-            subnet_price_usd = subnet_price_tao * tao_price_usd
-
-        subnet_data[netuid] = SubnetPriceData(
-            netuid=netuid,
-            tao_price_usd=tao_price_usd,
-            subnet_price_tao=subnet_price_tao,
-            subnet_price_usd=subnet_price_usd,
-        )
-
-    return subnet_data
-
-
-def write_json_file(netuids, json_folder, sleep_time):
-    bittensor.logging.info("Gathering subnet data.")
-    start_time = time.time()
-
-    netuid_range = f"{netuids[0]}-{netuids[-1]}"
-    json_base, json_ext = os.path.splitext(JSON_FILE_NAME)
-    json_file_name = f"{json_base}.{netuid_range}{json_ext}"
-    json_file = os.path.join(json_folder, json_file_name)
-
-    subnet_data = gather_subnet_data(netuids, sleep_time)
-    data_dict = {
-        netuid: asdict(subnet_data[netuid])
-        for netuid in subnet_data
-    }
-
-    bittensor.logging.info(f"Writing data to file: {json_file}")
-    with open(json_file, "w") as fd:
-        json.dump(data_dict, fd, indent=4)
-
-    total_time = round(time.time() - start_time)
-    bittensor.logging.info(
-        f"Subnet data gathering took {utils.get_formatted_time(total_time)}."
-    )
-
-
-def get_netuid_start_end_args(num_subnets, num_chunks):
-    chunk_size = int(numpy.ceil(num_subnets / num_chunks))
-    netuid_start = 1
-    while True:
-        netuid_end = netuid_start + chunk_size - 1
-        if netuid_end >= num_subnets:
-            yield netuid_start, None
-            break
-        yield netuid_start, netuid_end
-        netuid_start = netuid_end + 1
-
-
-def get_subtensor_network(local_subtensor, local_subtensor_index):
-    if local_subtensor is False:
-        return "finney"
-
-    network_name = (
-        local_subtensor or LOCAL_LITE_SUBTENSORS[local_subtensor_index]
-    )
-    return f"ws://subtensor-{network_name}.rizzo.network:9944"
-
-
 def run(options):
-    network = options.network
-    json_folder = options.json_folder
-    sleep_time = options.seconds_between_queries
-
-    bittensor.logging.info("Gathering subnet price data.")
-    bittensor.logging.info(f"Connecting to network: {network}")
-    try:
-        all_subnets = utils.get_all_subnets(network)
-    except Exception as err:
-        bittensor.logging.error(f"Subtensor connection failed on '{network}'")
-        bittensor.logging.error(f"{type(err).__name__}: {err}")
-        raise SubtensorConnectionError
-
-    tempdir = tempfile.mkdtemp(prefix="write_price_data_")
-
-    write_json_file(all_subnets, tempdir, sleep_time)
-
-    # Move files over to final location and write timestamp.
-    utils.move_json_files_to_final_dir(tempdir, json_folder)
-    utils.write_timestamp(json_folder, JSON_FILE_NAME, write_actual_time=False)
+    JsonWriterPrice(options)
 
 
 def main(options):
-    bittensor.logging.enable_info()
-
-    os.makedirs(options.json_folder, exist_ok=True)
-
-    local_subtensor_index = -1
-    interval_seconds = round(options.interval * 60 * 60)
-
-    while True:
-        start_time = time.time()
-        local_subtensor_index = (local_subtensor_index + 1) % len(LOCAL_LITE_SUBTENSORS)
-        options.network = get_subtensor_network(options.local_subtensor, local_subtensor_index)
-
-        try:
-            args = [options]
-            with multiprocessing.Pool(processes=1) as pool:
-                pool.apply(run, args)
-        except SubtensorConnectionError:
-            if options.local_subtensor is None:
-                bittensor.logging.error("Rotating subtensors and trying again.")
-                time.sleep(1)
-                continue
-
-        # Only gather the data once.
-        if not interval_seconds:
-            break
-
-        total_seconds = round(time.time() - start_time)
-        wait_seconds = interval_seconds - total_seconds
-        if wait_seconds > 0:
-            wait_time_formatted = utils.get_formatted_time(wait_seconds)
-            bittensor.logging.info(f"Waiting {wait_time_formatted}.")
-            time.sleep(wait_seconds)
-        else:
-            bittensor.logging.warning(
-                f"Processing took {total_seconds} seconds which is longer "
-                f"than {interval_seconds} seconds. Not waiting."
-            )
+    LoopRunnerPrice(run, options)
 
 
 if __name__ == "__main__":
@@ -269,7 +69,6 @@ if __name__ == "__main__":
 
     # Import bittensor and local modules after parsing args to keep the
     # bittensor module from overriding the --help arg.
-    import bittensor
-    import utils
+    from json_writer_price import JsonWriterPrice, LoopRunnerPrice
 
     main(options)
