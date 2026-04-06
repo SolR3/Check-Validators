@@ -1,6 +1,7 @@
 # standard imports
 import json
 import os
+import shutil
 import tempfile
 import time
 
@@ -8,7 +9,7 @@ import time
 import bittensor
 
 # Local imports
-from json_writer_base import JsonWriterBase, LoopRunnerBase
+from json_writer_base import JsonWriterBase, LoopRunnerBase, mp_queue
 from subnet_data_intervals import SubnetDataIntervals
 from constants import DATA_FILE_NAME
 import utils
@@ -32,9 +33,10 @@ class JsonWriterIntervals(JsonWriterBase):
 
         super().__init__(options)
 
-    def _create_tmp(self):
+    def _mk_tempdirs(self):
         # Make tmpdir for writing json files.
         self._tempdir = tempfile.mkdtemp(prefix="write_interval_data_")
+        mp_queue.put([self._tempdir])
 
     def _write_json_files_to_tmp(self):
         bittensor.logging.info("Gathering subnet intervals data.")
@@ -65,3 +67,7 @@ class JsonWriterIntervals(JsonWriterBase):
         # Move files over to final location and write timestamp.
         self._move_json_files_to_final_dir(self._tempdir, self._json_folder)
         self._write_timestamp(self._json_folder, DATA_FILE_NAME)
+
+    def _rm_tempdirs(self):
+        # Remove temp folders
+        shutil.rmtree(self._tempdir, ignore_errors=True)

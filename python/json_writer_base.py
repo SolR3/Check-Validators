@@ -2,6 +2,7 @@
 import multiprocessing
 import os
 import json
+import shutil
 import time
 
 # bittensor import
@@ -13,6 +14,9 @@ from constants import (
     TIMESTAMP_FILE_NAME,
 )
 import utils
+
+
+mp_queue = multiprocessing.Queue()
 
 
 class SubtensorConnectionError(Exception):
@@ -46,6 +50,11 @@ class LoopRunnerBase:
                     bittensor.logging.error("Rotating subtensors and trying again.")
                     time.sleep(1)
                     continue
+            finally:
+                while not mp_queue.empty():
+                    tempdirs = mp_queue.get()
+                    for tempdir in tempdirs:
+                        shutil.rmtree(tempdir, ignore_errors=True)
 
             # Only gather the data once.
             if not self._options.interval_seconds:
@@ -79,11 +88,14 @@ class JsonWriterBase:
             bittensor.logging.error(f"{type(err).__name__}: {err}")
             raise SubtensorConnectionError
 
-        self._create_tmp()
-        self._write_json_files_to_tmp()
-        self._mv_tmp_to_final()
+        try:
+            self._mk_tempdirs()
+            self._write_json_files_to_tmp()
+            self._mv_tmp_to_final()
+        finally:
+            self._rm_tempdirs()
 
-    def _create_tmp(self):
+    def _mk_tempdirs(self):
         raise NotImplementedError
 
     def _write_json_files_to_tmp(self):
@@ -91,6 +103,9 @@ class JsonWriterBase:
 
     def _mv_tmp_to_final(self):
          raise NotImplementedError
+
+    def _rm_tempdirs(self):
+        raise NotImplementedError
 
     @staticmethod
     def _move_json_files_to_final_dir(temp_dir, final_dir):
@@ -111,9 +126,6 @@ class JsonWriterBase:
             dest_file_path = os.path.join(final_dir, file_name)
             bittensor.logging.info(f"Moving {src_file_path} to {dest_file_path}")
             os.rename(src_file_path, dest_file_path)
-
-        # Remove temp folder
-        os.rmdir(temp_dir)
 
     @staticmethod
     def _write_timestamp(
