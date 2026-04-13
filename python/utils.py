@@ -2,8 +2,6 @@
 import os
 import random
 
-# bittensor import
-import bittensor
 
 # Import local constants
 from constants import LOCAL_LITE_SUBTENSORS
@@ -31,18 +29,6 @@ def get_formatted_time(total_time):
     formatted_time = ", ".join(formatted_time)
 
     return formatted_time
-
-
-def get_all_subnets(network):
-    bittensor.logging.info(f"Connecting to subtensor network: {network}")
-    bittensor.logging.info("Obtaining the list of subnets.")
-    with bittensor.Subtensor(network=network) as subtensor:
-        try:
-            all_subnets = subtensor.get_all_subnets_netuid()
-        except AttributeError:
-            all_subnets = subtensor.get_subnets()
-
-        return all_subnets[1:]
 
 
 def _create_get_lite_subtensor_network():

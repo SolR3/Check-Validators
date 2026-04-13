@@ -9,7 +9,12 @@ import time
 import bittensor
 
 # Local imports
-from json_writer_base import JsonWriterBase, LoopRunnerBase, mp_queue
+from json_writer_base import (
+    JsonWriterBase,
+    LoopRunnerBase,
+    mp_queue,
+    SubtensorConnectionError
+)
 from subnet_data_intervals import SubnetDataIntervals
 from constants import DATA_FILE_NAME
 import utils
@@ -17,7 +22,9 @@ import utils
 
 class LoopRunnerIntervals(LoopRunnerBase):
     def __init__(self, run_func, options):
-        options.archive_network = options.local_archive_subtensor or "archive"        
+        options.local_lite_subtensor = False
+        options.archive_network = options.local_archive_subtensor or "archive"
+
         super().__init__(run_func, options)
 
     def _makedirs(self):
@@ -42,25 +49,35 @@ class JsonWriterIntervals(JsonWriterBase):
         bittensor.logging.info("Gathering subnet intervals data.")
         start_time = time.time()
 
-        new_data_dict = SubnetDataIntervals(
-            self._netuids,
-            self._num_weights_intervals,
-            self._archive_network,
-            chunk_size=self._chunk_size,
-            existing_json_data_folder=self._json_folder
-        ).as_dict()
+        # Gather subnet data.
+        # This assumes that there are no bugs in SubnetDataMain and
+        # any exceptions raised are due to subtensor connection errors.
+        try:
+            subnet_data = SubnetDataIntervals(
+                self._archive_network,
+                self._num_weights_intervals,
+                chunk_size=self._chunk_size,
+                existing_json_data_folder=self._json_folder
+            )
+        except Exception as err:
+            bittensor.logging.error(f"Subtensor connection failed on '{self._lite_network}'")
+            bittensor.logging.error(f"{type(err).__name__}: {err}")
+            raise SubtensorConnectionError
 
-        for netuid in self._netuids:
+        validator_data = subnet_data.as_dict
+        netuids = subnet_data.netuids
+
+        for netuid in netuids:
             json_file_name = utils.get_json_file_name(DATA_FILE_NAME, netuid)
             write_json_file = os.path.join(self._tempdir, json_file_name)
             bittensor.logging.info(f"Writing data to file: {write_json_file}")
             with open(write_json_file, "w") as fp:
-                json.dump({netuid: new_data_dict[netuid]}, fp, indent=4)
+                json.dump({netuid: validator_data[netuid]}, fp, indent=4)
 
         total_time = round(time.time() - start_time)
         bittensor.logging.info(
             f"Subnet data gathering took {utils.get_formatted_time(total_time)} "
-            f"for subnets {self._netuids}."
+            f"for subnets {netuids}."
         )
 
     def _mv_tmp_to_final(self):

@@ -46,9 +46,14 @@ class SubnetDataBase:
         self._get_subnet_data()
 
     @property
+    def netuids(self):
+        return self._netuids
+
+    @property
     def validator_data(self):
         return self._validator_data
 
+    @property
     def as_dict(self):
         return {
             netuid: asdict(self._validator_data[netuid])
@@ -61,12 +66,12 @@ class SubnetDataBase:
 
 class SubnetDataIntervals(SubnetDataBase):
     def __init__(
-            self, netuids, num_intervals, network, chunk_size=0,
+            self, network, num_intervals, netuids=None, chunk_size=0,
             other_coldkey=None, existing_json_data_folder=None
     ):
         self._netuids = netuids
         self._network = network
-        self._chunk_size = chunk_size or len(self._netuids)
+        self._chunk_size = chunk_size
         self._num_intervals = num_intervals
         self._other_coldkey = self._get_other_coldkey(other_coldkey)
         self._existing_json_data_folder = existing_json_data_folder
@@ -89,16 +94,26 @@ class SubnetDataIntervals(SubnetDataBase):
     def _get_existing_subnet_data_from_json(self):
         if self._existing_json_data_folder:
             self._existing_data = SubnetDataIntervalsFromJson(
-            self._netuids, self._existing_json_data_folder
+                self._existing_json_data_folder, netuids=self._netuids
         ).validator_data
         else:
             self._existing_data = {}
 
     async def _async_get_subnet_data(self):
-        bittensor.logging.info(f"Gathering data in chunks of {self._chunk_size}")
-
         bittensor.logging.info(f"Connecting to subtensor network: {self._network}")
+
         async with bittensor.AsyncSubtensor(network=self._network) as subtensor:
+            # If netuids arg was not passed in, get all netuids from the subtensor here.
+            if not self._netuids:
+                all_subnets = await subtensor.get_all_subnets_netuid()
+                self._netuids = all_subnets[1:]
+
+            # If chunk_size is 0, get chunk_size after we know that we have the list of netuids.
+            if not self._chunk_size:
+                self._chunk_size = len(self._netuids)
+
+            bittensor.logging.info(f"Gathering data in chunks of {self._chunk_size}")
+
             max_attempts = 5
             for netuids in self._get_chunks():
                 for attempt in range(1, max_attempts+1):
@@ -345,21 +360,20 @@ class SubnetDataIntervals(SubnetDataBase):
 
 
 class SubnetDataIntervalsFromJson(SubnetDataBase):
-    def __init__(self, netuids, json_folder, num_intervals=None):
-        self._netuids = netuids
+    def __init__(self, json_folder, netuids=None, num_intervals=None):
         self._json_folder = json_folder
+        self._netuids = netuids or self._get_netuids_from_json_folder()
         self._num_intervals = num_intervals
         self._other_coldkey = None
 
         super().__init__()
 
-    @staticmethod
-    def get_netuids_from_json_folder(json_folder):
+    def _get_netuids_from_json_folder(self):
         netuids = []
         json_file_pattern = utils.get_json_file_name(DATA_FILE_NAME, r"(?P<netuid>\d+)")
         json_file_pattern = json_file_pattern.replace(".", r"\.")
         json_file_regex = re.compile(rf"^{json_file_pattern}$")
-        for _file in os.listdir(json_folder):
+        for _file in os.listdir(self._json_folder):
             regex_match = json_file_regex.match(_file)
             if regex_match:
                 netuids.append(int(regex_match.group("netuid")))
@@ -428,7 +442,7 @@ class SubnetDataIntervalsFromMainData(SubnetDataBase):
 
     def _get_subnet_data(self):
         existing_intervals_data = SubnetDataIntervalsFromJson(
-            self._netuids, self._json_intervals_folder
+            self._json_intervals_folder, netuids=self._netuids
         ).validator_data
 
         for netuid in self._netuids:

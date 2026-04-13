@@ -12,7 +12,12 @@ import random
 import bittensor
 
 # Local imports
-from json_writer_base import JsonWriterBase, LoopRunnerBase, mp_queue
+from json_writer_base import (
+    JsonWriterBase,
+    LoopRunnerBase,
+    mp_queue,
+    SubtensorConnectionError
+)
 from constants import (
     SUBNET_PRICE_FILE_NAME,
     TAOSTATS_HEADERS,
@@ -49,6 +54,7 @@ class JsonWriterPrice(JsonWriterBase):
         bittensor.logging.info("Gathering subnet price data.")
         start_time = time.time()
 
+        self._get_netuids()
         netuid_range = f"{self._netuids[0]}-{self._netuids[-1]}"
         json_file_name = utils.get_json_file_name(SUBNET_PRICE_FILE_NAME, netuid_range)
         json_file = os.path.join(self._tempdir, json_file_name)
@@ -76,6 +82,19 @@ class JsonWriterPrice(JsonWriterBase):
     def _rm_tempdirs(self):
         # Remove temp folders
         shutil.rmtree(self._tempdir, ignore_errors=True)
+
+    def _get_netuids(self):
+        # Get all Subnets.
+        bittensor.logging.info(f"Connecting to network: {self._lite_network}")
+        bittensor.logging.info("Obtaining the list of subnets.")
+        try:
+            with bittensor.Subtensor(network=self._lite_network) as subtensor:
+                all_subnets = subtensor.get_all_subnets_netuid()  
+            self._netuids = all_subnets[1:]
+        except Exception as err:
+            bittensor.logging.error(f"Subtensor connection failed on '{self._lite_network}'")
+            bittensor.logging.error(f"{type(err).__name__}: {err}")
+            raise SubtensorConnectionError
 
     def _gather_subnet_data(self):
         subnet_data = {}

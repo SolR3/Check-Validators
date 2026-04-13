@@ -23,6 +23,7 @@ def _parse_args():
 
     parser.add_argument(
         "-s", "--subnets",
+        dest="netuids",
         nargs="+",
         type=int,
         help="When specified, the list of netuids are checked. When not "
@@ -70,16 +71,15 @@ def main(options):
         bittensor.logging.enable_info()
 
     network = utils.get_lite_subtensor_network(options.local_lite_subtensor)
-    netuids = options.subnets or utils.get_all_subnets(network)
-    sort_subnets = not bool(options.subnets)
-    print_total_emission = not (options.chk_only or options.missing_chk or bool(options.subnets))
+    sort_subnets = not bool(options.netuids)
+    print_total_emission = not (options.chk_only or options.missing_chk or bool(options.netuids))
 
     start_time = time.time()
-    validator_data = SubnetDataMain(
-        netuids, network, other_coldkey=options.coldkey
-    ).validator_data
+    subnet_data = SubnetDataMain(
+        network, netuids=options.netuids, other_coldkey=options.coldkey
+    )
     subnet_data_printer = SubnetDataPrinter(
-        validator_data, netuids, options.chk_only, options.missing_chk,
+        subnet_data.validator_data, subnet_data.netuids, options.chk_only, options.missing_chk,
          sort_subnets, print_total_emission, options.vali_name
     )
     total_time = round(time.time() - start_time)

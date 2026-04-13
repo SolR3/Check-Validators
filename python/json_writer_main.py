@@ -9,7 +9,12 @@ import time
 import bittensor
 
 # Local imports
-from json_writer_base import JsonWriterBase, LoopRunnerBase, mp_queue
+from json_writer_base import (
+    JsonWriterBase,
+    LoopRunnerBase,
+    mp_queue,
+    SubtensorConnectionError
+)
 from subnet_data_main import SubnetDataMain
 from subnet_data_intervals import SubnetDataIntervalsFromMainData
 import utils
@@ -47,20 +52,24 @@ class JsonWriterMain(JsonWriterBase):
         bittensor.logging.info("Gathering subnet data.")
         start_time = time.time()
 
-        # TODO - Some refactoring is needed so we can get the data object
-        # from SubnetDataMain and then call as_dict() to get the main data
-        # and some new intervals calculation method to get the most recent
-        # interval.
+        # Gather subnet data.
+        # This assumes that there are no bugs in SubnetDataMain and
+        # any exceptions raised are due to subtensor connection errors.
+        try:
+            subnet_data = SubnetDataMain(
+                self._lite_network,
+                chunk_size=self._chunk_size,
+            )
+        except Exception as err:
+            bittensor.logging.error(f"Subtensor connection failed on '{self._lite_network}'")
+            bittensor.logging.error(f"{type(err).__name__}: {err}")
+            raise SubtensorConnectionError
 
-        # Gather subnet data
-        validator_data_main = SubnetDataMain(
-            self._netuids,
-            self._lite_network,
-            chunk_size=self._chunk_size,
-        ).as_dict()
+        validator_data_main = subnet_data.as_dict
+        netuids = subnet_data.netuids
 
         # Write main data json file
-        netuid_range = f"{self._netuids[0]}-{self._netuids[-1]}"        
+        netuid_range = f"{netuids[0]}-{netuids[-1]}"        
         json_file_name_main = utils.get_json_file_name(DATA_FILE_NAME, netuid_range)
         json_file_main = os.path.join(self._tempdir_main, json_file_name_main)
 
@@ -72,11 +81,11 @@ class JsonWriterMain(JsonWriterBase):
         # the existing json files and add interval blocks as necessary.
         if self._json_intervals_folder:
             validator_data_intervals = SubnetDataIntervalsFromMainData(
-                self._netuids, validator_data_main, self._json_intervals_folder,
+                netuids, validator_data_main, self._json_intervals_folder,
                 num_intervals=self._num_weights_intervals
-            ).as_dict()
+            ).as_dict
 
-            for netuid in self._netuids:
+            for netuid in netuids:
                 json_file_name_intervals = \
                     utils.get_json_file_name(DATA_FILE_NAME, netuid)
                 json_file_intervals = os.path.join(

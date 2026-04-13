@@ -59,7 +59,6 @@ def _parse_args():
 
     parser.add_argument(
         "-i", "--interval",
-        dest="interval_seconds",
         type=float,
         default=0,
         action=IntervalTimeAction,

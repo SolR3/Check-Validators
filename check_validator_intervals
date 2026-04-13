@@ -25,6 +25,7 @@ def parse_args():
 
     parser.add_argument(
         "-s", "--subnets",
+        dest="netuids",
         nargs="+",
         type=int,
         help="The subnet numbers."
@@ -72,7 +73,13 @@ def parse_args():
         help="Print verbose output."
     )
 
-    return parser.parse_args()
+    options = parser.parse_args()
+
+    if not (options.netuids or options.json_folder):
+        print("ERROR: Either --subnets or --json-folder or both must be specified.")
+        sys.exit(1)
+
+    return options
 
 
 def main(options):
@@ -81,26 +88,15 @@ def main(options):
 
     network = options.local_archive_subtensor or "archive"
 
-    if not options.subnets and not options.json_folder:
-        print("ERROR: Either --subnets or --json-folder or both must be specified.")
-        return
-
-    netuids = (
-        options.subnets
-        or SubnetDataIntervalsFromJson.get_netuids_from_json_folder(
-            options.json_folder
-        )
-    )
-
     timestamp_msg = None
     start_time = time.time()
     if options.json_folder:
         num_intervals = options.num_intervals or DEFAULT_NUM_INTERVALS_JSON
-        validator_data = SubnetDataIntervalsFromJson(
-            netuids,
+        subnet_data = SubnetDataIntervalsFromJson(
             options.json_folder,
+            netuids=options.netuids,
             num_intervals=num_intervals
-        ).validator_data
+        )
         timestamp_file = os.path.join(options.json_folder, TIMESTAMP_FILE_NAME)
         if os.path.isfile(timestamp_file):
             with open(timestamp_file, "r") as fd:
@@ -113,18 +109,18 @@ def main(options):
             timestamp_msg = Text("NO TIMESTAMP FILE!", style=RichPrinter.get_style(2))
     else:
         num_intervals = options.num_intervals or DEFAULT_NUM_INTERVALS_NO_JSON
-        validator_data = SubnetDataIntervals(
-            netuids,
-            num_intervals,
+        subnet_data = SubnetDataIntervals(
             network,
+            num_intervals,
+            netuids=options.netuids,
             other_coldkey=options.coldkey
-        ).validator_data
+        )
     total_time = round(time.time() - start_time)
     print(f"\nSubnet data gathering took {utils.get_formatted_time(total_time)}.\n")
 
     RichPrinter(
-        netuids=netuids,
-        validator_data=validator_data,
+        netuids=subnet_data.netuids,
+        validator_data=subnet_data.validator_data,
         print_tables=options.print_tables,
     )
 

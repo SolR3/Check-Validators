@@ -84,8 +84,19 @@ class SubnetDataBase:
         self._get_subnet_data()
 
     @property
+    def netuids(self):
+        return self._netuids
+
+    @property
     def validator_data(self):
         return self._validator_data
+
+    @property
+    def as_dict(self):
+        return {
+            netuid: asdict(self._validator_data[netuid])
+            for netuid in self._validator_data
+        }
 
     def _get_subnet_data(self):
         raise NotImplementedError
@@ -93,22 +104,16 @@ class SubnetDataBase:
 
 class SubnetDataMain(SubnetDataBase):
     def __init__(
-            self, netuids, network, chunk_size=0,
+            self, network, netuids=None, chunk_size=0,
             other_coldkey=None, other_chk_hotkey=None
         ):
         self._netuids = netuids
         self._network = network
-        self._chunk_size = chunk_size or len(self._netuids)
+        self._chunk_size = chunk_size
         self._other_coldkey = self._get_other_coldkey(other_coldkey)
         self._other_chk_hotkey = other_chk_hotkey
 
         super().__init__()
-
-    def as_dict(self):
-        return {
-            netuid: asdict(self._validator_data[netuid])
-            for netuid in self._validator_data
-        }
 
     @staticmethod
     def _get_other_coldkey(other_coldkey):
@@ -165,10 +170,20 @@ class SubnetDataMain(SubnetDataBase):
         asyncio.run(self._async_get_subnet_data())
 
     async def _async_get_subnet_data(self):
-        bittensor.logging.info(f"Gathering data in chunks of {self._chunk_size}")
-
         bittensor.logging.info(f"Connecting to subtensor network: {self._network}")
+
         async with bittensor.AsyncSubtensor(network=self._network) as subtensor:
+            # If netuids arg was not passed in, get all netuids from the subtensor here.
+            if not self._netuids:
+                all_subnets = await subtensor.get_all_subnets_netuid()
+                self._netuids = all_subnets[1:]
+
+            # If chunk_size is 0, get chunk_size after we know that we have the list of netuids.
+            if not self._chunk_size:
+                self._chunk_size = len(self._netuids)
+
+            bittensor.logging.info(f"Gathering data in chunks of {self._chunk_size}")
+
             max_attempts = 5
             for netuids in self._get_chunks():
                 for attempt in range(1, max_attempts+1):

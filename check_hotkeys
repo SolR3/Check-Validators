@@ -2,44 +2,21 @@
 
 # standard imports
 import argparse
-import asyncio
 import os
+from rich.text import Text
+from rich.console import Console
 import sys
+import time
 
 # Add local subnet_data module path
 sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 
 # Local imports
-from constants import (
-    COLDKEYS,
-    MULTI_UID_HOTKEYS,
-    RIZZO_HOTKEYS,
-)
+from constants import OWNED_SUBNETS
 
 
 def _parse_args():
     parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "-s", "--subnets",
-        nargs="+",
-        type=int,
-        help="When specified, the list of netuids are checked. When not "
-             "specified, all subnets are checked."
-    )
-
-    parser.add_argument(
-        "-d", "--diff",
-        action="store_true",
-        help="When specified, only the subnets found with hotkeys different than "
-             "those in subnet_constants.RIZZO_HOTKEYS are printed."
-    )
-
-    parser.add_argument(
-        "-t", "--takes",
-        action="store_true",
-        help="When specified print the CHK takes for each hotkey."
-    )
 
     parser.add_argument(
         "-l", "--local-subtensor",
@@ -49,124 +26,82 @@ def _parse_args():
              "When not specified, use the 'finney' network subtensor."
     )
 
+    parser.add_argument(
+        "-s", "--subnets",
+        dest="netuids",
+        nargs="+",
+        type=int,
+        help="When specified, the list of netuids are checked. When not "
+             "specified, all subnets are checked."
+    )
+
+    parser.add_argument(
+        "-k", "--coldkey",
+        help="Specify a different coldkey to check than Rizzo. This can be either "
+             "an actual coldkey address or the name of a validator who's coldkey we "
+             "happen to know (i.e. rt21, yuma, kraken, tao.com, otf, muv)."
+    )
+
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Print verbose output."
+    )
+
     return parser.parse_args()
 
 
-async def get_metagraphs(network, netuids):
-    async with bittensor.AsyncSubtensor(network=network) as subtensor:
-        if not netuids:
-            try:
-                netuids = await subtensor.get_all_subnets_netuid()
-            except AttributeError:
-                netuids = await subtensor.get_subnets()
-            netuids = netuids[1:]
+def main(options):
+    if options.verbose:
+        bittensor.logging.enable_info()
 
-        # Get the block to pass to async calls so everything is in sync
-        block = await subtensor.block
-
-        # Get the metagraph for each netuid
-        metagraphs = await asyncio.gather(
-            *[
-                subtensor.metagraph(netuid=netuid, block=block)
-                for netuid in netuids
-            ]
-        )
-
-    return metagraphs
-
-
-async def get_hotkey_takes(network, hotkeys):
-    async with bittensor.AsyncSubtensor(network=network) as subtensor:
-        chk_take_func_calls = []
-        for netuid in sorted(hotkeys):
-            hotkey = hotkeys[netuid]
-            chk_take_func_calls.append(
-                subtensor.query_subtensor("ChildkeyTake", params=[hotkey, netuid])
-            )
-        chk_takes = (
-            [bittensor.u16_normalized_float(r.value) for r in await asyncio.gather(*chk_take_func_calls)]
-            if chk_take_func_calls else []
-        )
-        for i, netuid in enumerate(sorted(hotkeys)):
-            take = int(round(chk_takes[i] * 100))
-            hotkeys[netuid] = (hotkeys[netuid], take)
-
-
-async def main(options):
     network = utils.get_lite_subtensor_network(options.local_lite_subtensor)
-    netuids = options.subnets 
 
-    metagraphs = await get_metagraphs(network, netuids)
+    start_time = time.time()
+    subnet_data = SubnetDataMain(
+        network, netuids=options.netuids, other_coldkey=options.coldkey
+    )
 
-    coldkey = COLDKEYS["Rizzo"]
-    hotkeys = {}
-    missing_hotkeys = {}
-    wrong_hotkeys = {}
-    for metagraph in metagraphs:
-        if metagraph.netuid in MULTI_UID_HOTKEYS:
-            found_hotkey = RIZZO_HOTKEYS[metagraph.netuid]
+    text = Text("\nHotkeys:")
+
+    for netuid in subnet_data.netuids:
+        validator_data = subnet_data.validator_data[netuid]
+        hotkey = (
+            validator_data.validator_hotkeys.Rizzo
+            or (not options.coldkey and validator_data.rizzo_expected_hotkey)
+            or "---"
+        )
+        hotkey_color = 15 if validator_data.validator_hotkeys.Rizzo else 9
+
+        take = int(round(validator_data.rizzo_hotkey_chk_take * 100))
+        if netuid in OWNED_SUBNETS:
+            take_color = 9 if take > 0 else 15
         else:
-            try:
-                coldkey_index = metagraph.coldkeys.index(coldkey)
-            except ValueError:
-                found_hotkey = None
-            else:
-                found_hotkey = metagraph.hotkeys[coldkey_index]
+            take_color = 9 if take < 9 else 15
 
-        if found_hotkey:
-            hotkeys[metagraph.netuid] = found_hotkey
+        text.append(f"\n{netuid:3}: ")
+        if not options.coldkey:
+            text.append(f"{take:2}%", style=f"color({take_color})")
+            text.append(" - ")
+        text.append(f"{hotkey}", style=f"color({hotkey_color})")
 
-        constants_hotkey = RIZZO_HOTKEYS.get(metagraph.netuid)
-        if not constants_hotkey:
-            missing_hotkeys[metagraph.netuid] = found_hotkey
-        elif found_hotkey and found_hotkey != constants_hotkey:
-            wrong_hotkeys[metagraph.netuid] = (constants_hotkey, found_hotkey)
+    Console().print(text)
 
-    if options.takes:
-        await get_hotkey_takes(network, hotkeys)
-
-    if options.diff:
-        print("")
-        if not missing_hotkeys:
-            print("No Missing Hotkeys")
-        else:
-            print("Missing Hotkeys:")
-            for netuid, good_hotkey in missing_hotkeys.items():
-                if good_hotkey:
-                    print(f"{netuid:3}: {good_hotkey}")
-                else:
-                    print(f"{netuid:3}: ???")
-        print("")
-        if not wrong_hotkeys:
-            print("No Wrong Hotkeys")
-        else:
-            print("Wrong Hotkeys:")
-            for netuid, (bad_hotkey, good_hotkey) in wrong_hotkeys.items():
-                print(f"{netuid:3}: {bad_hotkey} --> {good_hotkey}")
-    else:
-        print("")
-        print("Hotkeys:")
-        if options.takes:
-            for netuid, (hotkey, take) in hotkeys.items():
-                print(f"{netuid:3}: {take:2}% - {hotkey}")
-        else:
-            for netuid, hotkey in hotkeys.items():
-                print(f"{netuid:3}: {hotkey}")
-
-    print("")
+    total_time = round(time.time() - start_time)
+    print(f"\nSubnet data gathering took {utils.get_formatted_time(total_time)}.\n")
 
 
 if __name__ == "__main__":
     try:
         options = _parse_args()
 
-        # Bittensor import
+        # Import bittensor and local modules after parsing args to keep the
+        # bittensor module from overriding the --help arg.
         import bittensor
-
-        # Import local module
+        from subnet_data_main import SubnetDataMain
         import utils
 
-        asyncio.run(main(options))
+        main(options)
 
     except KeyboardInterrupt as exc:
         import traceback

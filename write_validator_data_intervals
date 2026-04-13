@@ -43,7 +43,6 @@ def _parse_args():
 
     parser.add_argument(
         "-i", "--interval",
-        dest="interval_seconds",
         type=float,
         default=0,
         action=IntervalTimeAction,
@@ -57,15 +56,6 @@ def _parse_args():
              "ip:port or url path:port. For exmpale, specifying 'archive' "
              "won't work. You must specify 'ws://subtensor-archive.rizzo.network:9945'. "
              "When not specified, use the 'archive' network subtensor."
-    )
-
-    parser.add_argument(
-        "--local-lite-subtensor",
-        nargs="?",
-        default=False,
-        help="Use the specified local lite subtensor (i.e. la, cali, titan, etc.) for obtaining "
-             "the list of subnets. List the flag without a value to rotate between all local "
-             "subtensors. When not specified, use the 'finney' network subtensor."
     )
 
     return parser.parse_args()

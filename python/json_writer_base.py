@@ -57,11 +57,11 @@ class LoopRunnerBase:
                         shutil.rmtree(tempdir, ignore_errors=True)
 
             # Only gather the data once.
-            if not self._options.interval_seconds:
+            if not self._options.interval:
                 break
 
             total_seconds = round(time.time() - start_time)
-            wait_seconds = self._options.interval_seconds - total_seconds
+            wait_seconds = self._options.interval - total_seconds
             if wait_seconds > 0:
                 wait_time_formatted = utils.get_formatted_time(wait_seconds)
                 bittensor.logging.info(f"Waiting {wait_time_formatted}.")
@@ -69,7 +69,7 @@ class LoopRunnerBase:
             else:
                 bittensor.logging.warning(
                     f"Processing took {total_seconds} seconds which is longer "
-                    f"than {self._options.interval_seconds} seconds. Not waiting."
+                    f"than {self._options.interval} seconds. Not waiting."
                 )
 
 
@@ -79,15 +79,6 @@ class JsonWriterBase:
             self._run()
 
     def _run(self):
-        # Get all Subnets.
-        bittensor.logging.info(f"Connecting to network: {self._lite_network}")
-        try:
-            self._netuids = utils.get_all_subnets(self._lite_network)
-        except Exception as err:
-            bittensor.logging.error(f"Subtensor connection failed on '{self._lite_network}'")
-            bittensor.logging.error(f"{type(err).__name__}: {err}")
-            raise SubtensorConnectionError
-
         try:
             self._mk_tempdirs()
             self._write_json_files_to_tmp()
