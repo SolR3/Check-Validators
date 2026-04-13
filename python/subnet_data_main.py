@@ -34,6 +34,7 @@ class SubnetDataBase:
         block: int
         netuid: int
         subnet_emission: float
+        subnet_alpha_price: float
         subnet_tempo: int
         num_total_validators: int
         num_valid_validators: int
@@ -403,8 +404,11 @@ class SubnetDataMain(SubnetDataBase):
         validator_hotkeys = self.ValidatorHotkeys(**vali_hotkeys)
 
         # Get emission percentage for the subnet.
-        # Multiplying by 2 since tao has been halved?
+        # Multiplying by 2 since tao has been halved.
         subnet_emission = metagraph.emissions.tao_in_emission * 100 * 2
+
+        # Get alpha price for the subnet.
+        subnet_alpha_price = metagraph.pool.tao_in / metagraph.pool.alpha_in
 
         # Get subnet tempo (used for determining bad Updated values)
         # subnet_tempo = subtensor.get_subnet_hyperparameters(netuid).tempo
@@ -574,6 +578,7 @@ class SubnetDataMain(SubnetDataBase):
             block=current_block,
             netuid=netuid,
             subnet_emission=subnet_emission,
+            subnet_alpha_price=subnet_alpha_price,
             subnet_tempo=subnet_tempo,
             num_total_validators=num_total_validators,
             num_valid_validators=num_valid_validators,

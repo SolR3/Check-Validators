@@ -20,6 +20,7 @@ class RichPrinterBase:
     _yellow = "11"
     _white = "15"
     _tab = "    "
+    _tao = "\u03c4"
 
     def __init__(self):
         self._console = Console()

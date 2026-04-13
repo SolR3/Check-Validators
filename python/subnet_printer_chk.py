@@ -54,7 +54,8 @@ class TablePrinter(TablePrinterBase):
     def _get_column_headers(self):
         column_headers = [
             "Subnet",
-            "Subnet E",
+            "Emission",
+            "Alpha",
             "CHK %",
             "Take %",
             "vTrust",
@@ -162,6 +163,7 @@ class TablePrinter(TablePrinterBase):
                 style=self._get_style(row_status)
             ),
             Text(f"{validator_data.subnet_emission:.2f}%"),
+            Text(f"{validator_data.subnet_alpha_price:.4f}{self._tao}"),
             Text.assemble(*chk_percents),
             Text.assemble(*chk_takes),
             Text.assemble(*chk_vtrusts),
