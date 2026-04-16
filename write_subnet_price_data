@@ -12,7 +12,7 @@ sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 def _parse_args():
     class IntervalTimeAction(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
-            seconds = round(values * 3600)
+            seconds = round(values * 60)
             setattr(namespace, self.dest, seconds)
 
     parser = argparse.ArgumentParser()
@@ -38,18 +38,8 @@ def _parse_args():
         type=float,
         default=0,
         action=IntervalTimeAction,
-        help="The number of hours between validator data gathering. If 0 or not "
+        help="The number of minutes between validator data gathering. If 0 or not "
              "specified then the data is gathered only once."
-    )
-
-    parser.add_argument(
-        "-t", "--seconds-between-queries",
-        type=int,
-        default=60,
-        help="The number of seconds between url queries. The higher the number, the "
-             "longer it takes to query all subnets (seconds-between-queries * total subnets) "
-             "but the less chance of getting rate limiting errors when querying taostats. "
-             "The default is 30 seconds."
     )
 
     return parser.parse_args()

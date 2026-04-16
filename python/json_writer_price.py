@@ -6,7 +6,6 @@ import requests
 import shutil
 import tempfile
 import time
-import random
 
 # bittensor import
 import bittensor
@@ -41,7 +40,6 @@ class LoopRunnerPrice(LoopRunnerBase):
 class JsonWriterPrice(JsonWriterBase):
     def __init__(self, options):
         self._json_folder = options.json_folder
-        self._sleep_time = options.seconds_between_queries
 
         super().__init__(options)
 
@@ -54,16 +52,16 @@ class JsonWriterPrice(JsonWriterBase):
         bittensor.logging.info("Gathering subnet price data.")
         start_time = time.time()
 
-        self._get_netuids()
-        netuid_range = f"{self._netuids[0]}-{self._netuids[-1]}"
-        json_file_name = utils.get_json_file_name(SUBNET_PRICE_FILE_NAME, netuid_range)
-        json_file = os.path.join(self._tempdir, json_file_name)
-
         subnet_data = self._gather_subnet_data()
         data_dict = {
             netuid: asdict(subnet_data[netuid])
             for netuid in subnet_data
         }
+
+        netuids = sorted(subnet_data)
+        netuid_range = f"{netuids[0]}-{netuids[-1]}"
+        json_file_name = utils.get_json_file_name(SUBNET_PRICE_FILE_NAME, netuid_range)
+        json_file = os.path.join(self._tempdir, json_file_name)
 
         bittensor.logging.info(f"Writing data to file: {json_file}")
         with open(json_file, "w") as fd:
@@ -83,33 +81,25 @@ class JsonWriterPrice(JsonWriterBase):
         # Remove temp folders
         shutil.rmtree(self._tempdir, ignore_errors=True)
 
-    def _get_netuids(self):
-        # Get all Subnets.
+    def _gather_subnet_data(self):
+        subnet_data = {}
+
+        bittensor.logging.info("Gathering subnet price for all netuids.")
         bittensor.logging.info(f"Connecting to network: {self._lite_network}")
-        bittensor.logging.info("Obtaining the list of subnets.")
         try:
             with bittensor.Subtensor(network=self._lite_network) as subtensor:
-                all_subnets = subtensor.get_all_subnets_netuid()  
-            self._netuids = all_subnets[1:]
+                subnet_prices = subtensor.get_subnet_prices()
         except Exception as err:
             bittensor.logging.error(f"Subtensor connection failed on '{self._lite_network}'")
             bittensor.logging.error(f"{type(err).__name__}: {err}")
             raise SubtensorConnectionError
 
-    def _gather_subnet_data(self):
-        subnet_data = {}
-
         bittensor.logging.info("Gathering tao price")
         tao_price_usd = self._get_price_from_url()
 
-        for netuid in self._netuids:
-            bittensor.logging.info(f"Gathering subnet price for netuid {netuid}")
-
-            try:
-                subnet_price_tao = self._get_price_from_url(netuid)
-            except Exception as e:
-                bittensor.logging.error(f"Exception while fetching subnet {netuid}: {e}")
-                subnet_price_tao = None
+        del subnet_prices[0]
+        for netuid in sorted(subnet_prices):
+            subnet_price_tao = subnet_prices[netuid].tao
 
             if subnet_price_tao is None or tao_price_usd is None:
                 subnet_price_usd = None
@@ -126,11 +116,8 @@ class JsonWriterPrice(JsonWriterBase):
         return subnet_data
 
     # Courtesy of gregbeard, thanks Greg!
-    def _get_price_from_url(self, netuid=None):
-        if netuid is None:
-            url = "https://api.taostats.io/api/price/latest/v1?asset=tao"
-        else:
-            url = f"https://api.taostats.io/api/dtao/pool/latest/v1?netuid={netuid}"
+    def _get_price_from_url(self):
+        url = "https://api.taostats.io/api/price/latest/v1?asset=tao"
 
         response = self._query_url(url)
         if response.status_code != 200:
@@ -148,19 +135,16 @@ class JsonWriterPrice(JsonWriterBase):
 
     def _query_url(self, url):
         num_attempts = 4
+        wait_seconds = 60
 
         for attempt in range(1, num_attempts + 1):
-            wait = self._sleep_time + random.uniform(0, 5)
-            bittensor.logging.info(f"Sleeping for {wait:.1f} seconds before attempt {attempt}.")
-            time.sleep(wait)
-
             response = requests.get(url, headers=TAOSTATS_HEADERS, timeout=10)
             if response.status_code != 429:
                 return response
 
             bittensor.logging.error(f"Attempt {attempt} failed due to rate limiting on url {url}")
-            retry_wait = wait * attempt
-            bittensor.logging.error(f"Sleeping for {retry_wait:.1f} seconds after failed attempt.")
+            retry_wait = wait_seconds * attempt
+            bittensor.logging.error(f"Sleeping for {retry_wait} seconds after failed attempt.")
             time.sleep(retry_wait)  # exponential backoff before next try
 
         return response
