@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+
+# Standard imports
+import argparse
+import asyncio
+import json
+import multiprocessing
+import os
+import shlex
+import subprocess
+import sys
+import time
+
+# Set path to import local modules
+sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
+
+# Local modules imports
+from constants import COLDKEYS
+from utils import get_formatted_time, get_lite_subtensor_network
+
+
+DRYRUN = False
+
+
+def _parse_args():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "-j", "--json-folder",
+        required=True,
+        help="The json folder in which to write the json files."
+    )
+
+    parser.add_argument(
+        "-i", "--interval",
+        type=float,
+        default=5,
+        help="The number of minutes between data gathering."
+    )
+
+    parser.add_argument(
+        "-l", "--local-subtensor",
+        dest="local_lite_subtensor",
+        nargs="?",
+        default=False,
+        help="Use the specified local subtensor (i.e. la, cali, titan, etc.). "
+             "List the flag without a value to rotate between all local "
+             "subtensors. When not specified, use the 'finney' network subtensor."
+    )
+
+    return parser.parse_args()
+
+
+class SubtensorConnectionError(Exception):
+    pass
+
+
+class ValidatorChecker:
+    _json_file_name = "validator_registered_subnets.json"
+    _discord_monitor_url = (
+        "https://discord.com/api/webhooks/1328849265765777468/"
+        "yJg07DYWLJyiFZgZPaLGTmFEwiAu2JWW5osyjFVoqlMWT66JBbV9_FOcslvDdtibtcR0"
+    )
+    _at_users = "<@297973047326146570> <@711033117485301811> <@795991134706991126>"
+
+    def __init__(self, args):
+        self._network = args.network
+        self._json_file = os.path.join(args.json_folder, self._json_file_name)
+
+        asyncio.run(self._run_check())
+
+    async def _run_check(self):
+        bittensor.logging.info("")
+        bittensor.logging.info("Checking registration status.")
+
+        previous_registered_list = self._read_registered_list_json_file()
+        new_registered_list = await self._get_registered_list()
+
+        self._compare_and_notify(previous_registered_list, new_registered_list)
+        self._write_registered_list_json_file(new_registered_list)
+
+    async def _get_registered_list(self):
+        start_time = time.time()
+        bittensor.logging.info(f"Connecting to subtensor: {self._network}")
+        try:
+            async with bittensor.AsyncSubtensor(network=self._network) as subtensor:
+                netuids = await subtensor.get_all_subnets_netuid()
+                netuids = netuids[1:]
+                bittensor.logging.info(f"Checking subnets: {netuids}")
+
+                block = await subtensor.block
+                metagraphs = await asyncio.gather(
+                    *[
+                        subtensor.metagraph(netuid=netuid, block=block)
+                        for netuid in netuids
+                    ]
+                )
+        except Exception as err:
+            bittensor.logging.error(f"ERROR: Subtensor connection failed on '{self._network}'")
+            bittensor.logging.error(f"{type(err).__name__}: {err}")
+            raise SubtensorConnectionError
+
+        total_time = time.time() - start_time
+        bittensor.logging.info(f"Gathered subnet data in {total_time:.3} seconds")
+
+        registered_list = [m.netuid for m in metagraphs if m.coldkeys.count(COLDKEYS["Rizzo"])]
+        return registered_list
+
+    def _compare_and_notify(self, previous_registered_list, new_registered_list):
+        # First run. Only creates the list. Nothing to compare yet.
+        if not previous_registered_list:
+            bittensor.logging.warning("No previous registered list to compare.")
+            return
+
+        deregistered_list = sorted(set(previous_registered_list).difference(set(new_registered_list)))
+
+        bittensor.logging.info(f"Previously registered on subnets: {previous_registered_list}")
+        bittensor.logging.info(f"Currently registered on subnets:  {new_registered_list}")
+        bittensor.logging.info(f"Deregistered from subnets: {deregistered_list}")
+
+        for netuid in deregistered_list:
+            message = f"We have been de-registered from subnet {netuid}"
+            self._notify(message)
+
+    def _notify(self, message):
+        message = self._at_users + " \u203C\uFE0F " + message
+        payload = json.dumps({"content": message})
+        monitor_cmd = [
+            "curl", "-H", "Content-Type: application/json",
+            "-d", payload, self._discord_monitor_url
+        ]
+        monitor_cmd_str = shlex.join(monitor_cmd)
+
+        if DRYRUN:
+            bittensor.logging.warning(f"Dryrun - Not running command: '{monitor_cmd_str}'")
+            return
+
+        bittensor.logging.info(f"Running command: '{monitor_cmd_str}'")
+        try:
+            subprocess.run(monitor_cmd, check=True)
+        except subprocess.CalledProcessError as exc:
+            bittensor.logging.error("Failed to send discord monitor notification.")
+            bittensor.logging.error(f"'{monitor_cmd_str}' command failed with error: {exc}")
+        else:
+            bittensor.logging.info("Discord monitor notification successfully sent.")
+
+    def _read_registered_list_json_file(self):
+        if not os.path.exists(self._json_file):
+            bittensor.logging.warning(f"Json file {self._json_file} does not exist. "
+                                      "This must be the first run.")
+            return None
+
+        with open(self._json_file, "r") as fp:
+            return json.load(fp)
+
+    def _write_registered_list_json_file(self, registered_subnet_list):
+        with open(self._json_file, "w") as fp:
+            return json.dump(registered_subnet_list, fp)
+
+
+def main(args):
+    bittensor.logging.enable_info()
+
+    interval_seconds = round(args.interval * 60)
+
+    while True:
+        args.network = get_lite_subtensor_network(args.local_lite_subtensor)
+        start_time = time.time()
+        try:
+            with multiprocessing.Pool(processes=1) as pool:
+                pool.apply(ValidatorChecker, [args])
+        except SubtensorConnectionError:
+            if args.local_lite_subtensor is None:
+                bittensor.logging.error("Rotating subtensors and trying again.")
+                time.sleep(1)
+                continue
+
+        total_seconds = round(time.time() - start_time)
+
+        wait_seconds = interval_seconds - total_seconds
+        if wait_seconds > 0:
+            wait_time_formatted = get_formatted_time(wait_seconds)
+            bittensor.logging.info(f"Waiting {wait_time_formatted}.")
+            time.sleep(wait_seconds)
+        else:
+             interval_formatted = get_formatted_time(interval_seconds)
+             bittensor.logging.warning("Subnet deregistration check took longer than "
+                                       f"{interval_formatted}. Not waiting.")
+
+
+if __name__ == "__main__":
+    args = _parse_args()
+
+    # Importing bittensor here suppresses the --help info
+    import bittensor
+
+    main(args)
