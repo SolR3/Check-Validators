@@ -7,6 +7,10 @@ import random
 from constants import LOCAL_LITE_SUBTENSORS
 
 
+class SubtensorConnectionError(Exception):
+    pass
+
+
 def get_formatted_time(total_time):
     # Get hours
     h = total_time/3600

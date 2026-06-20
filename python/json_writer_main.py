@@ -9,16 +9,19 @@ import time
 import bittensor
 
 # Local imports
+from constants import DATA_FILE_NAME
 from json_writer_base import (
     JsonWriterBase,
     LoopRunnerBase,
     mp_queue,
-    SubtensorConnectionError
 )
 from subnet_data_main import SubnetDataMain
 from subnet_data_intervals import SubnetDataIntervalsFromMainData
-import utils
-from constants import DATA_FILE_NAME
+from utils import (
+    get_formatted_time,
+    get_json_file_name,
+    SubtensorConnectionError,
+)
 
 
 class LoopRunnerMain(LoopRunnerBase):
@@ -70,7 +73,7 @@ class JsonWriterMain(JsonWriterBase):
 
         # Write main data json file
         netuid_range = f"{netuids[0]}-{netuids[-1]}"        
-        json_file_name_main = utils.get_json_file_name(DATA_FILE_NAME, netuid_range)
+        json_file_name_main = get_json_file_name(DATA_FILE_NAME, netuid_range)
         json_file_main = os.path.join(self._tempdir_main, json_file_name_main)
 
         bittensor.logging.info(f"Writing main data to file: {json_file_main}")
@@ -87,7 +90,7 @@ class JsonWriterMain(JsonWriterBase):
 
             for netuid in netuids:
                 json_file_name_intervals = \
-                    utils.get_json_file_name(DATA_FILE_NAME, netuid)
+                    get_json_file_name(DATA_FILE_NAME, netuid)
                 json_file_intervals = os.path.join(
                     self._tempdir_intervals, json_file_name_intervals)
                 bittensor.logging.info(f"Writing intervals data for netuid {netuid} to file: "
@@ -97,7 +100,7 @@ class JsonWriterMain(JsonWriterBase):
 
         total_time = round(time.time() - start_time)
         bittensor.logging.info(
-            f"Subnet data gathering took {utils.get_formatted_time(total_time)}."
+            f"Subnet data gathering took {get_formatted_time(total_time)}."
         )
 
     def _mv_tmp_to_final(self):

@@ -11,17 +11,20 @@ import time
 import bittensor
 
 # Local imports
-from json_writer_base import (
-    JsonWriterBase,
-    LoopRunnerBase,
-    mp_queue,
-    SubtensorConnectionError
-)
 from constants import (
     SUBNET_PRICE_FILE_NAME,
     TAOSTATS_HEADERS,
 )
-import utils
+from json_writer_base import (
+    JsonWriterBase,
+    LoopRunnerBase,
+    mp_queue,
+)
+from utils import (
+    get_formatted_time,
+    get_json_file_name,
+    SubtensorConnectionError,
+)
 
 
 @dataclass
@@ -60,7 +63,7 @@ class JsonWriterPrice(JsonWriterBase):
 
         netuids = sorted(subnet_data)
         netuid_range = f"{netuids[0]}-{netuids[-1]}"
-        json_file_name = utils.get_json_file_name(SUBNET_PRICE_FILE_NAME, netuid_range)
+        json_file_name = get_json_file_name(SUBNET_PRICE_FILE_NAME, netuid_range)
         json_file = os.path.join(self._tempdir, json_file_name)
 
         bittensor.logging.info(f"Writing data to file: {json_file}")
@@ -69,7 +72,7 @@ class JsonWriterPrice(JsonWriterBase):
 
         total_time = round(time.time() - start_time)
         bittensor.logging.info(
-            f"Subnet data gathering took {utils.get_formatted_time(total_time)}."
+            f"Subnet data gathering took {get_formatted_time(total_time)}."
         )
 
     def _mv_tmp_to_final(self):

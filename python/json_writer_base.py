@@ -13,14 +13,14 @@ from constants import (
     LOCAL_TIMEZONE,
     TIMESTAMP_FILE_NAME,
 )
-import utils
+from utils import (
+    get_formatted_time,
+    get_lite_subtensor_network,
+    SubtensorConnectionError,
+)
 
 
 mp_queue = multiprocessing.Queue()
-
-
-class SubtensorConnectionError(Exception):
-    pass
 
 
 class LoopRunnerBase:
@@ -39,7 +39,7 @@ class LoopRunnerBase:
     def _run_write_json_loop(self):
         while True:
             start_time = time.time()
-            self._options.lite_network = utils.get_lite_subtensor_network(self._options.local_lite_subtensor)
+            self._options.lite_network = get_lite_subtensor_network(self._options.local_lite_subtensor)
 
             args = [self._options]
             try:
@@ -63,7 +63,7 @@ class LoopRunnerBase:
             total_seconds = round(time.time() - start_time)
             wait_seconds = self._options.interval - total_seconds
             if wait_seconds > 0:
-                wait_time_formatted = utils.get_formatted_time(wait_seconds)
+                wait_time_formatted = get_formatted_time(wait_seconds)
                 bittensor.logging.info(f"Waiting {wait_time_formatted}.")
                 time.sleep(wait_seconds)
             else:

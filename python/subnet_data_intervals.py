@@ -22,7 +22,10 @@ from constants import (
     RIZZO_HOTKEYS,
     DATA_FILE_NAME,
 )
-import utils
+from utils import (
+    get_formatted_time,
+    get_json_file_name,
+)
 
 
 class SubnetDataBase:
@@ -322,7 +325,7 @@ class SubnetDataIntervals(SubnetDataBase):
 
         total_time = round(time.time() - start_time)
         bittensor.logging.info(
-            f"Subnet data gathered in {utils.get_formatted_time(total_time)}."
+            f"Subnet data gathered in {get_formatted_time(total_time)}."
         )
 
     def _get_rizzo_uid(self, metagraph):
@@ -370,7 +373,7 @@ class SubnetDataIntervalsFromJson(SubnetDataBase):
 
     def _get_netuids_from_json_folder(self):
         netuids = []
-        json_file_pattern = utils.get_json_file_name(DATA_FILE_NAME, r"(?P<netuid>\d+)")
+        json_file_pattern = get_json_file_name(DATA_FILE_NAME, r"(?P<netuid>\d+)")
         json_file_pattern = json_file_pattern.replace(".", r"\.")
         json_file_regex = re.compile(rf"^{json_file_pattern}$")
         for _file in os.listdir(self._json_folder):
@@ -389,7 +392,7 @@ class SubnetDataIntervalsFromJson(SubnetDataBase):
             )
 
             json_file = os.path.join(
-                self._json_folder, utils.get_json_file_name(DATA_FILE_NAME, netuid)
+                self._json_folder, get_json_file_name(DATA_FILE_NAME, netuid)
             )
             if not os.path.isfile(json_file):
                 bittensor.logging.info(
