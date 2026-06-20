@@ -3,6 +3,7 @@
 # Standard imports
 import argparse
 import asyncio
+import glob
 import json
 import multiprocessing
 import os
@@ -15,8 +16,15 @@ import time
 sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
 
 # Local modules imports
-from constants import COLDKEYS
-from utils import get_formatted_time, get_lite_subtensor_network
+from constants import (
+    COLDKEYS,
+    DATA_FILE_NAME,
+)
+from utils import (
+    get_formatted_time,
+    get_json_file_name,
+    get_lite_subtensor_network,
+)
 
 
 DRYRUN = False
@@ -26,19 +34,27 @@ def _parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "-j", "--json-folder",
-        required=True,
-        help="The json folder in which to write the json files."
-    )
-
-    parser.add_argument(
         "-i", "--interval",
         type=float,
         default=5,
         help="The number of minutes between data gathering."
     )
 
-    parser.add_argument(
+    subparsers = parser.add_subparsers(dest="mode")
+
+    subtensor_parser = subparsers.add_parser(
+        "from-subtensor",
+        help="Gather the data directly from the subtensor."
+    )
+
+    subtensor_parser.add_argument(
+        "-j", "--json-folder",
+        required=True,
+        help="The json folder in which to write the json files containing the data gathered "
+             "by the subprocess that connects to the subtensor."
+    )
+
+    subtensor_parser.add_argument(
         "-l", "--local-subtensor",
         dest="local_lite_subtensor",
         nargs="?",
@@ -46,6 +62,18 @@ def _parse_args():
         help="Use the specified local subtensor (i.e. la, cali, titan, etc.). "
              "List the flag without a value to rotate between all local "
              "subtensors. When not specified, use the 'finney' network subtensor."
+    )
+
+    json_parser = subparsers.add_parser(
+        "from-json",
+        help="Gather the data from the json file created by the 'write_validator_data_main' process."
+    )
+
+    json_parser.add_argument(
+        "-j", "--json-folder",
+        required=True,
+        help="The json folder containing the validator data written by the "
+             "'write_validator_data_main' process."
     )
 
     return parser.parse_args()
@@ -56,60 +84,19 @@ class SubtensorConnectionError(Exception):
 
 
 class ValidatorChecker:
-    _json_file_name = "validator_registered_subnets.json"
     _discord_monitor_url = (
         "https://discord.com/api/webhooks/1328849265765777468/"
         "yJg07DYWLJyiFZgZPaLGTmFEwiAu2JWW5osyjFVoqlMWT66JBbV9_FOcslvDdtibtcR0"
     )
     _at_users = "<@297973047326146570> <@711033117485301811> <@795991134706991126>"
 
-    def __init__(self, args):
-        self._network = args.network
-        self._json_file = os.path.join(args.json_folder, self._json_file_name)
-
-        asyncio.run(self._run_check())
-
-    async def _run_check(self):
-        bittensor.logging.info("")
-        bittensor.logging.info("Checking registration status.")
-
-        previous_registered_list = self._read_registered_list_json_file()
-        new_registered_list = await self._get_registered_list()
-
-        self._compare_and_notify(previous_registered_list, new_registered_list)
-        self._write_registered_list_json_file(new_registered_list)
-
-    async def _get_registered_list(self):
-        start_time = time.time()
-        bittensor.logging.info(f"Connecting to subtensor: {self._network}")
-        try:
-            async with bittensor.AsyncSubtensor(network=self._network) as subtensor:
-                netuids = await subtensor.get_all_subnets_netuid()
-                netuids = netuids[1:]
-                bittensor.logging.info(f"Checking subnets: {netuids}")
-
-                block = await subtensor.block
-                metagraphs = await asyncio.gather(
-                    *[
-                        subtensor.metagraph(netuid=netuid, block=block)
-                        for netuid in netuids
-                    ]
-                )
-        except Exception as err:
-            bittensor.logging.error(f"ERROR: Subtensor connection failed on '{self._network}'")
-            bittensor.logging.error(f"{type(err).__name__}: {err}")
-            raise SubtensorConnectionError
-
-        total_time = time.time() - start_time
-        bittensor.logging.info(f"Gathered subnet data in {total_time:.3} seconds")
-
-        registered_list = [m.netuid for m in metagraphs if m.coldkeys.count(COLDKEYS["Rizzo"])]
-        return registered_list
-
     def _compare_and_notify(self, previous_registered_list, new_registered_list):
         # First run. Only creates the list. Nothing to compare yet.
         if not previous_registered_list:
             bittensor.logging.warning("No previous registered list to compare.")
+            return
+        if not new_registered_list:
+            bittensor.logging.warning("No new registered list to compare.")
             return
 
         deregistered_list = sorted(set(previous_registered_list).difference(set(new_registered_list)))
@@ -144,6 +131,53 @@ class ValidatorChecker:
         else:
             bittensor.logging.info("Discord monitor notification successfully sent.")
 
+
+class ValidatorCheckerSubtensor(ValidatorChecker):
+    _json_file_name = "validator_registered_subnets.json"
+
+    def __init__(self, args):
+        self._json_file = os.path.join(args.json_folder, self._json_file_name)
+        self._network = args.network
+
+        asyncio.run(self._run_check())
+
+    async def _run_check(self):
+        bittensor.logging.info("")
+        bittensor.logging.info("Checking registration status from subtensor chain.")
+
+        previous_registered_list = self._read_registered_list_json_file()
+        new_registered_list = await self._get_registered_list()
+
+        self._compare_and_notify(previous_registered_list, new_registered_list)
+        self._write_registered_list_json_file(new_registered_list)
+
+    async def _get_registered_list(self):
+        start_time = time.time()
+        bittensor.logging.info(f"Connecting to subtensor: {self._network}")
+        try:
+            async with bittensor.AsyncSubtensor(network=self._network) as subtensor:
+                netuids = await subtensor.get_all_subnets_netuid()
+                netuids = netuids[1:]
+                bittensor.logging.info(f"Checking subnets: {netuids}")
+
+                block = await subtensor.block
+                metagraphs = await asyncio.gather(
+                    *[
+                        subtensor.metagraph(netuid=netuid, block=block)
+                        for netuid in netuids
+                    ]
+                )
+        except Exception as err:
+            bittensor.logging.error(f"ERROR: Subtensor connection failed on '{self._network}'")
+            bittensor.logging.error(f"{type(err).__name__}: {err}")
+            raise SubtensorConnectionError
+
+        total_time = time.time() - start_time
+        bittensor.logging.info(f"Gathered subnet data in {total_time:.3} seconds")
+
+        registered_list = [m.netuid for m in metagraphs if m.coldkeys.count(COLDKEYS["Rizzo"])]
+        return registered_list
+
     def _read_registered_list_json_file(self):
         if not os.path.exists(self._json_file):
             bittensor.logging.warning(f"Json file {self._json_file} does not exist. "
@@ -158,23 +192,71 @@ class ValidatorChecker:
             return json.dump(registered_subnet_list, fp)
 
 
+class ValidatorCheckerJson(ValidatorChecker):
+    def __init__(self, args):
+        json_file_name_glob = get_json_file_name(DATA_FILE_NAME, "*")
+        self._json_file_glob = os.path.join(args.json_folder, json_file_name_glob)
+        self._registered_list = None
+
+    def run_check(self):
+        bittensor.logging.info("")
+        bittensor.logging.info(f"Checking registration status from {self._json_file_glob} files.")
+
+        previous_registered_list = self._registered_list
+        new_registered_list = self._get_registered_list_from_data_json_file()
+
+        self._compare_and_notify(previous_registered_list, new_registered_list)
+        self._registered_list = new_registered_list
+
+    def _get_registered_list_from_data_json_file(self):
+        json_files = glob.glob(self._json_file_glob)
+        if not json_files:
+            bittensor.logging.error(f"No json files found: {self._json_file_glob}.")
+            return
+
+        registered_list = []
+        for json_file in json_files:
+            bittensor.logging.info(f"Reading data from {json_file}.")
+            with open(json_file, "r") as fp:
+                json_data = json.load(fp)
+            registered_list.extend([int(u) for u in json_data if json_data[u]["validator_hotkeys"]["Rizzo"]])
+
+        return sorted(registered_list)
+
+
+def run_subtensor_check(args):
+    while True:
+        args.network = get_lite_subtensor_network(args.local_lite_subtensor)
+        try:
+            with multiprocessing.Pool(processes=1) as pool:
+                pool.apply(ValidatorCheckerSubtensor, [args])
+        except SubtensorConnectionError:
+            if args.local_lite_subtensor is None:
+                bittensor.logging.error("Rotating subtensors and trying again.")
+                time.sleep(1)
+                continue
+        break
+
+
+def run_json_check(args):
+    validator_checker = globals().get("VALIDATOR_CHECKER")
+    if validator_checker is None:
+        validator_checker = ValidatorCheckerJson(args)
+        globals()["VALIDATOR_CHECKER"] = validator_checker
+    validator_checker.run_check()
+
+
 def main(args):
     bittensor.logging.enable_info()
 
     interval_seconds = round(args.interval * 60)
 
     while True:
-        args.network = get_lite_subtensor_network(args.local_lite_subtensor)
         start_time = time.time()
-        try:
-            with multiprocessing.Pool(processes=1) as pool:
-                pool.apply(ValidatorChecker, [args])
-        except SubtensorConnectionError:
-            if args.local_lite_subtensor is None:
-                bittensor.logging.error("Rotating subtensors and trying again.")
-                time.sleep(1)
-                continue
-
+        if args.mode == "from-subtensor":
+            run_subtensor_check(args)
+        else:
+            run_json_check(args)
         total_seconds = round(time.time() - start_time)
 
         wait_seconds = interval_seconds - total_seconds
