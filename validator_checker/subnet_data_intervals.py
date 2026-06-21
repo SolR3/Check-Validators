@@ -97,9 +97,8 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
             )
 
             # Get UID for Rizzo.
-            try:
-                rizzo_uid = self._get_uid(metagraph)
-            except ValueError:
+            rizzo_uid = self._get_uid(metagraph)
+            if rizzo_uid is None:
                 bittensor.logging.warning(
                     f"Rizzo validator not running on subnet {netuid}"
                 )
@@ -175,9 +174,8 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
                     continue
 
                 # Get UID for Rizzo.
-                try:
-                    rizzo_uid = self._get_uid(metagraph)
-                except ValueError:
+                rizzo_uid = self._get_uid(metagraph)
+                if rizzo_uid is None:
                     bittensor.logging.warning(
                         f"Unable to obtain all {self._num_intervals} "
                         f"weight setting intervals for subnet {netuid}."
