@@ -6,7 +6,7 @@ import bittensor
 
 # standart imports
 import asyncio
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 import json
 import numpy
 import os
@@ -17,23 +17,21 @@ import time
 from .constants import (
     MIN_VTRUST_THRESHOLD,
     MAX_U_THRESHOLD,
-    COLDKEYS,
-    MULTI_UID_HOTKEYS,
-    RIZZO_HOTKEYS,
     DATA_FILE_NAME,
 )
+from .subnet_data_base import SubnetDataBase, SubnetDataFromSubtensor
 from .utils import (
     get_formatted_time,
     get_json_file_name,
 )
 
 
-class SubnetDataBase:
+class SubnetDataIntervalsBase:
     @dataclass
     class ValidatorData:
         subnet_emission: float
         blocks: list[int]
-        block_data: list[SubnetDataBase.BlockData]
+        block_data: list[SubnetDataIntervalsBase.BlockData]
 
     @dataclass
     class BlockData:
@@ -42,32 +40,8 @@ class SubnetDataBase:
         avg_vtrust: float | None
         rizzo_updated: int | None
 
-    def __init__(self):
-        self._validator_data = {}
 
-        # Gather the data for all given subnets
-        self._get_subnet_data()
-
-    @property
-    def netuids(self):
-        return self._netuids
-
-    @property
-    def validator_data(self):
-        return self._validator_data
-
-    @property
-    def as_dict(self):
-        return {
-            netuid: asdict(self._validator_data[netuid])
-            for netuid in self._validator_data
-        }
-
-    def _get_subnet_data(self):
-        raise NotImplementedError
-
-
-class SubnetDataIntervals(SubnetDataBase):
+class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
     def __init__(
             self, network, num_intervals, netuids=None, chunk_size=0,
             other_coldkey=None, existing_json_data_folder=None
@@ -81,15 +55,6 @@ class SubnetDataIntervals(SubnetDataBase):
 
         super().__init__()
 
-    @staticmethod
-    def _get_other_coldkey(other_coldkey):
-        if not other_coldkey:
-            return None
-        for vali_name in COLDKEYS:
-            if other_coldkey.lower().replace(".", "_") == vali_name.lower():
-                return COLDKEYS[vali_name]
-        return other_coldkey
-
     def _get_subnet_data(self):
         self._get_existing_subnet_data_from_json()
         asyncio.run(self._async_get_subnet_data())
@@ -101,49 +66,6 @@ class SubnetDataIntervals(SubnetDataBase):
         ).validator_data
         else:
             self._existing_data = {}
-
-    async def _async_get_subnet_data(self):
-        bittensor.logging.info(f"Connecting to subtensor network: {self._network}")
-
-        async with bittensor.AsyncSubtensor(network=self._network) as subtensor:
-            # If netuids arg was not passed in, get all netuids from the subtensor here.
-            if not self._netuids:
-                all_subnets = await subtensor.get_all_subnets_netuid()
-                self._netuids = all_subnets[1:]
-
-            # If chunk_size is 0, get chunk_size after we know that we have the list of netuids.
-            if not self._chunk_size:
-                self._chunk_size = len(self._netuids)
-
-            bittensor.logging.info(f"Gathering data in chunks of {self._chunk_size}")
-
-            max_attempts = 5
-            for netuids in self._get_chunks():
-                for attempt in range(1, max_attempts+1):
-                    bittensor.logging.info(f"Attempt {attempt} of {max_attempts}")
-                    await self._get_validator_data(subtensor, netuids)
-
-                    # Get netuids missing data
-                    netuids = list(set(netuids).difference(set(self._validator_data)))
-                    if netuids:
-                        bittensor.logging.error(
-                            "Failed to gather data for subnets: "
-                            f"{', '.join([str(n) for n in netuids])}."
-                        )
-                    else:
-                        break
-
-    def _get_chunks(self):
-        num_netuids = len(self._netuids)
-        netuid_start = 0
-        while True:
-            netuid_end = netuid_start + self._chunk_size
-            if netuid_end >= num_netuids:
-                yield self._netuids[netuid_start:]
-                break
-            else:
-                yield self._netuids[netuid_start:netuid_end]
-                netuid_start = netuid_end
 
     async def _get_validator_data(self, subtensor, all_netuids):
         start_time = time.time()
@@ -176,7 +98,7 @@ class SubnetDataIntervals(SubnetDataBase):
 
             # Get UID for Rizzo.
             try:
-                rizzo_uid = self._get_rizzo_uid(metagraph)
+                rizzo_uid = self._get_uid(metagraph)
             except ValueError:
                 bittensor.logging.warning(
                     f"Rizzo validator not running on subnet {netuid}"
@@ -218,7 +140,7 @@ class SubnetDataIntervals(SubnetDataBase):
                 bittensor.logging.info(f"Attempt {attempt+1}: {netuids_remaining}")
                 mgs = await asyncio.gather(
                     *[
-                        self.get_metagraph_for_netuid_at_block(
+                        self._get_metagraph_for_netuid_at_block(
                             subtensor, netuid, last_weight_set_block[netuid] - 1
                         )
                         for netuid in netuids_remaining
@@ -254,7 +176,7 @@ class SubnetDataIntervals(SubnetDataBase):
 
                 # Get UID for Rizzo.
                 try:
-                    rizzo_uid = self._get_rizzo_uid(metagraph)
+                    rizzo_uid = self._get_uid(metagraph)
                 except ValueError:
                     bittensor.logging.warning(
                         f"Unable to obtain all {self._num_intervals} "
@@ -328,16 +250,7 @@ class SubnetDataIntervals(SubnetDataBase):
             f"Subnet data gathered in {get_formatted_time(total_time)}."
         )
 
-    def _get_rizzo_uid(self, metagraph):
-        if not self._other_coldkey and metagraph.netuid in MULTI_UID_HOTKEYS:
-            return metagraph.hotkeys.index(
-                RIZZO_HOTKEYS[metagraph.netuid]
-            )
-
-        coldkey = self._other_coldkey or COLDKEYS["Rizzo"]
-        return metagraph.coldkeys.index(coldkey)
-
-    async def get_metagraph_for_netuid_at_block(self, subtensor, netuid, block):
+    async def _get_metagraph_for_netuid_at_block(self, subtensor, netuid, block):
         #
         # For some reason this raises random errors:
         #     "Failed to decode type: "scale_info::580" with type id: 580"
@@ -362,7 +275,7 @@ class SubnetDataIntervals(SubnetDataBase):
         return None
 
 
-class SubnetDataIntervalsFromJson(SubnetDataBase):
+class SubnetDataIntervalsFromJson(SubnetDataBase, SubnetDataIntervalsBase):
     def __init__(self, json_folder, netuids=None, num_intervals=None):
         self._json_folder = json_folder
         self._netuids = netuids or self._get_netuids_from_json_folder()
@@ -430,7 +343,7 @@ class SubnetDataIntervalsFromJson(SubnetDataBase):
                 self._validator_data[netuid].block_data = block_data
 
 
-class SubnetDataIntervalsFromMainData(SubnetDataBase):
+class SubnetDataIntervalsFromMainData(SubnetDataBase, SubnetDataIntervalsBase):
     def __init__(
             self, netuids, validator_data_main, json_intervals_folder,
             num_intervals=None
