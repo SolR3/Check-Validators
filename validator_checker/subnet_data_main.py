@@ -7,12 +7,11 @@ import bittensor
 # standart imports
 import asyncio
 from dataclasses import dataclass, make_dataclass, asdict
-# import json
 import numpy
 import time
 
 # Local imports
-from constants import (
+from .constants import (
     MIN_VTRUST_THRESHOLD,
     MAX_U_THRESHOLD,
     COLDKEYS,

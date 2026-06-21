@@ -5,7 +5,7 @@ from rich.console import Console
 import time
 
 # Local imports
-from constants import (
+from .constants import (
     VTRUST_ERROR_THRESHOLD,
     VTRUST_WARNING_THRESHOLD,
     UPDATED_ERROR_THRESHOLD,

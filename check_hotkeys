@@ -8,11 +8,8 @@ from rich.console import Console
 import sys
 import time
 
-# Add local subnet_data module path
-sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
-
-# Local imports
-from constants import OWNED_SUBNETS
+# Add local validator_checker module path
+sys.path = [os.path.dirname(__file__)] + sys.path
 
 
 def _parse_args():
@@ -55,7 +52,7 @@ def main(options):
     if options.verbose:
         bittensor.logging.enable_info()
 
-    network = utils.get_lite_subtensor_network(options.local_lite_subtensor)
+    network = get_lite_subtensor_network(options.local_lite_subtensor)
 
     start_time = time.time()
     subnet_data = SubnetDataMain(
@@ -88,7 +85,7 @@ def main(options):
     Console().print(text)
 
     total_time = round(time.time() - start_time)
-    print(f"\nSubnet data gathering took {utils.get_formatted_time(total_time)}.\n")
+    print(f"\nSubnet data gathering took {get_formatted_time(total_time)}.\n")
 
 
 if __name__ == "__main__":
@@ -98,8 +95,12 @@ if __name__ == "__main__":
         # Import bittensor and local modules after parsing args to keep the
         # bittensor module from overriding the --help arg.
         import bittensor
-        from subnet_data_main import SubnetDataMain
-        import utils
+        from validator_checker.constants import OWNED_SUBNETS
+        from validator_checker.subnet_data_main import SubnetDataMain
+        from validator_checker.utils import (
+            get_formatted_time,
+            get_lite_subtensor_network,
+        )
 
         main(options)
 

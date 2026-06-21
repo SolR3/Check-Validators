@@ -9,15 +9,14 @@ from rich.text import Text
 import sys
 import time
 
-# Set path to import local modules
-sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
+# Add local validator_checker module path
+sys.path = [os.path.dirname(__file__)] + sys.path
 
-# Import local constants
-from constants import (
-    DEFAULT_NUM_INTERVALS_JSON,
-    DEFAULT_NUM_INTERVALS_NO_JSON,
-    TIMESTAMP_FILE_NAME,
-)
+# Import local constants used by the arg parser
+from validator_checker.constants import (
+        DEFAULT_NUM_INTERVALS_JSON,
+        DEFAULT_NUM_INTERVALS_NO_JSON,
+    )
 
 
 def parse_args():
@@ -116,7 +115,7 @@ def main(options):
             other_coldkey=options.coldkey
         )
     total_time = round(time.time() - start_time)
-    print(f"\nSubnet data gathering took {utils.get_formatted_time(total_time)}.\n")
+    print(f"\nSubnet data gathering took {get_formatted_time(total_time)}.\n")
 
     RichPrinter(
         netuids=subnet_data.netuids,
@@ -135,12 +134,15 @@ if __name__ == "__main__":
         # Import bittensor and local modules after parsing args to keep the
         # bittensor module from overriding the --help arg.
         import bittensor
-        from subnet_data_intervals import (
+        from validator_checker.constants import (
+            TIMESTAMP_FILE_NAME,
+        )
+        from validator_checker.subnet_data_intervals import (
             SubnetDataIntervals,
             SubnetDataIntervalsFromJson
         )
-        from subnet_printer_intervals import RichPrinter
-        import utils
+        from validator_checker.subnet_printer_intervals import RichPrinter
+        from validator_checker.utils import get_formatted_time
 
         main(options)
 

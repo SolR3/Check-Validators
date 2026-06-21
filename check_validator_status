@@ -6,8 +6,8 @@ import os
 import sys
 import time
 
-# Set path to import local modules
-sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
+# Add local validator_checker module path
+sys.path = [os.path.dirname(__file__)] + sys.path
 
 
 def _parse_args():
@@ -70,7 +70,7 @@ def main(options):
     if options.verbose:
         bittensor.logging.enable_info()
 
-    network = utils.get_lite_subtensor_network(options.local_lite_subtensor)
+    network = get_lite_subtensor_network(options.local_lite_subtensor)
     sort_subnets = not bool(options.netuids)
     print_total_emission = not (options.chk_only or options.missing_chk or bool(options.netuids))
 
@@ -85,7 +85,7 @@ def main(options):
     total_time = round(time.time() - start_time)
 
     subnet_data_printer.print_validator_data()
-    print(f"\nSubnet data gathering took {utils.get_formatted_time(total_time)}.\n")
+    print(f"\nSubnet data gathering took {get_formatted_time(total_time)}.\n")
 
 
 if __name__ == "__main__":
@@ -95,9 +95,12 @@ if __name__ == "__main__":
         # Import bittensor and local modules after parsing args to keep the
         # bittensor module from overriding the --help arg.
         import bittensor
-        from subnet_data_main import SubnetDataMain
-        from subnet_printer_status import SubnetDataPrinter
-        import utils
+        from validator_checker.subnet_data_main import SubnetDataMain
+        from validator_checker.subnet_printer_status import SubnetDataPrinter
+        from validator_checker.utils import (
+            get_formatted_time,
+            get_lite_subtensor_network,
+        )
 
         main(options)
 

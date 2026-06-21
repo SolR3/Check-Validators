@@ -11,16 +11,16 @@ import time
 import bittensor
 
 # Local imports
-from constants import (
+from .constants import (
     SUBNET_PRICE_FILE_NAME,
     TAOSTATS_HEADERS,
 )
-from json_writer_base import (
+from .json_writer_base import (
     JsonWriterBase,
     LoopRunnerBase,
     mp_queue,
 )
-from utils import (
+from .utils import (
     get_formatted_time,
     get_json_file_name,
     SubtensorConnectionError,

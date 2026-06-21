@@ -14,7 +14,7 @@ import re
 import time
 
 # Local imports
-from constants import (
+from .constants import (
     MIN_VTRUST_THRESHOLD,
     MAX_U_THRESHOLD,
     COLDKEYS,
@@ -22,7 +22,7 @@ from constants import (
     RIZZO_HOTKEYS,
     DATA_FILE_NAME,
 )
-from utils import (
+from .utils import (
     get_formatted_time,
     get_json_file_name,
 )

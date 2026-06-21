@@ -2,7 +2,7 @@
 from rich.text import Text
 
 # Local imports
-from subnet_printer_base import TablePrinterBase
+from .subnet_printer_base import TablePrinterBase
 
 
 class SubnetDataPrinter:

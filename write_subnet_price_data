@@ -5,8 +5,8 @@ import argparse
 import os
 import sys
 
-# Import local module
-sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
+# Add local validator_checker module path
+sys.path = [os.path.dirname(__file__)] + sys.path
 
 
 def _parse_args():
@@ -58,6 +58,9 @@ if __name__ == "__main__":
 
     # Import bittensor and local modules after parsing args to keep the
     # bittensor module from overriding the --help arg.
-    from json_writer_price import JsonWriterPrice, LoopRunnerPrice
+    from validator_checker.json_writer_price import (
+        JsonWriterPrice,
+        LoopRunnerPrice,
+    )
 
     main(options)

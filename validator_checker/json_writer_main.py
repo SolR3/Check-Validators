@@ -9,15 +9,15 @@ import time
 import bittensor
 
 # Local imports
-from constants import DATA_FILE_NAME
-from json_writer_base import (
+from .constants import DATA_FILE_NAME
+from .json_writer_base import (
     JsonWriterBase,
     LoopRunnerBase,
     mp_queue,
 )
-from subnet_data_main import SubnetDataMain
-from subnet_data_intervals import SubnetDataIntervalsFromMainData
-from utils import (
+from .subnet_data_main import SubnetDataMain
+from .subnet_data_intervals import SubnetDataIntervalsFromMainData
+from .utils import (
     get_formatted_time,
     get_json_file_name,
     SubtensorConnectionError,

@@ -4,7 +4,7 @@ import random
 
 
 # Import local constants
-from constants import LOCAL_LITE_SUBTENSORS
+from .constants import LOCAL_LITE_SUBTENSORS
 
 
 class SubtensorConnectionError(Exception):

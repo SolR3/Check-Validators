@@ -7,15 +7,8 @@ import os
 import sys
 import time
 
-# Set path to import local modules
-sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
-
-# Local modules imports
-from utils import (
-    get_formatted_time,
-    get_lite_subtensor_network,
-    SubtensorConnectionError,
-)
+# Add local validator_checker module path
+sys.path = [os.path.dirname(__file__)] + sys.path
 
 
 def _parse_args():
@@ -119,6 +112,14 @@ if __name__ == "__main__":
     # Import bittensor and local modules after parsing args to keep the
     # bittensor module from overriding the --help arg.
     import bittensor
-    from dereg_monitor import DeregCheckerSubtensor, DeregCheckerJson
+    from validator_checker.dereg_monitor import (
+        DeregCheckerSubtensor,
+        DeregCheckerJson,
+    )
+    from validator_checker.utils import (
+        get_formatted_time,
+        get_lite_subtensor_network,
+        SubtensorConnectionError,
+    )
 
     main(args)

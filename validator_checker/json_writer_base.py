@@ -9,11 +9,11 @@ import time
 import bittensor
 
 # Local imports
-from constants import (
+from .constants import (
     LOCAL_TIMEZONE,
     TIMESTAMP_FILE_NAME,
 )
-from utils import (
+from .utils import (
     get_formatted_time,
     get_lite_subtensor_network,
     SubtensorConnectionError,

@@ -5,11 +5,11 @@ import argparse
 import os
 import sys
 
-# Set path to import local modules
-sys.path = [os.path.join(os.path.dirname(__file__), "python")] + sys.path
+# Add local validator_checker module path
+sys.path = [os.path.dirname(__file__)] + sys.path
 
-# Import local constants
-from constants import DEFAULT_NUM_INTERVALS_JSON
+# Import local constants used by the arg parser
+from validator_checker.constants import DEFAULT_NUM_INTERVALS_JSON
 
 
 def _parse_args():
@@ -74,6 +74,9 @@ if __name__ == "__main__":
 
     # Import bittensor and local modules after parsing args to keep the
     # bittensor module from overriding the --help arg.
-    from json_writer_intervals import JsonWriterIntervals, LoopRunnerIntervals
+    from validator_checker.json_writer_intervals import (
+        JsonWriterIntervals,
+        LoopRunnerIntervals,
+    )
 
     main(options)

@@ -11,11 +11,11 @@ import time
 import bittensor
 
 # Local modules imports
-from constants import (
+from .constants import (
     COLDKEYS,
     DATA_FILE_NAME,
 )
-from utils import (
+from .utils import (
     get_json_file_name,
     SubtensorConnectionError,
 )
