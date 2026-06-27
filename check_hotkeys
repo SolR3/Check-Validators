@@ -72,9 +72,9 @@ def main(options):
 
         take = int(round(validator_data.rizzo_hotkey_chk_take * 100))
         if netuid in OWNED_SUBNETS:
-            take_color = 9 if take > 0 else 15
+            take_color = 9 if take > 0 else 10
         else:
-            take_color = 9 if take < 9 else 15
+            take_color = 9 if take < 2 else 11 if take < 9 else 10
 
         text.append(f"\n{netuid:3}: ")
         if not options.coldkey:
