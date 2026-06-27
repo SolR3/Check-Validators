@@ -30,6 +30,7 @@ class SubnetDataIntervalsBase:
     @dataclass
     class ValidatorData:
         subnet_emission: float
+        subnet_alpha_price: float
         blocks: list[int]
         block_data: list[SubnetDataIntervalsBase.BlockData]
 
@@ -86,12 +87,17 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
         last_weight_set_block = {}
         for ni, netuid in enumerate(all_netuids):
             metagraph = metagraphs[ni]
+
             # Get emission percentages.
             # Multiplying by 2 since tao has been halved?
             subnet_emission = metagraph.emissions.tao_in_emission * 100 * 2
 
+            # Get alpha price for the subnet.
+            subnet_alpha_price = metagraph.pool.tao_in / metagraph.pool.alpha_in
+
             self._validator_data[netuid] = self.ValidatorData(
                 subnet_emission=subnet_emission,
+                subnet_alpha_price=subnet_alpha_price,
                 blocks=[],
                 block_data=[],
             )
@@ -298,6 +304,7 @@ class SubnetDataIntervalsFromJson(SubnetDataBase, SubnetDataIntervalsBase):
         for netuid in self._netuids:
             self._validator_data[netuid] = self.ValidatorData(
                 subnet_emission=None,
+                subnet_alpha_price=None,
                 blocks=[],
                 block_data=[],
             )
@@ -333,6 +340,7 @@ class SubnetDataIntervalsFromJson(SubnetDataBase, SubnetDataIntervalsBase):
                 )
 
             self._validator_data[netuid].subnet_emission = subnet_data["subnet_emission"]
+            self._validator_data[netuid].subnet_alpha_price = subnet_data["subnet_alpha_price"]
             if self._num_intervals:
                 self._validator_data[netuid].blocks = subnet_data["blocks"][:self._num_intervals]
                 self._validator_data[netuid].block_data = block_data[:self._num_intervals]
@@ -365,6 +373,7 @@ class SubnetDataIntervalsFromMainData(SubnetDataBase, SubnetDataIntervalsBase):
 
             self._validator_data[netuid] = self.ValidatorData(
                 subnet_emission=main_data["subnet_emission"],
+                subnet_alpha_price=main_data["subnet_alpha_price"],
                 blocks=[],
                 block_data=[],
             )
