@@ -2,21 +2,32 @@
 from rich.text import Text
 
 # Local imports
+from .constants import COLDKEYS
 from .subnet_printer_base import TablePrinterBase
 
 
 class SubnetDataPrinter:
     def __init__(
             self, validator_data, netuids, chk_only, missing_chk,
-            sort_subnets, print_total_emission, vali_name,
+            sort_subnets, print_total_emission, coldkey,
         ):
         self._netuids = netuids
         self._chk_only = chk_only
         self._missing_chk = missing_chk
         self._sort_subnets = sort_subnets
         self._print_total_emission = print_total_emission
-        self._vali_name = vali_name
         self._validator_data = validator_data
+        self._vali_name = self._get_vali_name(coldkey)
+
+    def _get_vali_name(self, coldkey):
+        if not coldkey:
+            return "Rizzo"
+
+        for vali_name in COLDKEYS:
+            if coldkey.lower().replace(".", "_") == vali_name.lower():
+                return coldkey.capitalize()
+
+        return coldkey[:6] + "..."
 
     def print_validator_data(self):
         printer = TablePrinter(self._vali_name)

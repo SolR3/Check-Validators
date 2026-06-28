@@ -7,11 +7,11 @@ from .subnet_printer_base import TablePrinterBase
 
 class SubnetDataPrinter:
     def __init__(
-            self, validator_data, netuids, pending, vali_name,
+            self, validator_data, netuids, pending,
         ):
         self._netuids = netuids
         self._pending = pending
-        self._vali_name = vali_name
+        self._vali_name = "Rizzo"
         self._validator_data = validator_data
 
     def print_validator_data(self):

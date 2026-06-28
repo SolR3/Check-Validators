@@ -71,20 +71,16 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         "ValidatorHotkeys", [(k, str) for k in COLDKEYS]
     )
 
-    def __init__(
-            self, network, netuids=None, chunk_size=0,
-            other_coldkey=None, other_chk_hotkey=None
-        ):
+    def __init__(self, network, netuids=None, chunk_size=0, other_coldkey=None):
         self._netuids = netuids
         self._network = network
         self._chunk_size = chunk_size
         self._other_coldkey = self._get_other_coldkey(other_coldkey)
-        self._other_chk_hotkey = other_chk_hotkey
 
         super().__init__()
 
     def _get_chk_hotkey(self):
-        return self._other_chk_hotkey or RIZZO_CHK_HOTKEY
+        return RIZZO_CHK_HOTKEY
 
     def _get_subnet_data(self):
         asyncio.run(self._async_get_subnet_data())

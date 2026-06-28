@@ -80,7 +80,7 @@ def main(options):
     )
     subnet_data_printer = SubnetDataPrinter(
         subnet_data.validator_data, subnet_data.netuids, options.chk_only, options.missing_chk,
-         sort_subnets, print_total_emission, options.vali_name
+         sort_subnets, print_total_emission, options.coldkey
     )
     total_time = round(time.time() - start_time)
 

@@ -37,17 +37,6 @@ def _parse_args():
     )
 
     parser.add_argument(
-        "-k", "--hotkey",
-        help="Specify a different hotkey to check than Rizzo."
-    )
-
-    parser.add_argument(
-        "-n", "--vali-name",
-        default="Rizzo",
-        help="Specify a different validator name in the table printout."
-    )
-
-    parser.add_argument(
         "-v", "--verbose",
         action="store_true",
         help="Print verbose output."
@@ -63,11 +52,9 @@ def main(options):
     network = get_lite_subtensor_network(options.local_lite_subtensor)
 
     start_time = time.time()
-    subnet_data = SubnetDataMain(
-        network, netuids=options.netuids, other_chk_hotkey=options.hotkey
-    )
+    subnet_data = SubnetDataMain(network, netuids=options.netuids)
     subnet_data_printer = SubnetDataPrinter(
-        subnet_data.validator_data, subnet_data.netuids, options.pending, options.vali_name,
+        subnet_data.validator_data, subnet_data.netuids, options.pending,
     )
     total_time = round(time.time() - start_time)
 
