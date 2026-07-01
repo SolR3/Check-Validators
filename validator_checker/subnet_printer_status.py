@@ -2,7 +2,11 @@
 from rich.text import Text
 
 # Local imports
-from .constants import COLDKEYS
+from .constants import (
+    COLDKEYS,
+    EPSILON,
+    TAO,
+)
 from .subnet_printer_base import TablePrinterBase
 
 
@@ -54,7 +58,6 @@ class SubnetDataPrinter:
                 if self._sort_subnets else self._validator_data.keys()
             )
 
-        epsilon = 1e-5
         for netuid in netuids:
             if netuid not in self._validator_data:
                 missing_data.append(str(netuid))
@@ -65,7 +68,7 @@ class SubnetDataPrinter:
             if self._chk_only and not validator_data.child_hotkey_data:
                 continue
 
-            if self._missing_chk and validator_data.missing_chk <= epsilon:
+            if self._missing_chk and validator_data.missing_chk <= EPSILON:
                 continue
 
             if validator_data.rizzo_emission is not None:
@@ -109,8 +112,6 @@ class TablePrinter(TablePrinterBase):
         return column_headers
 
     def _get_row(self, validator_data):
-        epsilon = 1e-5
-
         rizzo_vtrust_status = self._get_vtrust_status(
             validator_data.rizzo_vtrust, validator_data.avg_vtrust
         )
@@ -126,7 +127,7 @@ class TablePrinter(TablePrinterBase):
         )
 
         missing_chk_status = (
-            2 if validator_data.missing_chk > epsilon
+            2 if validator_data.missing_chk > EPSILON
             else 0
         )
 
@@ -144,7 +145,7 @@ class TablePrinter(TablePrinterBase):
             chk_fraction_value = int(round(validator_data.chk_fraction * 100))
             chk_vtrust_value = f"{chk_vtrust_value} ({chk_fraction_value}%)"
 
-        if validator_data.missing_chk > epsilon:
+        if validator_data.missing_chk > EPSILON:
             missing_chk_value = int(round(validator_data.missing_chk * 100))
             missing_chk_value = f"{missing_chk_value}%"
         else:
@@ -176,7 +177,7 @@ class TablePrinter(TablePrinterBase):
                 )
             ),
             Text(f"{validator_data.subnet_emission:.2f}%"),
-            Text(f"{validator_data.subnet_alpha_price:.4f}{self._tao}"),
+            Text(f"{validator_data.subnet_alpha_price:.4f}{TAO}"),
             Text(
                 f"{validator_data.num_valid_validators:>2}  "
                 f"({validator_data.num_total_validators})"

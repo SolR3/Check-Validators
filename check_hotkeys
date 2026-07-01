@@ -68,13 +68,13 @@ def main(options):
             or (not options.coldkey and validator_data.rizzo_expected_hotkey)
             or "---"
         )
-        hotkey_color = 15 if validator_data.validator_hotkeys.Rizzo else 9
+        hotkey_color = WHITE if validator_data.validator_hotkeys.Rizzo else RED
 
         take = int(round(validator_data.rizzo_hotkey_chk_take * 100))
         if netuid in OWNED_SUBNETS:
-            take_color = 9 if take > 0 else 10
+            take_color = RED if take > 0 else GREEN
         else:
-            take_color = 9 if take < 2 else 11 if take < 9 else 10
+            take_color = RED if take < 2 else YELLOW if take < 9 else GREEN
 
         text.append(f"\n{netuid:3}: ")
         if not options.coldkey:
@@ -95,7 +95,13 @@ if __name__ == "__main__":
         # Import bittensor and local modules after parsing args to keep the
         # bittensor module from overriding the --help arg.
         import bittensor
-        from validator_checker.constants import OWNED_SUBNETS
+        from validator_checker.constants import (
+            OWNED_SUBNETS,
+            GREEN,
+            RED,
+            YELLOW,
+            WHITE,
+        )
         from validator_checker.subnet_data_main import SubnetDataMain
         from validator_checker.utils import (
             get_formatted_time,

@@ -2,6 +2,11 @@
 from rich.text import Text
 
 # Local imports
+from .constants import (
+    EPSILON,
+    TAB,
+    TAO,
+)
 from .subnet_printer_base import TablePrinterBase
 
 
@@ -71,7 +76,6 @@ class TablePrinter(TablePrinterBase):
         chk_takes = []
         chk_vtrusts = []
         chk_updateds = []
-        epsilon = 1e-5
         
         child_hotkey_data = getattr(validator_data, self._child_hotkey_attr)
 
@@ -94,16 +98,16 @@ class TablePrinter(TablePrinterBase):
                 or child_hotkey.hotkey == validator_data.rizzo_expected_hotkey
             ):
                 hotkey_take_status = (
-                    2 if child_hotkey.take + epsilon < 0.09
+                    2 if child_hotkey.take + EPSILON < 0.09
                     else 0
                 )
             else:
                 # If this is NOT the rizzo hotkey then the take should ideally be 0%
                 # but always 2% or less.
                 hotkey_take_status = (
-                    2 if child_hotkey.take + epsilon >= 0.09
+                    2 if child_hotkey.take + EPSILON >= 0.09
                     else (
-                        1 if child_hotkey.take - epsilon > 0.0
+                        1 if child_hotkey.take - EPSILON > 0.0
                         else 0
                     )
                 )
@@ -163,7 +167,7 @@ class TablePrinter(TablePrinterBase):
                 style=self._get_style(row_status)
             ),
             Text(f"{validator_data.subnet_emission:.2f}%"),
-            Text(f"{validator_data.subnet_alpha_price:.4f}{self._tao}"),
+            Text(f"{validator_data.subnet_alpha_price:.4f}{TAO}"),
             Text.assemble(*chk_percents),
             Text.assemble(*chk_takes),
             Text.assemble(*chk_vtrusts),
@@ -179,7 +183,7 @@ class TablePrinter(TablePrinterBase):
                 Text(
                     "\nThe following subnets do not have child hotkeys."
                     "\n===================="
-                    f"\n{self._tab}{', '.join(sorted(no_chk_subntets))}",
+                    f"\n{TAB}{', '.join(sorted(no_chk_subntets))}",
                     style=self._get_style(1)
                 )
             )

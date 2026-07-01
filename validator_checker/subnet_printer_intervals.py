@@ -9,15 +9,14 @@ from .constants import (
     UPDATED_WARNING_THRESHOLD,
     VTRUST_ERROR_THRESHOLD,
     VTRUST_WARNING_THRESHOLD,
+    GREEN,
+    RED,
+    YELLOW,
+    TAO,
 )
 
 
 class RichPrinter:
-    _red = "9"
-    _green = "10"
-    _yellow = "11"
-    _tao = "\u03c4"
-
     def __new__(cls, *args, **kwargs):
         if kwargs["print_tables"]:
             return super().__new__(RichTablePrinter)
@@ -35,11 +34,11 @@ class RichPrinter:
     @classmethod
     def get_style(cls, status):
         if status == 2:
-            return f"color({cls._red})"
+            return f"color({RED})"
         elif status == 1:
-                return f"color({cls._yellow})"
+                return f"color({YELLOW})"
         else:
-            return f"color({cls._green})"
+            return f"color({GREEN})"
     
     def _get_blocks_status(self, blocks):
         if blocks is None:
@@ -88,7 +87,7 @@ class RichTextPrinter(RichPrinter):
                 continue
 
             text.append(f"\nSubnet {netuid} ({subnet_data.subnet_emission:.2f}% "
-                        f"- {subnet_data.subnet_alpha_price:.4f}{self._tao}):")
+                        f"- {subnet_data.subnet_alpha_price:.4f}{TAO}):")
 
             interval_blocks = []
             interval_vtrusts = []
@@ -134,7 +133,7 @@ class RichTablePrinter(RichPrinter):
             subnet_data = self._validator_data[netuid]
 
             table = Table(title=f"\nSubnet {netuid} ({subnet_data.subnet_emission:.2f}% "
-                          f"- {subnet_data.subnet_alpha_price:.4f}{self._tao}):")
+                          f"- {subnet_data.subnet_alpha_price:.4f}{TAO}):")
             table.add_column("", justify="center", no_wrap=True)
 
             blocks_row = ["Updated"]

@@ -10,33 +10,31 @@ from .constants import (
     VTRUST_WARNING_THRESHOLD,
     UPDATED_ERROR_THRESHOLD,
     UPDATED_WARNING_THRESHOLD,
+    BLUE,
+    GREEN,
+    RED,
+    WHITE,
+    YELLOW,
+    TAB,
 )
 
 
 class RichPrinterBase:
-    _blue = "12"
-    _red = "9"
-    _green = "10"
-    _yellow = "11"
-    _white = "15"
-    _tab = "    "
-    _tao = "\u03c4"
-
     def __init__(self):
         self._console = Console()
 
     @classmethod
     def _get_style(cls, status):
         if status == 2:
-            return f"color({cls._red})"
+            return f"color({RED})"
         if status == 1:
-                return f"color({cls._yellow})"
+                return f"color({YELLOW})"
         if status == 0:
-            return f"color({cls._green})"
+            return f"color({GREEN})"
         if status == -1:
-            return f"color({cls._white})"
+            return f"color({WHITE})"
         if status == -2:
-            return f"color({cls._blue})"
+            return f"color({BLUE})"
         return ""
 
     @staticmethod
@@ -131,7 +129,7 @@ class TablePrinterBase(RichPrinterBase):
                     "\nFailed to obtain data from the following subnets."
                     "\n(Try running these separately)"
                     "\n===================="
-                    f"\n{self._tab}{', '.join(sorted(missing_data))}",
+                    f"\n{TAB}{', '.join(sorted(missing_data))}",
                     style=self._get_style(2)
                 )
             )
