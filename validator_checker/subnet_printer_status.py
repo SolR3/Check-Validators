@@ -98,7 +98,8 @@ class TablePrinter(TablePrinterBase):
             "CHK vT",
             "CHK ?",
             f"{self._vali_name} vT",
-            "Rt21 vT Gap",
+            # "Rt21 vT Gap",
+            "Tao.com vT Gap",
             "Yuma vT Gap",
             "Max vT",
             "Avg vT",
@@ -131,8 +132,11 @@ class TablePrinter(TablePrinterBase):
             else 0
         )
 
-        rt21_vtrust_gap_status = self._get_vtrust_gap_status(
-            validator_data.rt21_vtrust_gap
+        # rt21_vtrust_gap_status = self._get_vtrust_gap_status(
+        #     validator_data.rt21_vtrust_gap
+        # )
+        taocom_vtrust_gap_status = self._get_vtrust_gap_status(
+            validator_data.taocom_vtrust_gap
         )
         yuma_vtrust_gap_status = self._get_vtrust_gap_status(
             validator_data.yuma_vtrust_gap
@@ -151,12 +155,19 @@ class TablePrinter(TablePrinterBase):
         else:
             missing_chk_value = ""
 
-        rt21_vtrust_gap_value = self._get_float_value(
-            validator_data.rt21_vtrust_gap, False
+        # rt21_vtrust_gap_value = self._get_float_value(
+        #     validator_data.rt21_vtrust_gap, False
+        # )
+        # if rt21_vtrust_gap_value:
+        #     rt21_vtrust_value = self._get_float_value(validator_data.rt21_vtrust, False)
+        #     rt21_vtrust_gap_value = f"{rt21_vtrust_gap_value:>6} ({rt21_vtrust_value})"
+
+        taocom_vtrust_gap_value = self._get_float_value(
+            validator_data.taocom_vtrust_gap, False
         )
-        if rt21_vtrust_gap_value:
-            rt21_vtrust_value = self._get_float_value(validator_data.rt21_vtrust, False)
-            rt21_vtrust_gap_value = f"{rt21_vtrust_gap_value:>6} ({rt21_vtrust_value})"
+        if taocom_vtrust_gap_value:
+            taocom_vtrust_value = self._get_float_value(validator_data.taocom_vtrust, False)
+            taocom_vtrust_gap_value = f"{taocom_vtrust_gap_value:>6} ({taocom_vtrust_value})"
 
         yuma_vtrust_gap_value = self._get_float_value(
             validator_data.yuma_vtrust_gap, False
@@ -171,7 +182,8 @@ class TablePrinter(TablePrinterBase):
                 style=self._get_style(
                     max(
                         rizzo_vtrust_status, rizzo_updated_status,
-                        rt21_vtrust_gap_status, yuma_vtrust_gap_status,
+                        # rt21_vtrust_gap_status,
+                        taocom_vtrust_gap_status, yuma_vtrust_gap_status,
                         missing_chk_status
                     )
                 )
@@ -194,9 +206,13 @@ class TablePrinter(TablePrinterBase):
                 rizzo_vtrust_value,
                 style=self._get_style(rizzo_vtrust_status)
             ),
+            # Text(
+            #     rt21_vtrust_gap_value,
+            #     style=self._get_style(rt21_vtrust_gap_status)
+            # ),
             Text(
-                rt21_vtrust_gap_value,
-                style=self._get_style(rt21_vtrust_gap_status)
+                taocom_vtrust_gap_value,
+                style=self._get_style(taocom_vtrust_gap_status)
             ),
             Text(
                 yuma_vtrust_gap_value,

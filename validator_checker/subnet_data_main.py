@@ -38,6 +38,8 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         rizzo_vtrust: float | None
         rt21_vtrust: float | None
         rt21_vtrust_gap: float | None
+        taocom_vtrust: float | None
+        taocom_vtrust_gap: float | None
         yuma_vtrust: float | None
         yuma_vtrust_gap: float | None
         max_vtrust: float | None
@@ -416,6 +418,17 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         else:
             rt21_vtrust_gap = rt21_vtrust - rizzo_vtrust
 
+        # Get tao.com vTrust and gap between rizzo and tao.com
+        taocom_uid = self._get_other_vali_uid(metagraph, COLDKEYS["TAO_com"])
+        taocom_vtrust = float(metagraph.Tv[taocom_uid]) if taocom_uid is not None else None
+
+        if taocom_vtrust is None:
+            taocom_vtrust_gap = None
+        elif rizzo_vtrust is None:
+            taocom_vtrust_gap = taocom_vtrust
+        else:
+            taocom_vtrust_gap = taocom_vtrust - rizzo_vtrust
+
         # Get yuma vTrust and gap between rizzo and yuma
         yuma_uid = self._get_other_vali_uid(metagraph, COLDKEYS["Yuma"])
         yuma_vtrust = float(metagraph.Tv[yuma_uid]) if yuma_uid is not None else None
@@ -464,6 +477,8 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             rizzo_vtrust=rizzo_vtrust,
             rt21_vtrust=rt21_vtrust,
             rt21_vtrust_gap=rt21_vtrust_gap,
+            taocom_vtrust=taocom_vtrust,
+            taocom_vtrust_gap=taocom_vtrust_gap,
             yuma_vtrust=yuma_vtrust,
             yuma_vtrust_gap=yuma_vtrust_gap,
             max_vtrust=max_vtrust,
