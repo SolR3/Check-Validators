@@ -95,6 +95,12 @@ class RichPrinterBase:
             return 1
         return 0
 
+    @staticmethod
+    def _get_updated_list(updated_list, num_mechs):
+        if updated_list is None:
+            return [None] * num_mechs
+        return updated_list
+
 
 class TablePrinterBase(RichPrinterBase):
     reverse_sort = True

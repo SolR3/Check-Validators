@@ -105,6 +105,7 @@ class TablePrinter(TablePrinterBase):
             "Avg vT",
             "Min vT",
             "CHK U",
+            "Mech",
             f"{self._vali_name} U",
             "Min U",
             "Avg U",
@@ -113,19 +114,36 @@ class TablePrinter(TablePrinterBase):
         return column_headers
 
     def _get_row(self, validator_data):
+        chk_updateds = []
+        rizzo_updateds = []
+        min_updateds = []
+        avg_updateds = []
+        max_updateds = []
+        mechs = []
+
+        num_mechs = len(validator_data.subnet_mechs)
+
+        chk_updated_list = self._get_updated_list(validator_data.chk_updated, num_mechs)
+        rizzo_updated_list = self._get_updated_list(validator_data.rizzo_updated, num_mechs)
+        min_updated_list = self._get_updated_list(validator_data.min_updated, num_mechs)
+        avg_updated_list = self._get_updated_list(validator_data.avg_updated, num_mechs)
+        max_updated_list = self._get_updated_list(validator_data.max_updated, num_mechs)
+
         rizzo_vtrust_status = self._get_vtrust_status(
             validator_data.rizzo_vtrust, validator_data.avg_vtrust
         )
-        rizzo_updated_status = self._get_updated_status(
-            validator_data.rizzo_updated, validator_data.avg_updated
-        )
+        rizzo_updated_statuses = [
+            self._get_updated_status(rizzo_updated_list[i], avg_updated_list[i])
+            for i in range(num_mechs)
+        ]
 
         chk_vtrust_status = self._get_chk_vtrust_status(
             validator_data.chk_vtrust, validator_data.avg_vtrust
         )
-        chk_updated_status = self._get_updated_status(
-            validator_data.chk_updated, validator_data.avg_updated
-        )
+        chk_updated_statuses = [
+            self._get_updated_status(chk_updated_list[i], avg_updated_list[i])
+            for i in range(num_mechs)
+        ]
 
         missing_chk_status = (
             2 if validator_data.missing_chk > EPSILON
@@ -176,15 +194,42 @@ class TablePrinter(TablePrinterBase):
             yuma_vtrust_value = self._get_float_value(validator_data.yuma_vtrust, False)
             yuma_vtrust_gap_value = f"{yuma_vtrust_gap_value:>6} ({yuma_vtrust_value})"
 
+        for mi in range(num_mechs):
+            chk_updateds.extend(
+                [(self._get_int_value(chk_updated_list[mi], False), self._get_style(chk_updated_statuses[mi])), "\n"]
+            )
+            rizzo_updateds.extend(
+                [(self._get_int_value(rizzo_updated_list[mi], True), self._get_style(rizzo_updated_statuses[mi])), "\n"]
+            )
+            min_updateds.extend([self._get_int_value(min_updated_list[mi], True), "\n"])
+            avg_updateds.extend([self._get_int_value(avg_updated_list[mi], True), "\n"])
+            max_updateds.extend([self._get_int_value(max_updated_list[mi], True), "\n"])
+
+            if num_mechs > 1:
+                mechs.extend([f"{mi} ({validator_data.subnet_mechs[mi]}%)", "\n"])
+            else:
+                mechs.extend(["", "\n"])
+
+        chk_updateds.pop()
+        rizzo_updateds.pop()
+        min_updateds.pop()
+        avg_updateds.pop()
+        max_updateds.pop()
+        mechs.pop()
+
         row_columns = [
             Text(
                 str(validator_data.netuid),
                 style=self._get_style(
                     max(
-                        rizzo_vtrust_status, rizzo_updated_status,
+                        rizzo_vtrust_status,
+                        *rizzo_updated_statuses,
                         # rt21_vtrust_gap_status,
-                        taocom_vtrust_gap_status, yuma_vtrust_gap_status,
-                        missing_chk_status
+                        taocom_vtrust_gap_status,
+                        yuma_vtrust_gap_status,
+                        missing_chk_status,
+                        # chk_vtrust_status,
+                        # *chk_updated_statuses,
                     )
                 )
             ),
@@ -221,17 +266,12 @@ class TablePrinter(TablePrinterBase):
             Text(self._get_float_value(validator_data.max_vtrust, True)),
             Text(self._get_float_value(validator_data.avg_vtrust, True)),
             Text(self._get_float_value(validator_data.min_vtrust, True)),
-            Text(
-                self._get_int_value(validator_data.chk_updated, False),
-                style=self._get_style(chk_updated_status)
-            ),
-            Text(
-                self._get_int_value(validator_data.rizzo_updated, True),
-                style=self._get_style(rizzo_updated_status)
-            ),
-            Text(self._get_int_value(validator_data.min_updated, True)),
-            Text(self._get_int_value(validator_data.avg_updated, True)),
-            Text(self._get_int_value(validator_data.max_updated, True)),
+            Text.assemble(*chk_updateds),
+            Text.assemble(*mechs),
+            Text.assemble(*rizzo_updateds),
+            Text.assemble(*min_updateds),
+            Text.assemble(*avg_updateds),
+            Text.assemble(*max_updateds),
         ]
     
         return row_columns

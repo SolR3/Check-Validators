@@ -38,13 +38,6 @@ def parse_args():
              f"json folder is specified, {DEFAULT_NUM_INTERVALS_NO_JSON} "
              "when no json folder is specified."
     )
-
-    parser.add_argument(
-        "-t", "--print-tables",
-        action="store_true",
-        help="When specified, each subnet is printed as a table. Otherwise"
-             "when not specified, everything is printed as regular text."
-    )
     
     parser.add_argument(
         "-j", "--json-folder",
@@ -117,11 +110,7 @@ def main(options):
     total_time = round(time.time() - start_time)
     print(f"\nSubnet data gathering took {get_formatted_time(total_time)}.\n")
 
-    RichPrinter(
-        netuids=subnet_data.netuids,
-        validator_data=subnet_data.validator_data,
-        print_tables=options.print_tables,
-    )
+    RichPrinter(subnet_data.netuids, subnet_data.validator_data,)
 
     if timestamp_msg:
         Console().print(timestamp_msg)

@@ -64,6 +64,7 @@ class TablePrinter(TablePrinterBase):
             "CHK %",
             "Take %",
             "vTrust",
+            "Mech",
             "Updated",
             "Hotkey",
         ]
@@ -76,7 +77,10 @@ class TablePrinter(TablePrinterBase):
         chk_takes = []
         chk_vtrusts = []
         chk_updateds = []
-        
+        mechs = []
+
+        num_mechs = len(validator_data.subnet_mechs)
+        avg_updated_list = self._get_updated_list(validator_data.avg_updated, num_mechs)
         child_hotkey_data = getattr(validator_data, self._child_hotkey_attr)
 
         if not child_hotkey_data:
@@ -87,12 +91,15 @@ class TablePrinter(TablePrinterBase):
             chk_updateds = ["---", "\n"]
 
         for child_hotkey in child_hotkey_data:
+            chk_updated_list = self._get_updated_list(child_hotkey.updated, num_mechs)
+
             hotkey_vtrust_status = self._get_chk_vtrust_status(
                 child_hotkey.vtrust, validator_data.avg_vtrust
             )
-            hotkey_updated_status = self._get_updated_status(
-                child_hotkey.updated, validator_data.avg_updated
-            )
+            hotkey_updated_statuses = [
+                self._get_updated_status(chk_updated_list[i], avg_updated_list[i])
+                for i in range(num_mechs)
+            ]
             if (
                 child_hotkey.hotkey == validator_data.validator_hotkeys.Rizzo
                 or child_hotkey.hotkey == validator_data.rizzo_expected_hotkey
@@ -129,7 +136,7 @@ class TablePrinter(TablePrinterBase):
             row_status = max(
                 row_status,
                 hotkey_vtrust_status,
-                hotkey_updated_status,
+                *hotkey_updated_statuses,
                 hotkey_take_status
             )
 
@@ -146,10 +153,14 @@ class TablePrinter(TablePrinterBase):
                 [(hotkey_vtrust, self._get_style(hotkey_vtrust_status)), "\n"]
             )
 
-            hotkey_updated = self._get_int_value(child_hotkey.updated, True)
-            chk_updateds.extend(
-                [(hotkey_updated, self._get_style(hotkey_updated_status)), "\n"]
-            )
+            for mi in range(num_mechs):
+                chk_updateds.extend(
+                    [(self._get_int_value(chk_updated_list[mi], True), self._get_style(hotkey_updated_statuses[mi])), "\n"]
+                )
+                if num_mechs > 1:
+                    mechs.extend([f"{mi} ({validator_data.subnet_mechs[mi]}%)", "\n"])
+                else:
+                    mechs.extend(["", "\n"])
 
             chk_hotkeys.extend(
                 [(child_hotkey.hotkey, self._get_style(child_hotkey_status)), "\n"]
@@ -160,6 +171,7 @@ class TablePrinter(TablePrinterBase):
         chk_vtrusts.pop()
         chk_updateds.pop()
         chk_hotkeys.pop()
+        mechs.pop()
 
         row_columns = [
             Text(
@@ -171,6 +183,7 @@ class TablePrinter(TablePrinterBase):
             Text.assemble(*chk_percents),
             Text.assemble(*chk_takes),
             Text.assemble(*chk_vtrusts),
+            Text.assemble(*mechs),
             Text.assemble(*chk_updateds),
             Text.assemble(*chk_hotkeys),
         ]

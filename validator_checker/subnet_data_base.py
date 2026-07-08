@@ -90,6 +90,14 @@ class SubnetDataFromSubtensor(SubnetDataBase):
                 return uid
         return uids[0]  # I don't know if its best to return first uid or nothing.
 
+    @staticmethod
+    def _get_subnet_emission(metagraph):
+        return metagraph.emissions.tao_in_emission * 100 * 2
+
+    @staticmethod
+    def _get_subnet_alpha_price(metagraph):
+        return metagraph.pool.tao_in / metagraph.pool.alpha_in
+
     async def _async_get_subnet_data(self):
         def get_chunks():
             num_netuids = len(self._netuids)
@@ -134,3 +142,6 @@ class SubnetDataFromSubtensor(SubnetDataBase):
                         )
                     else:
                         break
+
+    async def _get_validator_data(self, *args, **kwargs):
+        raise NotImplementedError
