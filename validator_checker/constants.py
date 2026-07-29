@@ -71,7 +71,7 @@ COLDKEYS = {
 
 # This is a fix to handle the subnets on which our coldkeys is
 # registered on multiple uids.
-MULTI_UID_HOTKEYS = (20,)
+MULTI_UID_HOTKEYS = (20, 70,)
 
 OWNED_SUBNETS = (20, 45,)
 
