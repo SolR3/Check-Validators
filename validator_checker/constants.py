@@ -66,7 +66,6 @@ COLDKEYS = {
     "Yuma": "5E9fVY1jexCNVMjd2rdBsAxeamFGEMfzHcyTn2fHgdHeYc5p",
     "Kraken": "5FHxxe8ZKYaNmGcSLdG5ekxXeZDhQnk9cbpHdsJW8RunGpSs",
     "TAO_com": "5CWzmvA17MAMQ9mnAecLxFXS2N8846rz6T7m4QNHyVtJVq4j",
-    "MUV": "5CqsgERpW6dJn4AtTkfckcUd7Ab6JNVa2Hb2MhyjApYVXMUV",
 }
 
 # This is a fix to handle the subnets on which our coldkeys is
