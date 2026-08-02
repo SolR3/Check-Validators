@@ -18,6 +18,7 @@ def _parse_args():
     parser.add_argument(
         "-l", "--local-subtensor",
         dest="local_lite_subtensor",
+        nargs="?",
         default=False,
         help="Use the specified local subtensor (i.e. la, cali, titan, etc.). "
              "When not specified, use the 'finney' network subtensor."
