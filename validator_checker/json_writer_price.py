@@ -23,6 +23,7 @@ from .json_writer_base import (
 from .utils import (
     get_formatted_time,
     get_json_file_name,
+    logger,
     SubtensorConnectionError,
 )
 
@@ -52,7 +53,7 @@ class JsonWriterPrice(JsonWriterBase):
         mp_queue.put([self._tempdir])
 
     def _write_json_files_to_tmp(self):
-        bittensor.logging.info("Gathering subnet price data.")
+        logger.info("Gathering subnet price data.")
         start_time = time.time()
 
         subnet_data = self._gather_subnet_data()
@@ -66,12 +67,12 @@ class JsonWriterPrice(JsonWriterBase):
         json_file_name = get_json_file_name(SUBNET_PRICE_FILE_NAME, netuid_range)
         json_file = os.path.join(self._tempdir, json_file_name)
 
-        bittensor.logging.info(f"Writing data to file: {json_file}")
+        logger.info(f"Writing data to file: {json_file}")
         with open(json_file, "w") as fd:
             json.dump(data_dict, fd, indent=4)
 
         total_time = round(time.time() - start_time)
-        bittensor.logging.info(
+        logger.info(
             f"Subnet data gathering took {get_formatted_time(total_time)}."
         )
 
@@ -87,22 +88,22 @@ class JsonWriterPrice(JsonWriterBase):
     def _gather_subnet_data(self):
         subnet_data = {}
 
-        bittensor.logging.info("Gathering subnet price for all netuids.")
-        bittensor.logging.info(f"Connecting to network: {self._lite_network}")
+        logger.info("Gathering subnet price for all netuids.")
+        logger.info(f"Connecting to network: {self._lite_network}")
         try:
             with bittensor.Subtensor(network=self._lite_network) as subtensor:
-                subnet_prices = subtensor.get_subnet_prices()
+                subnet_prices = subtensor.prices.alpha_prices()
         except Exception as err:
-            bittensor.logging.error(f"Subtensor connection failed on '{self._lite_network}'")
-            bittensor.logging.error(f"{type(err).__name__}: {err}")
+            logger.error(f"Subtensor connection failed on '{self._lite_network}'")
+            logger.error(f"{type(err).__name__}: {err}")
             raise SubtensorConnectionError
 
-        bittensor.logging.info("Gathering tao price")
+        logger.info("Gathering tao price")
         tao_price_usd = self._get_price_from_url()
 
         del subnet_prices[0]
         for netuid in sorted(subnet_prices):
-            subnet_price_tao = subnet_prices[netuid].tao
+            subnet_price_tao = subnet_prices[netuid]
 
             if subnet_price_tao is None or tao_price_usd is None:
                 subnet_price_usd = None
@@ -124,14 +125,14 @@ class JsonWriterPrice(JsonWriterBase):
 
         response = self._query_url(url)
         if response.status_code != 200:
-            bittensor.logging.error(f"Failed to obtain data from url: {url} ({response.reason})")
+            logger.error(f"Failed to obtain data from url: {url} ({response.reason})")
             return None
 
         data = response.json()
         price = data.get("data", [{}])[0].get("price")
 
         if price is None:
-            bittensor.logging.error(f"No price data found on url: {url}")
+            logger.error(f"No price data found on url: {url}")
             return None
 
         return float(price)
@@ -145,9 +146,9 @@ class JsonWriterPrice(JsonWriterBase):
             if response.status_code != 429:
                 return response
 
-            bittensor.logging.error(f"Attempt {attempt} failed due to rate limiting on url {url}")
+            logger.error(f"Attempt {attempt} failed due to rate limiting on url {url}")
             retry_wait = wait_seconds * attempt
-            bittensor.logging.error(f"Sleeping for {retry_wait} seconds after failed attempt.")
+            logger.error(f"Sleeping for {retry_wait} seconds after failed attempt.")
             time.sleep(retry_wait)  # exponential backoff before next try
 
         return response

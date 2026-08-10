@@ -2,6 +2,7 @@
 
 # Standard imports
 import argparse
+import logging
 import multiprocessing
 import os
 import sys
@@ -9,6 +10,18 @@ import time
 
 # Add local validator_checker module path
 sys.path = [os.path.dirname(__file__)] + sys.path
+
+# local imports
+from validator_checker.dereg_monitor import (
+    DeregCheckerSubtensor,
+    DeregCheckerJson,
+)
+from validator_checker.utils import (
+    get_formatted_time,
+    get_lite_subtensor_network,
+    logger,
+    SubtensorConnectionError,
+)
 
 
 def _parse_args():
@@ -68,7 +81,7 @@ def run_subtensor_check(args):
                 pool.apply(DeregCheckerSubtensor, [args])
         except SubtensorConnectionError:
             if args.local_lite_subtensor is None:
-                bittensor.logging.error("Rotating subtensors and trying again.")
+                logger.error("Rotating subtensors and trying again.")
                 time.sleep(1)
                 continue
         break
@@ -82,8 +95,10 @@ def run_json_check(args):
     dereg_checker.run_check()
 
 
-def main(args):
-    bittensor.logging.enable_info()
+def main():
+    args = _parse_args()
+
+    logger.setLevel(logging.INFO)
 
     interval_seconds = round(args.interval * 60)
 
@@ -98,28 +113,19 @@ def main(args):
         wait_seconds = interval_seconds - total_seconds
         if wait_seconds > 0:
             wait_time_formatted = get_formatted_time(wait_seconds)
-            bittensor.logging.info(f"Waiting {wait_time_formatted}.")
+            logger.info(f"Waiting {wait_time_formatted}.")
             time.sleep(wait_seconds)
         else:
              interval_formatted = get_formatted_time(interval_seconds)
-             bittensor.logging.warning("Subnet deregistration check took longer than "
-                                       f"{interval_formatted}. Not waiting.")
+             logger.warning("Subnet deregistration check took longer than "
+                            f"{interval_formatted}. Not waiting.")
 
 
 if __name__ == "__main__":
-    args = _parse_args()
-
-    # Import bittensor and local modules after parsing args to keep the
-    # bittensor module from overriding the --help arg.
-    import bittensor
-    from validator_checker.dereg_monitor import (
-        DeregCheckerSubtensor,
-        DeregCheckerJson,
-    )
-    from validator_checker.utils import (
-        get_formatted_time,
-        get_lite_subtensor_network,
-        SubtensorConnectionError,
-    )
-
-    main(args)
+    try:
+        main()
+    except KeyboardInterrupt as exc:
+        import traceback
+        exc_list = traceback.format_exception_only(exc)
+        exc_text = "\n" + "".join(exc_list).strip("\n")
+        print(exc_text)

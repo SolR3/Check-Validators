@@ -1,14 +1,14 @@
 # Future imports
 from __future__ import annotations
 
-# bittensor import
-import bittensor
-
 # standart imports
 import asyncio
 from dataclasses import dataclass, make_dataclass
 import numpy
 import time
+
+# bittensor import
+import bittensor
 
 # Local imports
 from .constants import (
@@ -19,6 +19,7 @@ from .constants import (
     RIZZO_HOTKEYS,
 )
 from .subnet_data_base import SubnetDataFromSubtensor
+from .utils import logger
 
 
 class SubnetDataMain(SubnetDataFromSubtensor):
@@ -32,9 +33,6 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         subnet_tempo: int
         num_total_validators: int
         num_valid_validators: int
-        rizzo_stake_weight: float
-        rizzo_stake_rank: int | None
-        rizzo_emission: float | None
         rizzo_last_update: list[int] | None
         rizzo_vtrust: float | None
         rt21_vtrust: float | None
@@ -88,143 +86,128 @@ class SubnetDataMain(SubnetDataFromSubtensor):
     def _get_subnet_data(self):
         asyncio.run(self._async_get_subnet_data())
 
-    async def _get_validator_data(self, subtensor, netuids):
-        async def dummy_chk_take_func():
-            class DummyChkTake:
-                value = 0
-            return DummyChkTake()
-
+    async def _get_validator_data(self, subtensor, block, netuids):
         if type(netuids) != list:
             netuids = [netuids]
 
         start_time = time.time()
-        bittensor.logging.info(f"Obtaining data for subnets: {netuids}")
+        logger.info(f"Obtaining data for subnets: {netuids}")
 
-        # Get the block to pass to async calls so everything is in sync
-        block = await subtensor.block
+        # Get a snapshot at the current block so everything is in sync
+        snapshot = await subtensor.at(block)
 
-        # Get mechanisms for each netuid
-        mech_splits = await asyncio.gather(
+        # Get mechanisms forfor all subnets.
+        self._mech_splits = await asyncio.gather(
+            *[self._get_mech_split(snapshot, netuid) for netuid in netuids]
+        )
+
+        # Get emission percentage and alpha price for all subnets.
+        self._subnet_emissions = await asyncio.gather(
             *[
-                subtensor.get_mechanism_emission_split(netuid, block=block)
+                self._get_subnet_emission(snapshot, netuid)
                 for netuid in netuids
             ]
         )
-        # get_mechanism_emission_split will return None for subnets that have one mech
-        # so replace None with a list with a single emission value of 100%
-        mech_splits = [m or [100] for m in mech_splits]
-
-        # Get the metagraph for each netuid
-        metagraphs = await asyncio.gather(
+        self._subnet_alpha_prices = await asyncio.gather(
             *[
-                subtensor.metagraph(netuid, block=block)
+                self._get_subnet_alpha_price(snapshot, netuid)
                 for netuid in netuids
             ]
         )
 
-        # Get the metagraph info for mechs 1+ for each netuid with multiple mechs.
-        metagraph_info_results = await asyncio.gather(
+        # Get the metagraphs for all subnets.
+        self._metagraphs = await asyncio.gather(
+            *[self._get_metagraph(snapshot, netuid) for netuid in netuids]
+        )
+
+        # Get the last updated values for all mechids on all subnets.
+        last_updates_results = await asyncio.gather(
             *[
-                subtensor.get_metagraph_info(netuid, block=block, mechid=mechid)
-                for i, netuid in enumerate(netuids) for mechid in range(1, len(mech_splits[i]))
+                self._get_last_update(snapshot, netuid, mechid)
+                for i, netuid in enumerate(netuids) for mechid in range(len(self._mech_splits[i]))
             ]
         )
-        # Store the metagraph_infos in a dictionary where the keys are the netuids and the values
-        # are a list of metagraph infos for mechs 1+.
-        all_metagraph_infos = {}
-        i = 0
+        # Store the last_updates in a dictionary where the keys are the netuids and the values
+        # are a list of last_updates for each mechid.
+        self._last_updates_dict = {}
+        ri = 0
         for ni, netuid in enumerate(netuids):
-            metagraph_infos_for_netuid = []
-            for _ in range(1, len(mech_splits[ni])):
-                metagraph_infos_for_netuid.append(metagraph_info_results[i])
-                i += 1
-            all_metagraph_infos[netuid] = metagraph_infos_for_netuid
+            last_updates_for_netuid = []
+            for _ in range(len(self._mech_splits[ni])):
+                last_updates_for_netuid.append(last_updates_results[ri])
+                ri += 1
+            self._last_updates_dict[netuid] = last_updates_for_netuid
 
-        # No point in printing CHK column when checking a different
-        # coldkey until we figure out exactly how the CHK'ing is going
-        # to work for us vs. rt21 and others and the code is updated
-        # accordingly.
+        # Get the vtrust values for all subnets.
+        self._vtrusts = await asyncio.gather(
+            *[self._get_vtrust(snapshot, netuid)  for netuid in netuids]
+        )
+
         if self._other_coldkey:
-            children = [(True, [], '') for _ in netuids]
-            children_pending = [([], 0) for _ in netuids]
-            swap_child_hotkeys = dict([(n, (0.0, "")) for n in netuids])
+            self._children = [(True, [], '') for _ in netuids]
+            self._children_pending = [([], 0) for _ in netuids]
+            self._swap_child_hotkeys_dict = dict([(n, (0.0, "")) for n in netuids])
         else:
             # Get the list of child hotkeys for each netuid
-            children = await asyncio.gather(
-                *[
-                    subtensor.get_children(self._get_chk_hotkey(), netuid)
-                    for netuid in netuids
-                ]
+            self._children = await asyncio.gather(
+                *[self._get_children(snapshot, netuid) for netuid in netuids]
             )
-            swap_child_hotkeys = self._filter_swap_hotkeys(
-                metagraphs, children, False
-            )
+            self._swap_child_hotkeys_dict = self._filter_swap_hotkeys()
 
             # Get the list of pending child hotkeys for each netuid
-            children_pending = await asyncio.gather(
-                *[
-                    subtensor.get_children_pending(self._get_chk_hotkey(), netuid)
-                    for netuid in netuids
-                ]
+            self._children_pending = await asyncio.gather(
+                *[self._get_pending_children(snapshot, netuid) for netuid in netuids]
             )
-            # self._filter_swap_hotkeys(
-            #     metagraphs, children_pending, True
-            # )
 
         # Get the take for each child hotkey on each netuid.
-        chk_takes_dict = await self._get_child_hotkey_take_data(
-            subtensor, netuids, children, False
+        self._chk_takes_dict = await self._get_child_hotkey_take_data(
+            snapshot, netuids, False
         )
 
         # Get the take for each pending child hotkey on each netuid.
-        chk_takes_pending_dict = await self._get_child_hotkey_take_data(
-            subtensor, netuids, children_pending, True
+        self._chk_takes_pending_dict = await self._get_child_hotkey_take_data(
+            snapshot, netuids, True
         )
 
         # Get the CHK take for all of our local swap hotkeys so we can ensure
         # that only the hotkeys on subnets that we own have 0% take. These will
         # be displayed next to the hotkeys in the Subnet Hotkeys tab on the
         # ValidatorStatus web page.
+        async def dummy_chk_take_func():
+            class DummyChkTake:
+                value = 0
+            return DummyChkTake()
+
         chk_take_func_calls = []
         for netuid in netuids:
             hotkey = RIZZO_HOTKEYS.get(netuid)
             if hotkey:
                 chk_take_func_calls.append(
-                    subtensor.query_subtensor("ChildkeyTake", params=[hotkey, netuid])
+                    snapshot.query(
+                        bittensor.storage.SubtensorModule.ChildkeyTake,
+                        params=[hotkey, netuid]
+                    )
                 )
             else:
                 chk_take_func_calls.append(dummy_chk_take_func())
-        rizzo_hotkey_chk_takes = [
-            bittensor.u16_normalized_float(r.value)
-            for r in await asyncio.gather(*chk_take_func_calls)
+        rizzo_hotkey_chk_takes_result = await asyncio.gather(*chk_take_func_calls)
+        self._rizzo_hotkey_chk_takes = [
+            t / bittensor.settings.U16_MAX for t in rizzo_hotkey_chk_takes_result
         ]
 
         # Get all of the rest of the data from the metagraph.
-        for i, netuid in enumerate(netuids):
-            subnet_mechs = mech_splits[i]
-            metagraph = metagraphs[i]
-            metagraph_infos = all_metagraph_infos[netuid]
-            child_hotkeys = children[i][1]
-            child_takes = chk_takes_dict.get(netuid, [])
-            swap_child_hotkey = swap_child_hotkeys[netuid]
-            child_hotkeys_pending, chk_pending_block = children_pending[i]
-            child_takes_pending = chk_takes_pending_dict.get(netuid, [])
-            rizzo_hotkey_chk_take = rizzo_hotkey_chk_takes[i]
-            self._populate_validator_data_for_subnet(
-                netuid, subnet_mechs, metagraph, metagraph_infos, child_hotkeys, child_takes,
-                swap_child_hotkey, child_hotkeys_pending, child_takes_pending, block,
-                chk_pending_block, rizzo_hotkey_chk_take,
-            )
+        for ni, netuid in enumerate(netuids):
+            self._populate_validator_data_for_subnet(ni, netuid, block)
 
         total_time = time.time() - start_time
-        bittensor.logging.info(
+        logger.info(
             f"Data gathered in {int(total_time)} seconds for subnets: {netuids}."
         )
 
-    def _filter_swap_hotkeys(self, metagraphs, children, do_pending):
+    def _filter_swap_hotkeys(self):
         swap_child_hotkeys = {}
-        for i, netuid_element in enumerate(children):
-            metagraph = metagraphs[i]
+        for i, child_hotkeys in enumerate(self._children):
+            metagraph = self._metagraphs[i]
             swap_child_hotkeys[metagraph.netuid] = (0.0, "")
 
             uid = self._get_uid(metagraph)
@@ -234,10 +217,6 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             else:
                 hotkey = metagraph.hotkeys[uid]
 
-            if do_pending:
-                child_hotkeys = netuid_element[0]
-            else:
-                child_hotkeys = netuid_element[1]
             for hotkey_element in child_hotkeys:
                 if hotkey_element[1] == hotkey:
                     swap_child_hotkeys[metagraph.netuid] = hotkey_element
@@ -246,9 +225,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
 
         return swap_child_hotkeys
 
-    async def _get_child_hotkey_take_data(
-            self, subtensor, netuids, children, do_pending
-    ):
+    async def _get_child_hotkey_take_data(self, subtensor, netuids, do_pending):
         # Get the take for each child hotkey on each netuid.
         chk_take_func_calls = []
         chk_take_funcs_dict = {}
@@ -256,31 +233,25 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         func_call_index = 0
         for i, netuid in enumerate(netuids):
             if do_pending:
-                child_hotkeys, _ = children[i]
+                child_hotkeys = self._children_pending[i]["children"]
             else:
-                success, child_hotkeys, msg = children[i]
-                if not success:
-                     bittensor.logging.error(
-                        f"Failed to obtain child hotkeys from netuid {netuid}: {msg}"
-                    )
+                child_hotkeys = self._children[i]
 
             chk_take_funcs_dict[netuid] = []
             for _, child_hotkey in child_hotkeys:
                 chk_take_func_calls.append(
-                    subtensor.query_subtensor(
-                        "ChildkeyTake",
+                    subtensor.query(
+                        bittensor.storage.SubtensorModule.ChildkeyTake,
                         params=[child_hotkey, netuid]
                     )
                 )
                 chk_take_funcs_dict[netuid].append(func_call_index)
                 func_call_index += 1
         all_child_takes = (
-            [
-                bittensor.u16_normalized_float(r.value)
-                for r in await asyncio.gather(*chk_take_func_calls)
-            ]
+            await asyncio.gather(*chk_take_func_calls)
             if chk_take_func_calls else []
         )
+        all_child_takes = [t / bittensor.settings.U16_MAX for t in all_child_takes]
 
         # Massage the child take data to make it easier to obtain later on.
         for i, netuid in enumerate(netuids):
@@ -289,19 +260,21 @@ class SubnetDataMain(SubnetDataFromSubtensor):
 
         return chk_takes_dict
 
-    def _populate_validator_data_for_subnet(
-            self, netuid, subnet_mechs, metagraph, metagraph_infos, child_hotkeys, child_takes,
-            swap_child_hotkey, child_hotkeys_pending, child_takes_pending, current_block,
-            chk_pending_block, rizzo_hotkey_chk_take,
-    ):
-        # Convert the last_update attribues in the metagraph_info from tuples to numpy arrays
-        # and convatenate them into a list with the last_update atrribute in the metagraph.
-        # The metagraph last_update syyt is mech 0 and the metagraph_info last_update attrs
-        # are mechs 1+.
-        last_updates = [metagraph.last_update] + [
-            numpy.array(metagraph_info.last_update, dtype=int)
-            for metagraph_info in metagraph_infos
-        ]
+    def _populate_validator_data_for_subnet(self, netuid_index, netuid, current_block):
+        subnet_emission = self._subnet_emissions[netuid_index]
+        subnet_alpha_price = self._subnet_alpha_prices[netuid_index]
+        subnet_mechs = self._mech_splits[netuid_index]
+        metagraph = self._metagraphs[netuid_index]
+        child_hotkeys = self._children[netuid_index]
+        child_takes = self._chk_takes_dict.get(netuid, [])
+        swap_child_hotkey = self._swap_child_hotkeys_dict[netuid]
+        children_pending = self._children_pending[netuid_index]
+        child_hotkeys_pending = children_pending["children"]
+        chk_pending_block = children_pending["cooldown_block"]
+        child_takes_pending = self._chk_takes_pending_dict.get(netuid, [])
+        rizzo_hotkey_chk_take = self._rizzo_hotkey_chk_takes[netuid_index]
+        last_updates = self._last_updates_dict[netuid]
+        vtrust = self._vtrusts[netuid_index]
 
         # Get the hotkeys that we care about (Rizzo, Rt21, etc.)
         vali_hotkeys = {}
@@ -321,13 +294,6 @@ class SubnetDataMain(SubnetDataFromSubtensor):
                 vali_hotkeys[vali_name] = metagraph.hotkeys[vali_uid]
         validator_hotkeys = self.ValidatorHotkeys(**vali_hotkeys)
 
-        # Get emission percentage for the subnet.
-        # Multiplying by 2 since tao has been halved.
-        subnet_emission = self._get_subnet_emission(metagraph)
-
-        # Get alpha price for the subnet.
-        subnet_alpha_price = self._get_subnet_alpha_price(metagraph)
-
         # Get subnet tempo (used for determining bad Updated values)
         # subnet_tempo = subtensor.get_subnet_hyperparameters(netuid).tempo
         subnet_tempo = 360
@@ -335,28 +301,20 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         # Get Rizzo validator data
         rizzo_uid = self._get_uid(metagraph)
         if rizzo_uid is None:
-            bittensor.logging.warning(
+            logger.warning(
                 f"Rizzo validator not running on subnet {netuid}"
             )
-            rizzo_emission = None
             rizzo_vtrust = None
             rizzo_updated = None
             rizzo_last_update = None
-            rizzo_stake_weight = None
-            rizzo_stake_rank = None
         else:
-            rizzo_emission = float(metagraph.E[rizzo_uid])
-            rizzo_vtrust = float(metagraph.Tv[rizzo_uid])
+            rizzo_vtrust = vtrust[rizzo_uid]
             rizzo_updated = [
                 int(current_block - last_update[rizzo_uid]) for last_update in last_updates
             ]
             rizzo_last_update = [
                 int(last_update[rizzo_uid]) for last_update in last_updates
             ]
-            rizzo_stake_weight = float(metagraph.S[rizzo_uid])
-            rizzo_stake_rank = (
-                len(metagraph.S) - sorted(metagraph.S).index(rizzo_stake_weight)
-            )
 
         # Get child hotkey data
         chk_fraction = 0.0
@@ -375,7 +333,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
                     child_vtrust = None
                     child_updated = None
                 else:
-                    child_vtrust = float(metagraph.Tv[child_uid])
+                    child_vtrust = float(vtrust[child_uid])
                     child_updated = [
                         int(current_block - last_update[child_uid]) for last_update in last_updates
                     ]
@@ -422,7 +380,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
                     child_vtrust = None
                     child_updated = None
                 else:
-                    child_vtrust = float(metagraph.Tv[child_uid])
+                    child_vtrust = float(vtrust[child_uid])
                     child_updated = [
                         int(current_block - last_update[child_uid]) for last_update in last_updates
                     ]
@@ -438,21 +396,16 @@ class SubnetDataMain(SubnetDataFromSubtensor):
                 )
 
         # Get all validator uids that have validator permits.
-        all_uids = metagraph.uids[
-            metagraph.validator_permit & (metagraph.uids != rizzo_uid)
-        ]
+        all_uids = [v.uid for v in metagraph.validators if v.uid != rizzo_uid]
         num_total_validators = len(all_uids)
 
         # Get all validators that have proper VT and U
-        #
-        # valid_uids_vtrust = all valid uids with valid vtrust
-        # valid_uids = list of valid uids for each mechanism
-        # valid_uids_all = union of valid_uids
-        valid_uids_vtrust = all_uids[(metagraph.Tv[all_uids] > MIN_VTRUST_THRESHOLD)]
+        valid_uids_vtrust = [u for u in all_uids if (vtrust[u] > MIN_VTRUST_THRESHOLD)]
         valid_uids = [
-            valid_uids_vtrust[current_block - last_update[valid_uids_vtrust] < MAX_U_THRESHOLD]
+            [u for u in valid_uids_vtrust if (current_block - last_update[u] < MAX_U_THRESHOLD)]  
             for last_update in last_updates
         ]
+
         valid_uids_all = numpy.unique(numpy.concatenate(valid_uids))
         num_valid_validators = len(valid_uids_all)
 
@@ -466,7 +419,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
 
         # Get rt21 vTrust and gap between rizzo and rt21
         rt21_uid = self._get_other_vali_uid(metagraph, COLDKEYS["Rt21"])
-        rt21_vtrust = float(metagraph.Tv[rt21_uid]) if rt21_uid is not None else None
+        rt21_vtrust = vtrust[rt21_uid] if rt21_uid is not None else None
 
         if rt21_vtrust is None:
             rt21_vtrust_gap = None
@@ -477,7 +430,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
 
         # Get tao.com vTrust and gap between rizzo and tao.com
         taocom_uid = self._get_other_vali_uid(metagraph, COLDKEYS["TAO_com"])
-        taocom_vtrust = float(metagraph.Tv[taocom_uid]) if taocom_uid is not None else None
+        taocom_vtrust = vtrust[taocom_uid] if taocom_uid is not None else None
 
         if taocom_vtrust is None:
             taocom_vtrust_gap = None
@@ -488,7 +441,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
 
         # Get yuma vTrust and gap between rizzo and yuma
         yuma_uid = self._get_other_vali_uid(metagraph, COLDKEYS["Yuma"])
-        yuma_vtrust = float(metagraph.Tv[yuma_uid]) if yuma_uid is not None else None
+        yuma_vtrust = vtrust[yuma_uid] if yuma_uid is not None else None
 
         if yuma_vtrust is None:
             yuma_vtrust_gap = None
@@ -507,14 +460,15 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             max_updated = None
         else:
             # Get min/max/average vTrust values.
-            vtrusts = metagraph.Tv[valid_uids_all]
+            vtrusts = [vtrust[u] for u in valid_uids_all]
             max_vtrust = float(numpy.max(vtrusts))
             avg_vtrust = float(numpy.average(vtrusts))
             min_vtrust = float(numpy.min(vtrusts))
 
             # Get min/max/average Updated values.
             updateds = [
-                current_block - last_updates[i][valid_uids[i]] for i in range(len(last_updates))
+                [current_block - last_updates[i][u] for u in valid_uids[i]]
+                for i in range(len(last_updates))
             ]
             min_updated = [int(numpy.min(u)) for u in updateds]
             avg_updated = [int(numpy.round(numpy.average(u))) for u in updateds]
@@ -530,9 +484,6 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             subnet_tempo=subnet_tempo,
             num_total_validators=num_total_validators,
             num_valid_validators=num_valid_validators,
-            rizzo_stake_weight=rizzo_stake_weight,
-            rizzo_stake_rank=rizzo_stake_rank,
-            rizzo_emission=rizzo_emission,
             rizzo_last_update=rizzo_last_update,
             rizzo_vtrust=rizzo_vtrust,
             rt21_vtrust=rt21_vtrust,

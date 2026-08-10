@@ -1,11 +1,11 @@
 # Future imports
 from __future__ import annotations
 
-# bittensor import
-import bittensor
-
 # standart imports
 from dataclasses import asdict
+
+# bittensor import
+import bittensor
 
 # Local imports
 from .constants import (
@@ -13,6 +13,7 @@ from .constants import (
     MULTI_UID_HOTKEYS,
     RIZZO_HOTKEYS,
 )
+from .utils import logger
 
 
 class SubnetDataBase:
@@ -52,6 +53,7 @@ class SubnetDataFromSubtensor(SubnetDataBase):
         return other_coldkey
 
     def _get_uid(self, metagraph):
+
         if self._other_coldkey:
             return self._get_other_vali_uid(metagraph, self._other_coldkey)
 
@@ -86,17 +88,65 @@ class SubnetDataFromSubtensor(SubnetDataBase):
         # Registered with multiple uids
         uids = [i for i, c in enumerate(metagraph.coldkeys) if c == vali_coldkey]
         for uid in uids:
-            if metagraph.validator_permit[uid]:
+            if metagraph.neurons[uid].validator_permit:
                 return uid
         return uids[0]  # I don't know if its best to return first uid or nothing.
 
     @staticmethod
-    def _get_subnet_emission(metagraph):
-        return metagraph.emissions.tao_in_emission * 100 * 2
+    async def _get_subnet_emission(subtensor, netuid):
+        # Multiplying by 2 since tao has been halved
+        raw_emission = await subtensor.query(
+            bittensor.storage.SubtensorModule.SubnetTaoInEmission,
+            params=[netuid]
+        )
+        return raw_emission / bittensor.settings.RAO_PER_TAO * 100 * 2
 
     @staticmethod
-    def _get_subnet_alpha_price(metagraph):
-        return metagraph.pool.tao_in / metagraph.pool.alpha_in
+    async def _get_subnet_alpha_price(subtensor, netuid):
+        price_data = await subtensor.prices.alpha_price(netuid)
+        return price_data["tao_per_alpha"]
+
+    @staticmethod
+    async def _get_mech_split(subtensor, netuid):
+        # mechanism_emission_split will return None for subnets that have one mech
+        # so replace None with a list with a single emission value of 100%
+        mech_splits = await subtensor.subnets.mechanism_emission_split(netuid)
+        mech_splits = (
+            [round((m / bittensor.settings.U16_MAX) * 100) for m in mech_splits]
+            if mech_splits else [100]
+        )
+        return mech_splits
+
+    @staticmethod
+    async def _get_metagraph(subtensor, netuid):
+        metagraph = await subtensor.subnets.metagraph(netuid, commitments=False)
+        return metagraph
+
+    @staticmethod
+    async def _get_last_update(subtensor, netuid, mechid):
+        last_update_index = mechid * bittensor.settings.GLOBAL_MAX_SUBNET_COUNT + netuid
+        last_update = await subtensor.query(
+            bittensor.storage.SubtensorModule.LastUpdate,
+            params=[last_update_index]
+        )
+        return last_update
+
+    @staticmethod
+    async def _get_vtrust(subtensor, netuid):
+        vtrust = await subtensor.query(
+            bittensor.storage.SubtensorModule.ValidatorTrust,
+            params=[netuid]
+        )
+        return [vt / bittensor.settings.U16_MAX for vt in vtrust]
+
+    async def _get_children(self, subtensor, netuid):
+        children = await subtensor.delegation.children(self._get_chk_hotkey(), netuid)
+        return [(c[0] / (2**64 - 1), c[1]) for c in children]
+
+    async def _get_pending_children(self, subtensor, netuid):
+        pending_children = await subtensor.delegation.pending_children(self._get_chk_hotkey(), netuid)
+        pending_children["children"] = [(c[0] / (2**64 - 1), c[1]) for c in pending_children["children"]]
+        return pending_children
 
     async def _async_get_subnet_data(self):
         def get_chunks():
@@ -111,32 +161,35 @@ class SubnetDataFromSubtensor(SubnetDataBase):
                     yield self._netuids[netuid_start:netuid_end]
                     netuid_start = netuid_end
 
-        bittensor.logging.info(f"Connecting to subtensor network: {self._network}")
+        logger.info(f"Connecting to subtensor network: {self._network}")
 
-        async with bittensor.AsyncSubtensor(network=self._network) as subtensor:
+        async with bittensor.Subtensor(network=self._network) as subtensor:
+            # Get the current block.
+            block = await subtensor.block()
+
             # If netuids arg was not passed in, get all netuids from the subtensor here.
             if not self._netuids:
-                all_subnets = await subtensor.get_all_subnets_netuid()
-                self._netuids = all_subnets[1:]
+                subnets = await subtensor.subnets.all(block=block)
+                self._netuids = [sn.netuid for sn in subnets][1:]
 
             # If chunk_size is 0, get chunk_size after we know that we have the list of netuids.
             if not self._chunk_size:
                 self._chunk_size = len(self._netuids)
 
-            bittensor.logging.info(f"Gathering data in chunks of {self._chunk_size}")
+            logger.info(f"Gathering data in chunks of {self._chunk_size}")
 
             max_attempts = 5
             for netuids in get_chunks():
                 for attempt in range(1, max_attempts+1):
-                    bittensor.logging.info(f"Attempt {attempt} of {max_attempts}")
-                    await self._get_validator_data(subtensor, netuids)
+                    logger.info(f"Attempt {attempt} of {max_attempts}")
+                    await self._get_validator_data(subtensor, block, netuids)
 
                     # Get netuids missing data
                     # I don't think this is needed anymore but keeping it around
                     # just in case.
                     netuids = list(set(netuids).difference(set(self._validator_data)))
                     if netuids:
-                        bittensor.logging.error(
+                        logger.error(
                             "Failed to gather data for subnets: "
                             f"{', '.join([str(n) for n in netuids])}."
                         )

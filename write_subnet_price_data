@@ -2,11 +2,19 @@
 
 # standard imports
 import argparse
+import logging
 import os
 import sys
 
 # Add local validator_checker module path
 sys.path = [os.path.dirname(__file__)] + sys.path
+
+# local imports
+from validator_checker.json_writer_price import (
+    JsonWriterPrice,
+    LoopRunnerPrice,
+)
+from validator_checker.utils import logger
 
 
 def _parse_args():
@@ -49,18 +57,11 @@ def run(options):
     JsonWriterPrice(options)
 
 
-def main(options):
+def main():
+    options = _parse_args()
+    logger.setLevel(logging.INFO)
     LoopRunnerPrice(run, options)
 
 
 if __name__ == "__main__":
-    options = _parse_args()
-
-    # Import bittensor and local modules after parsing args to keep the
-    # bittensor module from overriding the --help arg.
-    from validator_checker.json_writer_price import (
-        JsonWriterPrice,
-        LoopRunnerPrice,
-    )
-
-    main(options)
+    main()

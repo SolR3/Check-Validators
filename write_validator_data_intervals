@@ -2,14 +2,20 @@
 
 # standard imports
 import argparse
+import logging
 import os
 import sys
 
 # Add local validator_checker module path
 sys.path = [os.path.dirname(__file__)] + sys.path
 
-# Import local constants used by the arg parser
+# local imports
 from validator_checker.constants import DEFAULT_NUM_INTERVALS_JSON
+from validator_checker.json_writer_intervals import (
+    JsonWriterIntervals,
+    LoopRunnerIntervals,
+)
+from validator_checker.utils import logger
 
 
 def _parse_args():
@@ -65,18 +71,11 @@ def run(options):
     JsonWriterIntervals(options)
 
 
-def main(options):
+def main():
+    options = _parse_args()
+    logger.setLevel(logging.INFO)
     LoopRunnerIntervals(run, options)
 
 
 if __name__ == "__main__":
-    options = _parse_args()
-
-    # Import bittensor and local modules after parsing args to keep the
-    # bittensor module from overriding the --help arg.
-    from validator_checker.json_writer_intervals import (
-        JsonWriterIntervals,
-        LoopRunnerIntervals,
-    )
-
-    main(options)
+    main()

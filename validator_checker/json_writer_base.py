@@ -5,9 +5,6 @@ import json
 import shutil
 import time
 
-# bittensor import
-import bittensor
-
 # Local imports
 from .constants import (
     LOCAL_TIMEZONE,
@@ -16,6 +13,7 @@ from .constants import (
 from .utils import (
     get_formatted_time,
     get_lite_subtensor_network,
+    logger,
     SubtensorConnectionError,
 )
 
@@ -27,8 +25,6 @@ class LoopRunnerBase:
     def __init__(self, run_func, options):
         self._run_func = run_func
         self._options = options
-
-        bittensor.logging.enable_info()
 
         self._makedirs()
         self._run_write_json_loop()
@@ -47,7 +43,7 @@ class LoopRunnerBase:
                     pool.apply(self._run_func, args)
             except SubtensorConnectionError:
                 if self._options.local_lite_subtensor is None:
-                    bittensor.logging.error("Rotating subtensors and trying again.")
+                    logger.error("Rotating subtensors and trying again.")
                     time.sleep(1)
                     continue
             finally:
@@ -64,10 +60,10 @@ class LoopRunnerBase:
             wait_seconds = self._options.interval - total_seconds
             if wait_seconds > 0:
                 wait_time_formatted = get_formatted_time(wait_seconds)
-                bittensor.logging.info(f"Waiting {wait_time_formatted}.")
+                logger.info(f"Waiting {wait_time_formatted}.")
                 time.sleep(wait_seconds)
             else:
-                bittensor.logging.warning(
+                logger.warning(
                     f"Processing took {total_seconds} seconds which is longer "
                     f"than {self._options.interval} seconds. Not waiting."
                 )
@@ -108,14 +104,14 @@ class JsonWriterBase:
                 or os.path.splitext(file_path)[1] != ".json"
             ):
                 continue
-            bittensor.logging.info(f"Removing {file_path}")
+            logger.info(f"Removing {file_path}")
             os.unlink(file_path)
 
         # Copy files from temp folder to final folder
         for file_name in os.listdir(temp_dir):
             src_file_path = os.path.join(temp_dir, file_name)
             dest_file_path = os.path.join(final_dir, file_name)
-            bittensor.logging.info(f"Moving {src_file_path} to {dest_file_path}")
+            logger.info(f"Moving {src_file_path} to {dest_file_path}")
             os.rename(src_file_path, dest_file_path)
 
     @staticmethod
@@ -154,6 +150,6 @@ class JsonWriterBase:
             timestamp = None
 
         timestamp_file = os.path.join(json_folder, TIMESTAMP_FILE_NAME)
-        bittensor.logging.info(f"Writing timestamp file: {timestamp_file}")
+        logger.info(f"Writing timestamp file: {timestamp_file}")
         with open(timestamp_file, "w") as fp:
             json.dump(timestamp, fp)

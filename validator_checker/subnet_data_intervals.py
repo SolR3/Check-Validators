@@ -1,9 +1,6 @@
 # Future imports
 from __future__ import annotations
 
-# bittensor import
-import bittensor
-
 # standart imports
 import asyncio
 from dataclasses import dataclass
@@ -23,6 +20,7 @@ from .subnet_data_base import SubnetDataBase, SubnetDataFromSubtensor
 from .utils import (
     get_formatted_time,
     get_json_file_name,
+    logger,
 )
 
 
@@ -42,7 +40,6 @@ class SubnetDataIntervalsBase:
 
     @dataclass
     class BlockData:
-        rizzo_emission: float
         rizzo_vtrust: float
         avg_vtrust: float | None
         rizzo_updated: int | None
@@ -74,42 +71,43 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
         else:
             self._existing_data = {}
 
-    async def _get_validator_data(self, subtensor, all_netuids):
+    async def _get_validator_data(self, subtensor, block, all_netuids):
         start_time = time.time()
-        bittensor.logging.info(f"Obtaining data for subnets: {all_netuids}")
+        logger.info(f"Obtaining data for subnets: {all_netuids}")
 
-        # Get the block to pass to async calls so everything is in sync
-        block = await subtensor.block
+        # Get a snapshot at the current block
+        snapshot = await subtensor.at(block)
 
-        # Get the metagraphs.
-        metagraphs = await asyncio.gather(
-            *[
-                subtensor.metagraph(netuid, block=block)
-                for netuid in all_netuids
-            ]
-        )
-
-        # Get mechanisms for each netuid
+        # Get mechanisms forfor all subnets.
         mech_splits = await asyncio.gather(
+            *[self._get_mech_split(snapshot, netuid) for netuid in all_netuids]
+        )
+
+        # Get emission percentage and alpha price for all subnets.
+        subnet_emissions = await asyncio.gather(
             *[
-                subtensor.get_mechanism_emission_split(netuid, block=block)
+                self._get_subnet_emission(snapshot, netuid)
                 for netuid in all_netuids
             ]
         )
-        # get_mechanism_emission_split will return None for subnets that have one mech
-        # so replace None with a list with a single emission value of 100%
-        mech_splits = [m or [100] for m in mech_splits]
+        subnet_alpha_prices = await asyncio.gather(
+            *[
+                self._get_subnet_alpha_price(snapshot, netuid)
+                for netuid in all_netuids
+            ]
+        )
+
+        # Get the metagraphs for all subnets.
+        metagraphs = await asyncio.gather(
+            *[self._get_metagraph(snapshot, netuid) for netuid in all_netuids]
+        )
 
         mechids_data = {}
         for ni, netuid in enumerate(all_netuids):
+            subnet_emission = subnet_emissions[ni]
+            subnet_alpha_price = subnet_alpha_prices[ni]
+            mech_split = mech_splits[ni]
             metagraph = metagraphs[ni]
-
-            # Get emission percentages.
-            # Multiplying by 2 since tao has been halved?
-            subnet_emission = self._get_subnet_emission(metagraph)
-
-            # Get alpha price for the subnet.
-            subnet_alpha_price = self._get_subnet_alpha_price(metagraph)
 
             # Initialize ValidatorData for netuid.
             self._validator_data[netuid] = self.ValidatorData(
@@ -118,7 +116,6 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
                 mech_block_data=[],
             )
 
-            mech_split = mech_splits[ni]
             for mechid, mech_emission in enumerate(mech_split):
                 # Initialize MechBlockData for netuid.
                 mech_block_data = self.MechBlockData(
@@ -139,42 +136,29 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
         for mechid, mechid_data in mechids_data.items():
             netuids = mechid_data["netuids"]
             metagraphs = mechid_data["metagraphs"]
-            await self._get_validator_data_for_mechid(subtensor, block, mechid, netuids, metagraphs)
+            await self._get_validator_data_for_mechid(subtensor, snapshot, mechid, netuids, metagraphs)
 
         total_time = round(time.time() - start_time)
-        bittensor.logging.info(
+        logger.info(
             f"Subnet data gathered in {get_formatted_time(total_time)}."
         )
 
-    async def _get_validator_data_for_mechid(self, subtensor, block, mechid, all_netuids, metagraphs):
-        if mechid:
-            # If this is mech 1+ then get the last_update atts from the metagraph_infos.
-            metagraph_infos = await asyncio.gather(
-                *[
-                    subtensor.get_metagraph_info(netuid, block=block, mechid=mechid)
-                    for netuid in all_netuids
-                ]
-            )
-            # Convert the last_update attribues in the metagraph_infos from tuples to numpy arrays.
-            last_updates = [
-                numpy.array(metagraph_info.last_update, dtype=int)
-                for metagraph_info in metagraph_infos
+    async def _get_validator_data_for_mechid(self, subtensor, snapshot, mechid, all_netuids, metagraphs):
+        last_updates = await asyncio.gather(
+            *[
+                self._get_last_update(snapshot, netuid, mechid)
+                for netuid in all_netuids
             ]
-        else:
-            # Otherwise get the last_update atts from the metagraphs.
-            last_updates = [
-                metagraph.last_update for metagraph in metagraphs
-            ]
+        )
 
         block_to_stop = {}
         last_weight_set_block = {}
         for ni, netuid in enumerate(all_netuids):
-            metagraph = metagraphs[ni]
-
             # Get UID for Rizzo.
+            metagraph = metagraphs[ni]
             rizzo_uid = self._get_uid(metagraph)
             if rizzo_uid is None:
-                bittensor.logging.warning(
+                logger.warning(
                     f"Rizzo validator not running on subnet {netuid}"
                 )
                 continue
@@ -209,14 +193,14 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
             # and it seems non-deterministic.
             # Putting this in a loop.
             #
-            metagraphs_data = {}
+            snapshots_data = {}
             netuids_remaining = netuids[:]
             max_attemps = 3
             for attempt in range(max_attemps):
-                bittensor.logging.info(f"Attempt {attempt+1}: {netuids_remaining}")
-                metagraph_data = await asyncio.gather(
+                logger.info(f"Attempt {attempt+1}: {netuids_remaining}")
+                snapshot_data = await asyncio.gather(
                     *[
-                        self._get_metagraph_data_for_netuid_at_block(
+                        self._get_snapshot_data_for_netuid_at_block(
                             subtensor, netuid, mechid, last_weight_set_block[netuid] - 1
                         )
                         for netuid in netuids_remaining
@@ -224,8 +208,8 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
                 )
                 failed_netuids = []
                 for ni, netuid in enumerate(netuids_remaining):
-                    if metagraph_data[ni]:
-                        metagraphs_data[netuid] = metagraph_data[ni]
+                    if snapshot_data[ni]:
+                        snapshots_data[netuid] = snapshot_data[ni]
                     else:
                         failed_netuids.append(netuid)
                 if not failed_netuids:
@@ -233,56 +217,49 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
                 netuids_remaining = failed_netuids
 
             for netuid in netuids:
-                if netuid not in metagraphs_data:
-                    bittensor.logging.warning(
+                if netuid not in snapshots_data:
+                    logger.warning(
                         f"Unable to obtain all {self._num_intervals} "
                         f"weight setting intervals for subnet {netuid}."
                     )
                     del block_to_stop[netuid]
                     continue
 
-                metagraph_data = metagraphs_data[netuid]
-                if not metagraph_data:
-                    bittensor.logging.warning(
+                snapshot_data = snapshots_data[netuid]
+                if not snapshot_data:
+                    logger.warning(
                         f"Unable to obtain all {self._num_intervals} "
                         f"weight setting intervals for subnet {netuid}."
                     )
                     del block_to_stop[netuid]
                     continue
 
-                metagraph, metagraph_info = metagraph_data
+                metagraph, last_update, vtrust = snapshot_data
 
-                # Get UID for Rizzo.
                 rizzo_uid = self._get_uid(metagraph)
                 if rizzo_uid is None:
-                    bittensor.logging.warning(
+                    logger.warning(
                         f"Unable to obtain all {self._num_intervals} "
                         f"weight setting intervals for subnet {netuid}."
                     )
                     del block_to_stop[netuid]
                     continue
-
-                # Convert the last_update attribue in the metagraph_info from a tuple to a numpy array.
-                last_update = (
-                    numpy.array(metagraph_info.last_update, dtype=int) if mechid
-                    else metagraph.last_update
-                )
 
                 # There's some weirdness going on with sn72. Catching it here.
                 try:
                     prev_weight_set_block = int(last_update[rizzo_uid])
                     interval = last_weight_set_block[netuid] - prev_weight_set_block
-                    rizzo_vtrust = float(metagraph.Tv[rizzo_uid])
-                    rizzo_emission = float(metagraph.E[rizzo_uid])
+                    rizzo_vtrust = vtrust[rizzo_uid]
 
                     # Get all validator uids that have validator permits.
-                    all_uids = metagraph.uids[
-                        metagraph.validator_permit & (metagraph.uids != rizzo_uid)
-                    ]
+                    all_uids = [v.uid for v in metagraph.validators if v.uid != rizzo_uid]
                     # Get all validators that have proper VT and U
-                    valid_uids = all_uids[
-                        (metagraph.Tv[all_uids] > MIN_VTRUST_THRESHOLD)
-                        & (last_weight_set_block[netuid] - last_update[all_uids] < MAX_U_THRESHOLD)
+                    valid_uids = [
+                        u for u in all_uids if (
+                            (vtrust[u] > MIN_VTRUST_THRESHOLD)
+                            and
+                            (last_weight_set_block[netuid] - last_update[u] < MAX_U_THRESHOLD)
+                        )
                     ]
 
                     if not len(valid_uids):
@@ -290,9 +267,9 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
                     else:
                         # Get min/max/average vTrust values.
                         # vtrusts = [metagraph.Tv[uid] for uid in valid_uids]
-                        avg_vtrust = float(numpy.average(metagraph.Tv[valid_uids]))
+                        avg_vtrust = float(numpy.average([vtrust[u] for u in valid_uids]))
                 except IndexError:
-                    bittensor.logging.warning(
+                    logger.warning(
                         f"Unable to obtain all {self._num_intervals} "
                         f"weight setting intervals for subnet {netuid}."
                     )
@@ -300,7 +277,6 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
                     continue
 
                 block_data = self.BlockData(
-                    rizzo_emission=rizzo_emission,
                     rizzo_vtrust=rizzo_vtrust,
                     avg_vtrust=avg_vtrust,
                     rizzo_updated=interval,
@@ -327,7 +303,7 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
                     mech_block_data.blocks = mech_block_data.blocks[:self._num_intervals]
                     mech_block_data.block_data = mech_block_data.block_data[:self._num_intervals]
 
-    async def _get_metagraph_data_for_netuid_at_block(self, subtensor, netuid, mechid, block):
+    async def _get_snapshot_data_for_netuid_at_block(self, subtensor, netuid, mechid, block):
         #
         # For some reason this raises random errors:
         #     "Failed to decode type: "scale_info::580" with type id: 580"
@@ -337,22 +313,20 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
         max_attemps = 3
         for attempt in range(max_attemps):
             try:
-                metagraph = await subtensor.metagraph(
-                    netuid, block=int(block)
-                )
-                if mechid:
-                    metagraph_info = await subtensor.get_metagraph_info(
-                        netuid, block=int(block), mechid=mechid
-                    )
-                else:
-                    metagraph_info = None
-                return metagraph, metagraph_info
+                snapshot = await subtensor.at(block)
+
+                metagraph = await self._get_metagraph(snapshot, netuid)
+                last_update = await self._get_last_update(snapshot, netuid, mechid)
+                vtrust = await self._get_vtrust(snapshot, netuid)
+
+                return (metagraph, last_update, vtrust)
+
             except Exception as err:
-                bittensor.logging.error(
+                logger.error(
                     f"failed attempt: {attempt+1}, netuid: {netuid}, block: {block}, error: {err}"
                 )
 
-        bittensor.logging.error(
+        logger.error(
             f"Failed to obtain metagraph for netuid {netuid} at block {block} "
             f"after {max_attemps} attempts."
         )
@@ -392,12 +366,12 @@ class SubnetDataIntervalsFromJson(SubnetDataBase, SubnetDataIntervalsBase):
                 self._json_folder, get_json_file_name(DATA_FILE_NAME, netuid)
             )
             if not os.path.isfile(json_file):
-                bittensor.logging.info(
+                logger.info(
                     f"Json file ({json_file}) for netuid {netuid} does not exist."
                 )
                 continue
 
-            bittensor.logging.info(
+            logger.info(
                 f"Obtaining existing data from json file ({json_file}) "
                 f"for netuid {netuid}."
             )
@@ -423,7 +397,6 @@ class SubnetDataIntervalsFromJson(SubnetDataBase, SubnetDataIntervalsBase):
                 for json_block_data in json_mech_block_data["block_data"]:
                     block_data.append(
                         self.BlockData(
-                            rizzo_emission=json_block_data["rizzo_emission"],
                             rizzo_vtrust=json_block_data["rizzo_vtrust"],
                             avg_vtrust=json_block_data["avg_vtrust"],
                             rizzo_updated=json_block_data["rizzo_updated"],
@@ -481,7 +454,7 @@ class SubnetDataIntervalsFromMainData(SubnetDataBase, SubnetDataIntervalsBase):
 
                 last_weight_block = main_data["rizzo_last_update"][mechid]
 
-                # The rizzo_emission, rizzo_vtrust, and avg_vtrust aren't 100% accurate.
+                # The rizzo_vtrust and avg_vtrust aren't 100% accurate.
                 # They're actually the current values rather than the values when weights
                 # were set. But the difference between those should never be more than
                 # 75 blocks and usually never more than 25 blocks so it's probably
@@ -489,7 +462,6 @@ class SubnetDataIntervalsFromMainData(SubnetDataBase, SubnetDataIntervalsBase):
                 #
                 # Interval defaults to None in case there is no existing intervals data.
                 block_data = self.BlockData(
-                    rizzo_emission=main_data["rizzo_emission"],
                     rizzo_vtrust=main_data["rizzo_vtrust"],
                     avg_vtrust=main_data["avg_vtrust"],
                     rizzo_updated=None,

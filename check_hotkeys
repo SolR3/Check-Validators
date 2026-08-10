@@ -2,6 +2,7 @@
 
 # standard imports
 import argparse
+import logging
 import os
 from rich.text import Text
 from rich.console import Console
@@ -10,6 +11,21 @@ import time
 
 # Add local validator_checker module path
 sys.path = [os.path.dirname(__file__)] + sys.path
+
+# local imports
+from validator_checker.constants import (
+    OWNED_SUBNETS,
+    GREEN,
+    RED,
+    YELLOW,
+    WHITE,
+)
+from validator_checker.subnet_data_main import SubnetDataMain
+from validator_checker.utils import (
+    get_formatted_time,
+    get_lite_subtensor_network,
+    logger,
+)
 
 
 def _parse_args():
@@ -49,9 +65,11 @@ def _parse_args():
     return parser.parse_args()
 
 
-def main(options):
+def main():
+    options = _parse_args()
+
     if options.verbose:
-        bittensor.logging.enable_info()
+        logger.setLevel(logging.INFO)
 
     network = get_lite_subtensor_network(options.local_lite_subtensor)
 
@@ -91,26 +109,7 @@ def main(options):
 
 if __name__ == "__main__":
     try:
-        options = _parse_args()
-
-        # Import bittensor and local modules after parsing args to keep the
-        # bittensor module from overriding the --help arg.
-        import bittensor
-        from validator_checker.constants import (
-            OWNED_SUBNETS,
-            GREEN,
-            RED,
-            YELLOW,
-            WHITE,
-        )
-        from validator_checker.subnet_data_main import SubnetDataMain
-        from validator_checker.utils import (
-            get_formatted_time,
-            get_lite_subtensor_network,
-        )
-
-        main(options)
-
+        main()
     except KeyboardInterrupt as exc:
         import traceback
         exc_list = traceback.format_exception_only(exc)

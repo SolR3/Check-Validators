@@ -17,6 +17,7 @@ from .constants import (
 )
 from .utils import (
     get_json_file_name,
+    logger,
     SubtensorConnectionError,
 )
 
@@ -31,17 +32,17 @@ class DeregChecker:
     def _compare_and_notify(self, previous_registered_list, new_registered_list):
         # First run. Only creates the list. Nothing to compare yet.
         if not previous_registered_list:
-            bittensor.logging.warning("No previous registered list to compare.")
+            logger.warning("No previous registered list to compare.")
             return
         if not new_registered_list:
-            bittensor.logging.warning("No new registered list to compare.")
+            logger.warning("No new registered list to compare.")
             return
 
         deregistered_list = sorted(set(previous_registered_list).difference(set(new_registered_list)))
 
-        bittensor.logging.info(f"Previously registered on subnets: {previous_registered_list}")
-        bittensor.logging.info(f"Currently registered on subnets:  {new_registered_list}")
-        bittensor.logging.info(f"Deregistered from subnets: {deregistered_list}")
+        logger.info(f"Previously registered on subnets: {previous_registered_list}")
+        logger.info(f"Currently registered on subnets:  {new_registered_list}")
+        logger.info(f"Deregistered from subnets: {deregistered_list}")
 
         for netuid in deregistered_list:
             message = f"We have been de-registered from subnet {netuid}"
@@ -56,14 +57,14 @@ class DeregChecker:
         ]
         monitor_cmd_str = shlex.join(monitor_cmd)
 
-        bittensor.logging.info(f"Running command: '{monitor_cmd_str}'")
+        logger.info(f"Running command: '{monitor_cmd_str}'")
         try:
             subprocess.run(monitor_cmd, check=True)
         except subprocess.CalledProcessError as exc:
-            bittensor.logging.error("Failed to send discord monitor notification.")
-            bittensor.logging.error(f"'{monitor_cmd_str}' command failed with error: {exc}")
+            logger.error("Failed to send discord monitor notification.")
+            logger.error(f"'{monitor_cmd_str}' command failed with error: {exc}")
         else:
-            bittensor.logging.info("Discord monitor notification successfully sent.")
+            logger.info("Discord monitor notification successfully sent.")
 
 
 class DeregCheckerSubtensor(DeregChecker):
@@ -76,8 +77,8 @@ class DeregCheckerSubtensor(DeregChecker):
         asyncio.run(self._run_check())
 
     async def _run_check(self):
-        bittensor.logging.info("")
-        bittensor.logging.info("Checking registration status from subtensor chain.")
+        logger.info("")
+        logger.info("Checking registration status from subtensor chain.")
 
         previous_registered_list = self._read_registered_list_json_file()
         new_registered_list = await self._get_registered_list()
@@ -87,34 +88,39 @@ class DeregCheckerSubtensor(DeregChecker):
 
     async def _get_registered_list(self):
         start_time = time.time()
-        bittensor.logging.info(f"Connecting to subtensor: {self._network}")
+        logger.info(f"Connecting to subtensor: {self._network}")
         try:
-            async with bittensor.AsyncSubtensor(network=self._network) as subtensor:
-                netuids = await subtensor.get_all_subnets_netuid()
-                netuids = netuids[1:]
-                bittensor.logging.info(f"Checking subnets: {netuids}")
+            async with bittensor.Subtensor(network=self._network) as subtensor:
+                block = await subtensor.block()
+                snapshot = await subtensor.at(block)
 
-                block = await subtensor.block
-                metagraphs = await asyncio.gather(
-                    *[
-                        subtensor.metagraph(netuid=netuid, block=block)
-                        for netuid in netuids
-                    ]
+                subnets = await snapshot.subnets.all()
+                netuids = [sn.netuid for sn in subnets][1:]
+                logger.info(f"Checking subnets: {netuids}")
+
+                subnets_neurons = await asyncio.gather(
+                    *[snapshot.neurons.all(netuid) for netuid in netuids]
                 )
         except Exception as err:
-            bittensor.logging.error(f"ERROR: Subtensor connection failed on '{self._network}'")
-            bittensor.logging.error(f"{type(err).__name__}: {err}")
+            logger.error(f"ERROR: Subtensor connection failed on '{self._network}'")
+            logger.error(f"{type(err).__name__}: {err}")
             raise SubtensorConnectionError
 
         total_time = time.time() - start_time
-        bittensor.logging.info(f"Gathered subnet data in {total_time:.3} seconds")
+        logger.info(f"Gathered subnet data in {total_time:.3} seconds")
 
-        registered_list = [m.netuid for m in metagraphs if m.coldkeys.count(COLDKEYS["Rizzo"])]
+        registered_list = []
+        for ni, netuid in enumerate(netuids):
+            neurons = subnets_neurons[ni]
+            coldkeys = [n.coldkey for n in neurons]
+            if COLDKEYS["Rizzo"] in coldkeys:
+                registered_list.append(netuid)
+
         return registered_list
 
     def _read_registered_list_json_file(self):
         if not os.path.exists(self._json_file):
-            bittensor.logging.warning(f"Json file {self._json_file} does not exist. "
+            logger.warning(f"Json file {self._json_file} does not exist. "
                                       "This must be the first run.")
             return None
 
@@ -133,8 +139,8 @@ class DeregCheckerJson(DeregChecker):
         self._registered_list = None
 
     def run_check(self):
-        bittensor.logging.info("")
-        bittensor.logging.info(f"Checking registration status from {self._json_file_glob} files.")
+        logger.info("")
+        logger.info(f"Checking registration status from {self._json_file_glob} files.")
 
         previous_registered_list = self._registered_list
         new_registered_list = self._get_registered_list_from_data_json_file()
@@ -145,12 +151,12 @@ class DeregCheckerJson(DeregChecker):
     def _get_registered_list_from_data_json_file(self):
         json_files = glob.glob(self._json_file_glob)
         if not json_files:
-            bittensor.logging.error(f"No json files found: {self._json_file_glob}.")
+            logger.error(f"No json files found: {self._json_file_glob}.")
             return
 
         registered_list = []
         for json_file in json_files:
-            bittensor.logging.info(f"Reading data from {json_file}.")
+            logger.info(f"Reading data from {json_file}.")
             with open(json_file, "r") as fp:
                 json_data = json.load(fp)
             registered_list.extend([int(u) for u in json_data if json_data[u]["validator_hotkeys"]["Rizzo"]])

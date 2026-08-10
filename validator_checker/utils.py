@@ -1,7 +1,9 @@
 # standard imports
+import logging
 import os
 import random
-
+import sys
+import time
 
 # Import local constants
 from .constants import LOCAL_LITE_SUBTENSORS
@@ -9,6 +11,30 @@ from .constants import LOCAL_LITE_SUBTENSORS
 
 class SubtensorConnectionError(Exception):
     pass
+
+
+def _get_logger():
+
+    class BtDateFormatter(logging.Formatter):
+        def formatTime(self, record, datefmt=None):
+            created = self.converter(record.created)
+            if datefmt:
+                s = time.strftime(datefmt, created)
+            else:
+                s = time.strftime("%Y-%m-%d %H:%M:%S", created)
+            s += f".{int(record.msecs):03d}"
+            return s
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(BtDateFormatter("%(asctime)s | %(levelname)s | %(message)s"))
+
+    logger = logging.getLogger("bittensor")
+    logger.addHandler(handler)
+    logger.propagate = False
+
+    return logger
+
+logger = _get_logger()
 
 
 def get_formatted_time(total_time):

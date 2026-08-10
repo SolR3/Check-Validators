@@ -5,9 +5,6 @@ import shutil
 import tempfile
 import time
 
-# bittensor import
-import bittensor
-
 # Local imports
 from .constants import DATA_FILE_NAME
 from .json_writer_base import (
@@ -19,6 +16,7 @@ from .subnet_data_intervals import SubnetDataIntervals
 from .utils import (
     get_formatted_time,
     get_json_file_name,
+    logger,
     SubtensorConnectionError,
 )
 
@@ -49,7 +47,7 @@ class JsonWriterIntervals(JsonWriterBase):
         mp_queue.put([self._tempdir])
 
     def _write_json_files_to_tmp(self):
-        bittensor.logging.info("Gathering subnet intervals data.")
+        logger.info("Gathering subnet intervals data.")
         start_time = time.time()
 
         # Gather subnet data.
@@ -63,8 +61,8 @@ class JsonWriterIntervals(JsonWriterBase):
                 existing_json_data_folder=self._json_folder
             )
         except Exception as err:
-            bittensor.logging.error(f"Subtensor connection failed on '{self._lite_network}'")
-            bittensor.logging.error(f"{type(err).__name__}: {err}")
+            logger.error(f"Subtensor connection failed on '{self._lite_network}'")
+            logger.error(f"{type(err).__name__}: {err}")
             raise SubtensorConnectionError
 
         validator_data = subnet_data.as_dict
@@ -73,12 +71,12 @@ class JsonWriterIntervals(JsonWriterBase):
         for netuid in netuids:
             json_file_name = get_json_file_name(DATA_FILE_NAME, netuid)
             write_json_file = os.path.join(self._tempdir, json_file_name)
-            bittensor.logging.info(f"Writing data to file: {write_json_file}")
+            logger.info(f"Writing data to file: {write_json_file}")
             with open(write_json_file, "w") as fp:
                 json.dump({netuid: validator_data[netuid]}, fp, indent=4)
 
         total_time = round(time.time() - start_time)
-        bittensor.logging.info(
+        logger.info(
             f"Subnet data gathering took {get_formatted_time(total_time)} "
             f"for subnets {netuids}."
         )

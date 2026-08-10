@@ -42,7 +42,6 @@ class SubnetDataPrinter:
                 sort_key *= -1
             return sort_key
 
-        total_emission = 0.0
         missing_data = []
 
         # Loop through all subnets and print out
@@ -71,16 +70,10 @@ class SubnetDataPrinter:
             if self._missing_chk and validator_data.missing_chk <= EPSILON:
                 continue
 
-            if validator_data.rizzo_emission is not None:
-                total_emission += validator_data.rizzo_emission
-
             printer.update_printout(validator_data)
 
         # Print extra stuff
-        printer.add_extra_printout(
-            missing_data,
-            total_emission if self._print_total_emission else None
-        )
+        printer.add_extra_printout(missing_data)
         
         # Print everything
         printer.print_everything()
@@ -275,12 +268,3 @@ class TablePrinter(TablePrinterBase):
         ]
     
         return row_columns
-
-    def add_extra_printout(self, missing_data, total_emission):
-        
-        if total_emission is not None:
-            self._extra_printout.append(
-                Text(f"\nTotal Emission = {total_emission:.5f}")
-            )
-
-        super().add_extra_printout(missing_data)

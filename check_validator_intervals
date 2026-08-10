@@ -2,6 +2,7 @@
 
 # standard imports
 import argparse
+import logging
 import json
 import os
 from rich.console import Console
@@ -12,11 +13,21 @@ import time
 # Add local validator_checker module path
 sys.path = [os.path.dirname(__file__)] + sys.path
 
-# Import local constants used by the arg parser
+# local imports
 from validator_checker.constants import (
-        DEFAULT_NUM_INTERVALS_JSON,
-        DEFAULT_NUM_INTERVALS_NO_JSON,
-    )
+    DEFAULT_NUM_INTERVALS_JSON,
+    DEFAULT_NUM_INTERVALS_NO_JSON,
+    TIMESTAMP_FILE_NAME,
+)
+from validator_checker.subnet_data_intervals import (
+    SubnetDataIntervals,
+    SubnetDataIntervalsFromJson
+)
+from validator_checker.subnet_printer_intervals import RichPrinter
+from validator_checker.utils import (
+    get_formatted_time,
+    logger,
+)
 
 
 def parse_args():
@@ -74,9 +85,11 @@ def parse_args():
     return options
 
 
-def main(options):
+def main():
+    options = parse_args()
+
     if options.verbose:
-        bittensor.logging.enable_info()
+        logger.setLevel(logging.INFO)
 
     network = options.local_archive_subtensor or "archive"
 
@@ -118,23 +131,7 @@ def main(options):
 
 if __name__ == "__main__":
     try:
-        options = parse_args()
-
-        # Import bittensor and local modules after parsing args to keep the
-        # bittensor module from overriding the --help arg.
-        import bittensor
-        from validator_checker.constants import (
-            TIMESTAMP_FILE_NAME,
-        )
-        from validator_checker.subnet_data_intervals import (
-            SubnetDataIntervals,
-            SubnetDataIntervalsFromJson
-        )
-        from validator_checker.subnet_printer_intervals import RichPrinter
-        from validator_checker.utils import get_formatted_time
-
-        main(options)
-
+        main()
     except KeyboardInterrupt as exc:
         import traceback
         exc_list = traceback.format_exception_only(exc)
