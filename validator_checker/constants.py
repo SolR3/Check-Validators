@@ -65,7 +65,7 @@ COLDKEYS = {
     "OTF": "5EBuUXD6eXSSWVaT1NqaUQoAACUkAmEogzAfPQvDXTEQZ8Ff",
     "Yuma": "5E9fVY1jexCNVMjd2rdBsAxeamFGEMfzHcyTn2fHgdHeYc5p",
     "Kraken": "5FHxxe8ZKYaNmGcSLdG5ekxXeZDhQnk9cbpHdsJW8RunGpSs",
-    "TAO_com": "5CWzmvA17MAMQ9mnAecLxFXS2N8846rz6T7m4QNHyVtJVq4j",
+    "TAO_com": "5DXiV1gqHRQKop5RZA5ywvcZ9bW1p7CmwuSAT8R6143jXUWg",
 }
 
 # This is a fix to handle the subnets on which our coldkeys is
