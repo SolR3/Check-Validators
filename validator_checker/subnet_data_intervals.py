@@ -83,19 +83,8 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
             *[self._get_mech_split(snapshot, netuid) for netuid in all_netuids]
         )
 
-        # Get emission percentage and alpha price for all subnets.
-        subnet_emissions = await asyncio.gather(
-            *[
-                self._get_subnet_emission(snapshot, netuid)
-                for netuid in all_netuids
-            ]
-        )
-        subnet_alpha_prices = await asyncio.gather(
-            *[
-                self._get_subnet_alpha_price(snapshot, netuid)
-                for netuid in all_netuids
-            ]
-        )
+        # Get emission percentage for all subnets.
+        subnet_emissions = await self._get_subnet_emissions(snapshot, all_netuids)
 
         # Get the metagraphs for all subnets.
         metagraphs = await asyncio.gather(
@@ -105,9 +94,9 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
         mechids_data = {}
         for ni, netuid in enumerate(all_netuids):
             subnet_emission = subnet_emissions[ni]
-            subnet_alpha_price = subnet_alpha_prices[ni]
             mech_split = mech_splits[ni]
             metagraph = metagraphs[ni]
+            subnet_alpha_price = metagraph.price
 
             # Initialize ValidatorData for netuid.
             self._validator_data[netuid] = self.ValidatorData(

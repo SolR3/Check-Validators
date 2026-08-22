@@ -101,19 +101,8 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             *[self._get_mech_split(snapshot, netuid) for netuid in netuids]
         )
 
-        # Get emission percentage and alpha price for all subnets.
-        self._subnet_emissions = await asyncio.gather(
-            *[
-                self._get_subnet_emission(snapshot, netuid)
-                for netuid in netuids
-            ]
-        )
-        self._subnet_alpha_prices = await asyncio.gather(
-            *[
-                self._get_subnet_alpha_price(snapshot, netuid)
-                for netuid in netuids
-            ]
-        )
+        # Get emission percentage for all subnets.
+        self._subnet_emissions = await self._get_subnet_emissions(snapshot, netuids)
 
         # Get the metagraphs for all subnets.
         self._metagraphs = await asyncio.gather(
@@ -262,7 +251,6 @@ class SubnetDataMain(SubnetDataFromSubtensor):
 
     def _populate_validator_data_for_subnet(self, netuid_index, netuid, current_block):
         subnet_emission = self._subnet_emissions[netuid_index]
-        subnet_alpha_price = self._subnet_alpha_prices[netuid_index]
         subnet_mechs = self._mech_splits[netuid_index]
         metagraph = self._metagraphs[netuid_index]
         child_hotkeys = self._children[netuid_index]
@@ -275,6 +263,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         rizzo_hotkey_chk_take = self._rizzo_hotkey_chk_takes[netuid_index]
         last_updates = self._last_updates_dict[netuid]
         vtrust = self._vtrusts[netuid_index]
+        subnet_alpha_price = metagraph.price
 
         # Get the hotkeys that we care about (Rizzo, Rt21, etc.)
         vali_hotkeys = {}

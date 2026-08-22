@@ -93,18 +93,24 @@ class SubnetDataFromSubtensor(SubnetDataBase):
         return uids[0]  # I don't know if its best to return first uid or nothing.
 
     @staticmethod
-    async def _get_subnet_emission(subtensor, netuid):
-        # Multiplying by 2 since tao has been halved
-        raw_emission = await subtensor.query(
-            bittensor.storage.SubtensorModule.SubnetTaoInEmission,
-            params=[netuid]
+    async def _get_subnet_emissions(snapshot, netuids):
+        tao_emission = await snapshot.query_map(
+            bittensor.storage.SubtensorModule.SubnetTaoInEmission
         )
-        return raw_emission / bittensor.settings.RAO_PER_TAO * 100 * 2
+        tao_emission = dict(tao_emission)
 
-    @staticmethod
-    async def _get_subnet_alpha_price(subtensor, netuid):
-        price_data = await subtensor.prices.alpha_price(netuid)
-        return price_data["tao_per_alpha"]
+        excess_tao = await snapshot.query_map(
+            bittensor.storage.SubtensorModule.SubnetExcessTao
+        )
+        excess_tao = dict(excess_tao)
+
+        raw_emission = {
+            n: tao_emission.get(n, 0) + excess_tao.get(n, 0)
+            for n in set(list(tao_emission) + list(excess_tao))
+        }
+        total_emission = sum(raw_emission.values())
+
+        return [(raw_emission.get(n, 0.0) / total_emission * 100) for n in netuids]
 
     @staticmethod
     async def _get_mech_split(subtensor, netuid):
