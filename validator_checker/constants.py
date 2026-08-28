@@ -72,7 +72,7 @@ COLDKEYS = {
 # registered on multiple uids.
 MULTI_UID_HOTKEYS = (20, 70,)
 
-OWNED_SUBNETS = (20, 45,)
+OWNED_SUBNETS = (45,)
 
 RIZZO_CHK_HOTKEY = "5FtBncJvGhxjBs4aFn2pid6aur9tBUuo9QR7sHe5DkoRizzo"
 
