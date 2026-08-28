@@ -29,6 +29,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         netuid: int
         subnet_emission: float
         subnet_alpha_price: float
+        subnet_tao_pool: int
         subnet_mechs: list[int]
         subnet_tempo: int
         num_total_validators: int
@@ -264,6 +265,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         last_updates = self._last_updates_dict[netuid]
         vtrust = self._vtrusts[netuid_index]
         subnet_alpha_price = metagraph.price
+        subnet_tao_pool = round(metagraph.raw["tao_in"] / bittensor.settings.RAO_PER_TAO)
 
         # Get the hotkeys that we care about (Rizzo, Rt21, etc.)
         vali_hotkeys = {}
@@ -469,6 +471,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             netuid=netuid,
             subnet_emission=subnet_emission,
             subnet_alpha_price=subnet_alpha_price,
+            subnet_tao_pool=subnet_tao_pool,
             subnet_mechs=subnet_mechs,
             subnet_tempo=subnet_tempo,
             num_total_validators=num_total_validators,

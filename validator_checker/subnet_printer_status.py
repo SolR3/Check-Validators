@@ -87,6 +87,7 @@ class TablePrinter(TablePrinterBase):
             "Subnet",
             "Emission",
             "Alpha",
+            "Tao Pool",
             "# Valis",
             "CHK vT",
             "CHK ?",
@@ -228,6 +229,7 @@ class TablePrinter(TablePrinterBase):
             ),
             Text(f"{validator_data.subnet_emission:.2f}%"),
             Text(f"{validator_data.subnet_alpha_price:.4f}{TAO}"),
+            Text(f"{validator_data.subnet_tao_pool:,}{TAO}"),
             Text(
                 f"{validator_data.num_valid_validators:>2}  "
                 f"({validator_data.num_total_validators})"
