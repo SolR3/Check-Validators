@@ -1,5 +1,4 @@
 # standard imports
-import json
 import os
 import shutil
 import tempfile
@@ -16,7 +15,7 @@ from .subnet_data_main import SubnetDataMain
 from .subnet_data_intervals import SubnetDataIntervalsFromMainData
 from .utils import (
     get_formatted_time,
-    get_json_file_name,
+    get_json_file_name_for_netuid,
     logger,
     SubtensorConnectionError,
 )
@@ -70,13 +69,10 @@ class JsonWriterMain(JsonWriterBase):
         netuids = subnet_data.netuids
 
         # Write main data json file
-        netuid_range = f"{netuids[0]}-{netuids[-1]}"        
-        json_file_name_main = get_json_file_name(DATA_FILE_NAME, netuid_range)
-        json_file_main = os.path.join(self._tempdir_main, json_file_name_main)
+        json_file_main = os.path.join(self._tempdir_main, DATA_FILE_NAME)
 
         logger.info(f"Writing main data to file: {json_file_main}")
-        with open(json_file_main, "w") as fp:
-            json.dump(validator_data_main, fp, indent=4)
+        self._write_json_with_timestamp(validator_data_main, json_file_main)
 
         # If the --json-intervals-folder was specified then gather the intervals from
         # the existing json files and add interval blocks as necessary.
@@ -87,14 +83,14 @@ class JsonWriterMain(JsonWriterBase):
             ).as_dict
 
             for netuid in netuids:
-                json_file_name_intervals = \
-                    get_json_file_name(DATA_FILE_NAME, netuid)
+                json_file_name_intervals = get_json_file_name_for_netuid(DATA_FILE_NAME, netuid)
                 json_file_intervals = os.path.join(
                     self._tempdir_intervals, json_file_name_intervals)
                 logger.info(f"Writing intervals data for netuid {netuid} to file: "
                       f"{json_file_intervals}")
-                with open(json_file_intervals, "w") as fp:
-                    json.dump({netuid: validator_data_intervals[netuid]}, fp, indent=4)
+                self._write_json_with_timestamp(
+                    validator_data_intervals[netuid], json_file_intervals
+                )
 
         total_time = round(time.time() - start_time)
         logger.info(
@@ -102,13 +98,11 @@ class JsonWriterMain(JsonWriterBase):
         )
 
     def _mv_tmp_to_final(self):
-        # Move files over to final location and write timestamp.
+        # Move files over to final location.
         self._move_json_files_to_final_dir(self._tempdir_main, self._json_main_folder)
-        self._write_timestamp(self._json_main_folder, DATA_FILE_NAME)
 
         if self._json_intervals_folder:
             self._move_json_files_to_final_dir(self._tempdir_intervals, self._json_intervals_folder)
-            self._write_timestamp(self._json_intervals_folder, DATA_FILE_NAME)
 
     def _rm_tempdirs(self):
         # Remove temp folders

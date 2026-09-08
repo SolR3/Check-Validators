@@ -1,5 +1,4 @@
 # standard imports
-import json
 import os
 import shutil
 import tempfile
@@ -15,7 +14,7 @@ from .json_writer_base import (
 from .subnet_data_intervals import SubnetDataIntervals
 from .utils import (
     get_formatted_time,
-    get_json_file_name,
+    get_json_file_name_for_netuid,
     logger,
     SubtensorConnectionError,
 )
@@ -69,11 +68,12 @@ class JsonWriterIntervals(JsonWriterBase):
         netuids = subnet_data.netuids
 
         for netuid in netuids:
-            json_file_name = get_json_file_name(DATA_FILE_NAME, netuid)
+            json_file_name = get_json_file_name_for_netuid(DATA_FILE_NAME, netuid)
             write_json_file = os.path.join(self._tempdir, json_file_name)
             logger.info(f"Writing data to file: {write_json_file}")
-            with open(write_json_file, "w") as fp:
-                json.dump({netuid: validator_data[netuid]}, fp, indent=4)
+            self._write_json_with_timestamp(
+                validator_data[netuid], write_json_file
+            )
 
         total_time = round(time.time() - start_time)
         logger.info(
@@ -82,9 +82,8 @@ class JsonWriterIntervals(JsonWriterBase):
         )
 
     def _mv_tmp_to_final(self):
-        # Move files over to final location and write timestamp.
+        # Move files over to final location.
         self._move_json_files_to_final_dir(self._tempdir, self._json_folder)
-        self._write_timestamp(self._json_folder, DATA_FILE_NAME)
 
     def _rm_tempdirs(self):
         # Remove temp folders

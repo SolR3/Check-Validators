@@ -95,6 +95,16 @@ class JsonWriterBase:
         raise NotImplementedError
 
     @staticmethod
+    def _write_json_with_timestamp(data, json_file):
+        timestamp = int(time.time())
+        json_contents = {
+            "data": data,
+            "timestamp": timestamp,
+        }
+        with open(json_file, "w") as fp:
+            json.dump(json_contents, fp, indent=4)
+
+    @staticmethod
     def _move_json_files_to_final_dir(temp_dir, final_dir):
         # Remove old files from final folder
         for file_name in os.listdir(final_dir):
@@ -115,10 +125,7 @@ class JsonWriterBase:
             os.rename(src_file_path, dest_file_path)
 
     @staticmethod
-    def _write_timestamp(
-            json_folder, data_file_name,
-            write_display_time=True, write_actual_time=True
-    ):
+    def _write_timestamp(json_folder, data_file_name):
         os.environ["TZ"] = LOCAL_TIMEZONE
         time.tzset()
 
@@ -134,20 +141,7 @@ class JsonWriterBase:
             if min_file_time == 0 or file_time < min_file_time:
                 min_file_time = file_time
         
-        display_time = time.ctime(min_file_time)
-        actual_time = int(min_file_time)
-
-        if write_display_time and write_actual_time:
-            timestamp = {
-                "display_time": display_time,
-                "actual_time": actual_time,
-            }
-        elif write_display_time:
-            timestamp = display_time
-        elif write_actual_time:
-            timestamp = actual_time
-        else:
-            timestamp = None
+        timestamp = time.ctime(min_file_time)
 
         timestamp_file = os.path.join(json_folder, TIMESTAMP_FILE_NAME)
         logger.info(f"Writing timestamp file: {timestamp_file}")

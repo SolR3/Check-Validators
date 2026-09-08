@@ -22,7 +22,7 @@ from .json_writer_base import (
 )
 from .utils import (
     get_formatted_time,
-    get_json_file_name,
+    get_json_file_name_for_netuid,
     logger,
     SubtensorConnectionError,
 )
@@ -64,7 +64,7 @@ class JsonWriterPrice(JsonWriterBase):
 
         netuids = sorted(subnet_data)
         netuid_range = f"{netuids[0]}-{netuids[-1]}"
-        json_file_name = get_json_file_name(SUBNET_PRICE_FILE_NAME, netuid_range)
+        json_file_name = get_json_file_name_for_netuid(SUBNET_PRICE_FILE_NAME, netuid_range)
         json_file = os.path.join(self._tempdir, json_file_name)
 
         logger.info(f"Writing data to file: {json_file}")
@@ -79,7 +79,7 @@ class JsonWriterPrice(JsonWriterBase):
     def _mv_tmp_to_final(self):
         # Move files over to final location and write timestamp.
         self._move_json_files_to_final_dir(self._tempdir, self._json_folder)
-        self._write_timestamp(self._json_folder, SUBNET_PRICE_FILE_NAME, write_actual_time=False)
+        self._write_timestamp(self._json_folder, SUBNET_PRICE_FILE_NAME)
 
     def _rm_tempdirs(self):
         # Remove temp folders

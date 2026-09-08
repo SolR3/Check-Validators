@@ -86,6 +86,6 @@ def _create_get_lite_subtensor_network():
 get_lite_subtensor_network = _create_get_lite_subtensor_network()
 
 
-def get_json_file_name(json_file_name, netuid):
+def get_json_file_name_for_netuid(json_file_name, netuid):
     json_base, json_ext = os.path.splitext(json_file_name)
     return f"{json_base}.{netuid}{json_ext}"

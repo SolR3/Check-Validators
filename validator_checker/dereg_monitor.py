@@ -1,6 +1,5 @@
 # Standard imports
 import asyncio
-import glob
 import json
 import os
 import shlex
@@ -16,7 +15,6 @@ from .constants import (
     DATA_FILE_NAME,
 )
 from .utils import (
-    get_json_file_name,
     logger,
     SubtensorConnectionError,
 )
@@ -120,8 +118,7 @@ class DeregCheckerSubtensor(DeregChecker):
 
     def _read_registered_list_json_file(self):
         if not os.path.exists(self._json_file):
-            logger.warning(f"Json file {self._json_file} does not exist. "
-                                      "This must be the first run.")
+            logger.warning(f"Json file {self._json_file} does not exist. This must be the first run.")
             return None
 
         with open(self._json_file, "r") as fp:
@@ -134,13 +131,12 @@ class DeregCheckerSubtensor(DeregChecker):
 
 class DeregCheckerJson(DeregChecker):
     def __init__(self, args):
-        json_file_name_glob = get_json_file_name(DATA_FILE_NAME, "*")
-        self._json_file_glob = os.path.join(args.json_folder, json_file_name_glob)
+        self._data_json_file = os.path.join(args.json_folder, DATA_FILE_NAME)
         self._registered_list = None
 
     def run_check(self):
         logger.info("")
-        logger.info(f"Checking registration status from {self._json_file_glob} files.")
+        logger.info(f"Checking registration status from {self._data_json_file}.")
 
         previous_registered_list = self._registered_list
         new_registered_list = self._get_registered_list_from_data_json_file()
@@ -149,16 +145,13 @@ class DeregCheckerJson(DeregChecker):
         self._registered_list = new_registered_list
 
     def _get_registered_list_from_data_json_file(self):
-        json_files = glob.glob(self._json_file_glob)
-        if not json_files:
-            logger.error(f"No json files found: {self._json_file_glob}.")
-            return
+        if not os.path.isfile(self._data_json_file):
+            logger.error(f"No json file found: {self._data_json_file}.")
+            return None
 
-        registered_list = []
-        for json_file in json_files:
-            logger.info(f"Reading data from {json_file}.")
-            with open(json_file, "r") as fp:
-                json_data = json.load(fp)
-            registered_list.extend([int(u) for u in json_data if json_data[u]["validator_hotkeys"]["Rizzo"]])
+        logger.info(f"Reading data from {self._data_json_file}.")
+        with open(self._data_json_file, "r") as fp:
+            json_data = json.load(fp)
+        registered_list = [int(u) for u in json_data if json_data[u]["validator_hotkeys"]["Rizzo"]]
 
         return sorted(registered_list)
