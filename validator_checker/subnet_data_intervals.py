@@ -19,7 +19,7 @@ from .constants import (
 from .subnet_data_base import SubnetDataBase, SubnetDataFromSubtensor
 from .utils import (
     get_formatted_time,
-    get_json_file_name,
+    get_json_file_name_for_netuid,
     logger,
 )
 
@@ -333,7 +333,7 @@ class SubnetDataIntervalsFromJson(SubnetDataBase, SubnetDataIntervalsBase):
 
     def _get_netuids_from_json_folder(self):
         netuids = []
-        json_file_pattern = get_json_file_name(DATA_FILE_NAME, r"(?P<netuid>\d+)")
+        json_file_pattern = get_json_file_name_for_netuid(DATA_FILE_NAME, r"(?P<netuid>\d+)")
         json_file_pattern = json_file_pattern.replace(".", r"\.")
         json_file_regex = re.compile(rf"^{json_file_pattern}$")
         for _file in os.listdir(self._json_folder):
@@ -352,7 +352,7 @@ class SubnetDataIntervalsFromJson(SubnetDataBase, SubnetDataIntervalsBase):
             )
 
             json_file = os.path.join(
-                self._json_folder, get_json_file_name(DATA_FILE_NAME, netuid)
+                self._json_folder, get_json_file_name_for_netuid(DATA_FILE_NAME, netuid)
             )
             if not os.path.isfile(json_file):
                 logger.info(
