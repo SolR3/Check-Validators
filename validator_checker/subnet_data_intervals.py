@@ -368,7 +368,7 @@ class SubnetDataIntervalsFromJson(SubnetDataBase, SubnetDataIntervalsBase):
             with open(json_file, "r") as fd:
                 json_data = json.load(fd)
 
-            json_data = json_data["data"][str(netuid)]
+            json_data = json_data["data"]
 
             self._validator_data[netuid].subnet_emission = json_data["subnet_emission"]
             self._validator_data[netuid].subnet_alpha_price = json_data["subnet_alpha_price"]
