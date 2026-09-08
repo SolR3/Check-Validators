@@ -152,6 +152,7 @@ class DeregCheckerJson(DeregChecker):
         logger.info(f"Reading data from {self._data_json_file}.")
         with open(self._data_json_file, "r") as fp:
             json_data = json.load(fp)
-        registered_list = [int(u) for u in json_data if json_data[u]["validator_hotkeys"]["Rizzo"]]
+        subnet_data = json_data["data"]
+        registered_list = [int(u) for u in subnet_data if subnet_data[u]["validator_hotkeys"]["Rizzo"]]
 
         return sorted(registered_list)
