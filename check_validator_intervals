@@ -3,10 +3,7 @@
 # standard imports
 import argparse
 import logging
-import json
 import os
-from rich.console import Console
-from rich.text import Text
 import sys
 import time
 
@@ -17,7 +14,6 @@ sys.path = [os.path.dirname(__file__)] + sys.path
 from validator_checker.constants import (
     DEFAULT_NUM_INTERVALS_JSON,
     DEFAULT_NUM_INTERVALS_NO_JSON,
-    TIMESTAMP_FILE_NAME,
 )
 from validator_checker.subnet_data_intervals import (
     SubnetDataIntervals,
@@ -93,7 +89,6 @@ def main():
 
     network = options.local_archive_subtensor or "archive"
 
-    timestamp_msg = None
     start_time = time.time()
     if options.json_folder:
         num_intervals = options.num_intervals or DEFAULT_NUM_INTERVALS_JSON
@@ -102,16 +97,6 @@ def main():
             netuids=options.netuids,
             num_intervals=num_intervals
         )
-        timestamp_file = os.path.join(options.json_folder, TIMESTAMP_FILE_NAME)
-        if os.path.isfile(timestamp_file):
-            with open(timestamp_file, "r") as fd:
-                timestamp = json.load(fd)["display_time"]
-                timestamp_msg = Text(
-                    f"Last update: {timestamp} (US Mountain Time)",
-                    style=RichPrinter.get_style(0)
-                )
-        else:
-            timestamp_msg = Text("NO TIMESTAMP FILE!", style=RichPrinter.get_style(2))
     else:
         num_intervals = options.num_intervals or DEFAULT_NUM_INTERVALS_NO_JSON
         subnet_data = SubnetDataIntervals(
@@ -124,9 +109,6 @@ def main():
     print(f"\nSubnet data gathering took {get_formatted_time(total_time)}.\n")
 
     RichPrinter(subnet_data.netuids, subnet_data.validator_data,)
-
-    if timestamp_msg:
-        Console().print(timestamp_msg)
 
 
 if __name__ == "__main__":
