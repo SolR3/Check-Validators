@@ -62,7 +62,7 @@ TAOSTATS_HEADERS = {
 COLDKEYS = {
     "Rizzo": "5FuzgvtfbZWdKSRxyYVPAPYNaNnf9cMnpT7phL3s2T3Kkrzo",
     "Rt21": "5GW9X8GyXwA3VQbNhnzb6sJmfPvKBBJwx19hJrCseverjovV",
-    "OTF": "5EBuUXD6eXSSWVaT1NqaUQoAACUkAmEogzAfPQvDXTEQZ8Ff",
+    "Summer": "5GaET4LPiVs8LhWFSCsfmAGfFnqeaACb3zFoZbfVUKz3XTPo",
     "Yuma": "5E9fVY1jexCNVMjd2rdBsAxeamFGEMfzHcyTn2fHgdHeYc5p",
     "Kraken": "5FHxxe8ZKYaNmGcSLdG5ekxXeZDhQnk9cbpHdsJW8RunGpSs",
     "TAO_com": "5DXiV1gqHRQKop5RZA5ywvcZ9bW1p7CmwuSAT8R6143jXUWg",

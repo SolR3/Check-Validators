@@ -134,8 +134,8 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         )
 
         if self._other_coldkey:
-            self._children = [(True, [], '') for _ in netuids]
-            self._children_pending = [([], 0) for _ in netuids]
+            self._children = [[] for _ in netuids]
+            self._children_pending = [{"children": [], "cooldown_block": 0} for _ in netuids]
             self._swap_child_hotkeys_dict = dict([(n, (0.0, "")) for n in netuids])
         else:
             # Get the list of child hotkeys for each netuid
