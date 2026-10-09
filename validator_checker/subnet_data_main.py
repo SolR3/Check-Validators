@@ -12,6 +12,7 @@ import bittensor
 
 # Local imports
 from .constants import (
+    OWNED_SUBNETS,
     MIN_VTRUST_THRESHOLD,
     MAX_U_THRESHOLD,
     COLDKEYS,
@@ -27,6 +28,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
     class ValidatorData:
         block: int
         netuid: int
+        is_owned_subnet: bool
         subnet_emission: float
         subnet_alpha_price: float
         subnet_tao_pool: int
@@ -251,6 +253,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         return chk_takes_dict
 
     def _populate_validator_data_for_subnet(self, netuid_index, netuid, current_block):
+        is_owned_subnet = netuid in OWNED_SUBNETS
         subnet_emission = self._subnet_emissions[netuid_index]
         subnet_mechs = self._mech_splits[netuid_index]
         metagraph = self._metagraphs[netuid_index]
@@ -469,6 +472,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         self._validator_data[netuid] = self.ValidatorData(
             block=current_block,
             netuid=netuid,
+            is_owned_subnet=is_owned_subnet,
             subnet_emission=subnet_emission,
             subnet_alpha_price=subnet_alpha_price,
             subnet_tao_pool=subnet_tao_pool,

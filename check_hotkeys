@@ -14,7 +14,6 @@ sys.path = [os.path.dirname(__file__)] + sys.path
 
 # local imports
 from validator_checker.constants import (
-    OWNED_SUBNETS,
     GREEN,
     RED,
     YELLOW,
@@ -90,7 +89,7 @@ def main():
         hotkey_color = WHITE if validator_data.validator_hotkeys.Rizzo else RED
 
         take = int(round(validator_data.rizzo_hotkey_chk_take * 100))
-        if netuid in OWNED_SUBNETS:
+        if validator_data.is_owned_subnet:
             take_color = RED if take > 0 else GREEN
         else:
             take_color = RED if take < 2 else YELLOW if take < 9 else GREEN
