@@ -14,6 +14,7 @@ sys.path = [os.path.dirname(__file__)] + sys.path
 
 # local imports
 from validator_checker.constants import (
+    EPSILON,
     GREEN,
     RED,
     YELLOW,
@@ -46,6 +47,20 @@ def _parse_args():
         type=int,
         help="When specified, the list of netuids are checked. When not "
              "specified, all subnets are checked."
+    )
+
+    parser.add_argument(
+        "-t", "--take-range",
+        nargs=2,
+        type=int,
+        help="When specified, only subnets with CHK take values in the specified range "
+             "are displayed."
+    )
+
+    parser.add_argument(
+        "-u", "--unregistered",
+        action="store_true",
+        help="When specified, only subnets on which we are not registered are displayed."
     )
 
     parser.add_argument(
@@ -86,9 +101,18 @@ def main():
             or (not options.coldkey and validator_data.rizzo_expected_hotkey)
             or "---"
         )
+
+        if options.unregistered and validator_data.validator_hotkeys.Rizzo:
+            continue
+
         hotkey_color = WHITE if validator_data.validator_hotkeys.Rizzo else RED
 
         take = int(round(validator_data.rizzo_hotkey_chk_take * 100))
+        if options.take_range:
+            min_take, max_take = options.take_range
+            if take < (min_take - EPSILON) or take > (max_take + EPSILON):
+                continue
+
         if validator_data.is_owned_subnet:
             take_color = RED if take > 0 else GREEN
         else:
