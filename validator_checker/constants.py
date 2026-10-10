@@ -43,6 +43,7 @@ LOCAL_LITE_SUBTENSORS = [
     "moonbase",
     "titan",
 ]
+DATACENTER_SUBTENSOR = "datacenter01"
 
 
 #########################

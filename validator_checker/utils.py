@@ -6,7 +6,10 @@ import sys
 import time
 
 # Import local constants
-from .constants import LOCAL_LITE_SUBTENSORS
+from .constants import (
+    DATACENTER_SUBTENSOR,
+    LOCAL_LITE_SUBTENSORS
+)
 
 
 class SubtensorConnectionError(Exception):
@@ -66,7 +69,7 @@ def _create_get_lite_subtensor_network():
     random.seed()
     local_subtensor_index = random.randint(0, len(LOCAL_LITE_SUBTENSORS) - 1)
 
-    def get_network(name=None):
+    def get_network(name, skip_datacenter_subtensor=False):
 
         def get_network_from_name(name):
             return name if ":" in name else f"ws://subtensor-{name}.rizzo.network:9944"
@@ -76,8 +79,12 @@ def _create_get_lite_subtensor_network():
 
         if name is None:
             nonlocal local_subtensor_index
-            local_subtensor_index = (local_subtensor_index + 1) % len(LOCAL_LITE_SUBTENSORS)
-            name = LOCAL_LITE_SUBTENSORS[local_subtensor_index]
+
+            while True:
+                local_subtensor_index = (local_subtensor_index + 1) % len(LOCAL_LITE_SUBTENSORS)
+                name = LOCAL_LITE_SUBTENSORS[local_subtensor_index]
+                if not (skip_datacenter_subtensor and name == DATACENTER_SUBTENSOR):
+                    break
 
         return get_network_from_name(name)
     

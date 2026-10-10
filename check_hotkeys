@@ -41,6 +41,13 @@ def _parse_args():
     )
 
     parser.add_argument(
+        "-d", "--skip-datacenter-subtensor",
+        action="store_true",
+        help="When specified, ignore the datacenter01 subtensor when randomly selecting "
+             "a local subtensor."
+    )
+
+    parser.add_argument(
         "-s", "--subnets",
         dest="netuids",
         nargs="+",
@@ -85,7 +92,10 @@ def main():
     if options.verbose:
         logger.setLevel(logging.INFO)
 
-    network = get_lite_subtensor_network(options.local_lite_subtensor)
+    network = get_lite_subtensor_network(
+        options.local_lite_subtensor,
+        skip_datacenter_subtensor=options.skip_datacenter_subtensor
+    )
 
     start_time = time.time()
     subnet_data = SubnetDataMain(
