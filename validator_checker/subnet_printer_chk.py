@@ -81,6 +81,7 @@ class TablePrinter(TablePrinterBase):
         mechs = []
 
         num_mechs = len(validator_data.subnet_mechs)
+        activity_cutoff = validator_data.subnet_validator_activity_cutoff
         avg_updated_list = self._get_updated_list(validator_data.avg_updated, num_mechs)
         child_hotkey_data = getattr(validator_data, self._child_hotkey_attr)
 
@@ -98,7 +99,9 @@ class TablePrinter(TablePrinterBase):
                 child_hotkey.vtrust, validator_data.avg_vtrust
             )
             hotkey_updated_statuses = [
-                self._get_updated_status(chk_updated_list[i], avg_updated_list[i])
+                self._get_updated_status(
+                    chk_updated_list[i], avg_updated_list[i], activity_cutoff
+                )
                 for i in range(num_mechs)
             ]
             if (

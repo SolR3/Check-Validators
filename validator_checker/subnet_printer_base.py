@@ -8,7 +8,6 @@ import time
 from .constants import (
     VTRUST_ERROR_THRESHOLD,
     VTRUST_WARNING_THRESHOLD,
-    UPDATED_ERROR_THRESHOLD,
     UPDATED_WARNING_THRESHOLD,
     BLUE,
     GREEN,
@@ -84,12 +83,13 @@ class RichPrinterBase:
         return 0
 
     @staticmethod
-    def _get_updated_status(updated, avg_updated):
-        if avg_updated is None:
-            return 1
+    def _get_updated_status(updated, avg_updated, activity_cutoff):
         if updated is None:
+            if avg_updated is None:
+                return 1
             return 2
-        if updated > UPDATED_ERROR_THRESHOLD:
+
+        if updated > activity_cutoff:
             return 2
         if updated > UPDATED_WARNING_THRESHOLD:
             return 1

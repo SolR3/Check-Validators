@@ -92,6 +92,7 @@ class SubnetDataFromSubtensor(SubnetDataBase):
                 return uid
         return uids[0]  # I don't know if its best to return first uid or nothing.
 
+    # TODO - Fix this to not use query_map since it doesn't always get the values for all netuids
     @staticmethod
     async def _get_subnet_emissions(snapshot, netuids):
         tao_emission = await snapshot.query_map(
@@ -122,6 +123,18 @@ class SubnetDataFromSubtensor(SubnetDataBase):
             if mech_splits else [100]
         )
         return mech_splits
+
+    @staticmethod
+    async def _get_validator_activity_cutoff(subtensor, netuid):
+        cutoff_factor = await subtensor.query(
+            bittensor.storage.SubtensorModule.ActivityCutoffFactorMilli,
+            params=[netuid]
+        )
+        tempo = await subtensor.query(
+            bittensor.storage.SubtensorModule.Tempo,
+            params=[netuid]
+        )
+        return int(round(cutoff_factor * tempo / 1000))
 
     @staticmethod
     async def _get_metagraph(subtensor, netuid):

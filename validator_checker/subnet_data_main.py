@@ -33,7 +33,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         subnet_alpha_price: float
         subnet_tao_pool: int
         subnet_mechs: list[int]
-        subnet_tempo: int
+        subnet_validator_activity_cutoff: int
         num_total_validators: int
         num_valid_validators: int
         rizzo_last_update: list[int] | None
@@ -106,6 +106,11 @@ class SubnetDataMain(SubnetDataFromSubtensor):
 
         # Get emission percentage for all subnets.
         self._subnet_emissions = await self._get_subnet_emissions(snapshot, netuids)
+
+        # Get the validator activity cutoff for all subnets.
+        self._subnet_validator_activity_cutoffs = await asyncio.gather(
+            *[self._get_validator_activity_cutoff(snapshot, netuid) for netuid in netuids]
+        )
 
         # Get the metagraphs for all subnets.
         self._metagraphs = await asyncio.gather(
@@ -256,6 +261,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         is_owned_subnet = netuid in OWNED_SUBNETS
         subnet_emission = self._subnet_emissions[netuid_index]
         subnet_mechs = self._mech_splits[netuid_index]
+        subnet_validator_activity_cutoff = self._subnet_validator_activity_cutoffs[netuid_index]
         metagraph = self._metagraphs[netuid_index]
         child_hotkeys = self._children[netuid_index]
         child_takes = self._chk_takes_dict.get(netuid, [])
@@ -287,10 +293,6 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             else:
                 vali_hotkeys[vali_name] = metagraph.hotkeys[vali_uid]
         validator_hotkeys = self.ValidatorHotkeys(**vali_hotkeys)
-
-        # Get subnet tempo (used for determining bad Updated values)
-        # subnet_tempo = subtensor.get_subnet_hyperparameters(netuid).tempo
-        subnet_tempo = 360
 
         # Get Rizzo validator data
         rizzo_uid = self._get_uid(metagraph)
@@ -477,7 +479,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             subnet_alpha_price=subnet_alpha_price,
             subnet_tao_pool=subnet_tao_pool,
             subnet_mechs=subnet_mechs,
-            subnet_tempo=subnet_tempo,
+            subnet_validator_activity_cutoff=subnet_validator_activity_cutoff,
             num_total_validators=num_total_validators,
             num_valid_validators=num_valid_validators,
             rizzo_last_update=rizzo_last_update,

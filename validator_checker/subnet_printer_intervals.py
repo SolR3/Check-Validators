@@ -4,14 +4,12 @@ from rich.text import Text
 
 # Local imports
 from .constants import (
-    UPDATED_ERROR_THRESHOLD,
     UPDATED_WARNING_THRESHOLD,
     VTRUST_ERROR_THRESHOLD,
     VTRUST_WARNING_THRESHOLD,
     GREEN,
     RED,
     YELLOW,
-    TAO,
 )
 
 
@@ -39,10 +37,10 @@ class RichPrinter:
         else:
             return f"color({GREEN})"
     
-    def _get_blocks_status(self, blocks):
+    def _get_blocks_status(self, blocks, cutoff):
         if blocks is None:
             return 2
-        if  blocks > UPDATED_ERROR_THRESHOLD:
+        if  blocks > cutoff:
             return 2
         if blocks > UPDATED_WARNING_THRESHOLD:
             return 1
@@ -71,6 +69,7 @@ class RichPrinter:
                 continue
 
             subnet_data = self._validator_data[netuid]
+            cutoff_blocks = subnet_data.subnet_validator_activity_cutoff
 
             if (
                 not subnet_data.mech_block_data
@@ -83,8 +82,7 @@ class RichPrinter:
                 text.append("\n")
                 continue
 
-            text.append(f"\nSubnet {netuid} ({subnet_data.subnet_emission:.2f}% "
-                        f"- {subnet_data.subnet_alpha_price:.4f}{TAO}):")
+            text.append(f"\nSubnet {netuid} ({subnet_data.subnet_emission:.2f}%):")
 
             for mech_block_data in subnet_data.mech_block_data:
                 if len(subnet_data.mech_block_data) > 1:
@@ -94,7 +92,7 @@ class RichPrinter:
                 interval_vtrusts = []
                 for subnet_block in mech_block_data.block_data:
                     blocks = subnet_block.rizzo_updated
-                    blocks_status = self._get_blocks_status(blocks)
+                    blocks_status = self._get_blocks_status(blocks, cutoff_blocks)
                     blocks = self._get_int_value(blocks)
 
                     vtrust = subnet_block.rizzo_vtrust

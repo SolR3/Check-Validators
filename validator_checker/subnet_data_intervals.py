@@ -28,7 +28,7 @@ class SubnetDataIntervalsBase:
     @dataclass
     class ValidatorData:
         subnet_emission: float
-        subnet_alpha_price: float
+        subnet_validator_activity_cutoff: int
         mech_block_data: list[SubnetDataIntervalsBase.MechBlockData]
 
     @dataclass
@@ -86,6 +86,10 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
         # Get emission percentage for all subnets.
         subnet_emissions = await self._get_subnet_emissions(snapshot, all_netuids)
 
+        subnet_validator_activity_cutoffs = await asyncio.gather(
+            *[self._get_validator_activity_cutoff(snapshot, netuid) for netuid in all_netuids]
+        )
+
         # Get the metagraphs for all subnets.
         metagraphs = await asyncio.gather(
             *[self._get_metagraph(snapshot, netuid) for netuid in all_netuids]
@@ -96,12 +100,12 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
             subnet_emission = subnet_emissions[ni]
             mech_split = mech_splits[ni]
             metagraph = metagraphs[ni]
-            subnet_alpha_price = metagraph.price
+            subnet_validator_activity_cutoff = subnet_validator_activity_cutoffs[ni]
 
             # Initialize ValidatorData for netuid.
             self._validator_data[netuid] = self.ValidatorData(
                 subnet_emission=subnet_emission,
-                subnet_alpha_price=subnet_alpha_price,
+                subnet_validator_activity_cutoff=subnet_validator_activity_cutoff,
                 mech_block_data=[],
             )
 
@@ -347,7 +351,7 @@ class SubnetDataIntervalsFromJson(SubnetDataBase, SubnetDataIntervalsBase):
         for netuid in self._netuids:
             self._validator_data[netuid] = self.ValidatorData(
                 subnet_emission=None,
-                subnet_alpha_price=None,
+                subnet_validator_activity_cutoff=None,
                 mech_block_data=[],
             )
 
@@ -371,7 +375,8 @@ class SubnetDataIntervalsFromJson(SubnetDataBase, SubnetDataIntervalsBase):
             json_data = json_data["data"]
 
             self._validator_data[netuid].subnet_emission = json_data["subnet_emission"]
-            self._validator_data[netuid].subnet_alpha_price = json_data["subnet_alpha_price"]
+            self._validator_data[netuid].subnet_validator_activity_cutoff = \
+                json_data["subnet_validator_activity_cutoff"]
 
             for json_mech_block_data in json_data["mech_block_data"]:
                 mech_block_data = self.MechBlockData(
@@ -424,7 +429,7 @@ class SubnetDataIntervalsFromMainData(SubnetDataBase, SubnetDataIntervalsBase):
 
             self._validator_data[netuid] = self.ValidatorData(
                 subnet_emission=main_data["subnet_emission"],
-                subnet_alpha_price=main_data["subnet_alpha_price"],
+                subnet_validator_activity_cutoff=main_data["subnet_validator_activity_cutoff"],
                 mech_block_data=[],
             )
 
