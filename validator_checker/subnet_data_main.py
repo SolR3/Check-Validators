@@ -400,7 +400,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             for last_update in last_updates
         ]
 
-        valid_uids_all = numpy.unique(numpy.concatenate(valid_uids))
+        valid_uids_all = numpy.unique(numpy.concatenate(valid_uids)).astype(int)
         num_valid_validators = len(valid_uids_all)
 
         if rizzo_uid is not None:
@@ -464,9 +464,9 @@ class SubnetDataMain(SubnetDataFromSubtensor):
                 [current_block - last_updates[i][u] for u in valid_uids[i]]
                 for i in range(len(last_updates))
             ]
-            min_updated = [int(numpy.min(u)) for u in updateds]
-            avg_updated = [int(numpy.round(numpy.average(u))) for u in updateds]
-            max_updated = [int(numpy.max(u)) for u in updateds]
+            min_updated = [int(numpy.min(u)) if u else None for u in updateds]
+            avg_updated = [int(numpy.round(numpy.average(u))) if u else None for u in updateds]
+            max_updated = [int(numpy.max(u)) if u else None for u in updateds]
 
         # Store the data.
         self._validator_data[netuid] = self.ValidatorData(
