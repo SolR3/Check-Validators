@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 # standart imports
+import asyncio
 from dataclasses import asdict
 
 # bittensor import
@@ -92,26 +93,33 @@ class SubnetDataFromSubtensor(SubnetDataBase):
                 return uid
         return uids[0]  # I don't know if its best to return first uid or nothing.
 
-    # TODO - Fix this to not use query_map since it doesn't always get the values for all netuids
     @staticmethod
     async def _get_subnet_emissions(snapshot, netuids):
-        tao_emission = await snapshot.query_map(
-            bittensor.storage.SubtensorModule.SubnetTaoInEmission
+        all_subnets = await snapshot.subnets.all()
+        all_netuids = [sn.netuid for sn in all_subnets][1:]
+
+        tao_emission = await asyncio.gather(
+            *[
+                snapshot.query(
+                    bittensor.storage.SubtensorModule.SubnetTaoInEmission,
+                    params=[netuid]
+                )
+            for netuid in all_netuids
+            ]
         )
-        tao_emission = dict(tao_emission)
-
-        excess_tao = await snapshot.query_map(
-            bittensor.storage.SubtensorModule.SubnetExcessTao
+        excess_tao = await asyncio.gather(
+            *[
+                snapshot.query(
+                    bittensor.storage.SubtensorModule.SubnetExcessTao,
+                    params=[netuid]
+                )
+            for netuid in all_netuids
+            ]
         )
-        excess_tao = dict(excess_tao)
 
-        raw_emission = {
-            n: tao_emission.get(n, 0) + excess_tao.get(n, 0)
-            for n in set(list(tao_emission) + list(excess_tao))
-        }
-        total_emission = sum(raw_emission.values())
-
-        return [(raw_emission.get(n, 0.0) / total_emission * 100) for n in netuids]
+        raw_emission = [tao_emission[ni] + excess_tao[ni] for ni in range(len(all_netuids))]
+        total_emission = sum(raw_emission)
+        return [raw_emission[all_netuids.index(n)] / total_emission * 100 for n in netuids]
 
     @staticmethod
     async def _get_mech_split(subtensor, netuid):
