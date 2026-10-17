@@ -375,10 +375,8 @@ class SubnetDataIntervalsFromJson(SubnetDataBase, SubnetDataIntervalsBase):
             json_data = json_data["data"]
 
             self._validator_data[netuid].subnet_emission = json_data["subnet_emission"]
-            self._validator_data[netuid].subnet_validator_activity_cutoff = (
+            self._validator_data[netuid].subnet_validator_activity_cutoff = \
                 json_data["subnet_validator_activity_cutoff"]
-                if "subnet_validator_activity_cutoff" in json_data else 0
-            )
 
             for json_mech_block_data in json_data["mech_block_data"]:
                 mech_block_data = self.MechBlockData(
