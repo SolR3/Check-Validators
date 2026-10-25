@@ -9,7 +9,6 @@ from .constants import DATA_FILE_NAME
 from .json_writer_base import (
     JsonWriterBase,
     LoopRunnerBase,
-    mp_queue,
 )
 from .subnet_data_main import SubnetDataMain
 from .subnet_data_intervals import SubnetDataIntervalsFromMainData
@@ -46,7 +45,6 @@ class JsonWriterMain(JsonWriterBase):
             tempdirs.append(self._tempdir_intervals)
         else:
             self._tempdir_intervals = None
-        mp_queue.put(tempdirs)
 
     def _write_json_files_to_tmp(self):
         logger.info("Gathering subnet data.")

@@ -1,8 +1,6 @@
 # standard imports
-import multiprocessing
 import os
 import json
-import shutil
 import time
 
 # Local imports
@@ -16,9 +14,6 @@ from .utils import (
     logger,
     SubtensorConnectionError,
 )
-
-
-mp_queue = multiprocessing.Queue()
 
 
 class LoopRunnerBase:
@@ -37,20 +32,13 @@ class LoopRunnerBase:
             start_time = time.time()
             self._options.lite_network = get_lite_subtensor_network(self._options.local_lite_subtensor)
 
-            args = [self._options]
             try:
-                with multiprocessing.Pool(processes=1) as pool:
-                    pool.apply(self._run_func, args)
+                self._run_func(self._options)
             except SubtensorConnectionError:
                 if self._options.local_lite_subtensor is None:
                     logger.error("Rotating subtensors and trying again.")
                     time.sleep(1)
                     continue
-            finally:
-                while not mp_queue.empty():
-                    tempdirs = mp_queue.get()
-                    for tempdir in tempdirs:
-                        shutil.rmtree(tempdir, ignore_errors=True)
 
             # Only gather the data once.
             if not self._options.interval:

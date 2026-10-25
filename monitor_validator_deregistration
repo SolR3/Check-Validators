@@ -3,7 +3,6 @@
 # Standard imports
 import argparse
 import logging
-import multiprocessing
 import os
 import sys
 import time
@@ -77,8 +76,7 @@ def run_subtensor_check(args):
     while True:
         args.network = get_lite_subtensor_network(args.local_lite_subtensor)
         try:
-            with multiprocessing.Pool(processes=1) as pool:
-                pool.apply(DeregCheckerSubtensor, [args])
+            DeregCheckerSubtensor(args)
         except SubtensorConnectionError:
             if args.local_lite_subtensor is None:
                 logger.error("Rotating subtensors and trying again.")

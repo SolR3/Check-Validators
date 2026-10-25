@@ -18,7 +18,6 @@ from .constants import (
 from .json_writer_base import (
     JsonWriterBase,
     LoopRunnerBase,
-    mp_queue,
 )
 from .utils import (
     get_formatted_time,
@@ -50,7 +49,6 @@ class JsonWriterPrice(JsonWriterBase):
     def _mk_tempdirs(self):
         # Make tmpdir for writing json files.
         self._tempdir = tempfile.mkdtemp(prefix="write_price_data_")
-        mp_queue.put([self._tempdir])
 
     def _write_json_files_to_tmp(self):
         logger.info("Gathering subnet price data.")
