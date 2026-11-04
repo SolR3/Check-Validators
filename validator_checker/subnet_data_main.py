@@ -308,7 +308,8 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             rizzo_updated = None
             rizzo_last_update = None
         else:
-            rizzo_emission = metagraph.neurons[rizzo_uid].emission.alpha * subnet_alpha_price
+            # The emission.alpha value already seems to be in Tao units, as displayed on taostats.io
+            rizzo_emission = metagraph.neurons[rizzo_uid].emission.alpha
             rizzo_vtrust = vtrust[rizzo_uid]
             rizzo_updated = [
                 int(current_block - last_update[rizzo_uid]) for last_update in last_updates
