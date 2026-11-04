@@ -33,9 +33,11 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         subnet_alpha_price: float
         subnet_tao_pool: int
         subnet_mechs: list[int]
+        subnet_tempo: int
         subnet_validator_activity_cutoff: int
         num_total_validators: int
         num_valid_validators: int
+        rizzo_emission: float
         rizzo_last_update: list[int] | None
         rizzo_vtrust: float | None
         rt21_vtrust: float | None
@@ -275,6 +277,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         vtrust = self._vtrusts[netuid_index]
         subnet_alpha_price = metagraph.price
         subnet_tao_pool = round(metagraph.raw["tao_in"] / bittensor.settings.RAO_PER_TAO)
+        subnet_tempo = metagraph.tempo
 
         # Get the hotkeys that we care about (Rizzo, Rt21, etc.)
         vali_hotkeys = {}
@@ -300,10 +303,12 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             logger.warning(
                 f"Rizzo validator not running on subnet {netuid}"
             )
+            rizzo_emission = None
             rizzo_vtrust = None
             rizzo_updated = None
             rizzo_last_update = None
         else:
+            rizzo_emission = metagraph.neurons[rizzo_uid].emission.alpha * subnet_alpha_price
             rizzo_vtrust = vtrust[rizzo_uid]
             rizzo_updated = [
                 int(current_block - last_update[rizzo_uid]) for last_update in last_updates
@@ -479,9 +484,11 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             subnet_alpha_price=subnet_alpha_price,
             subnet_tao_pool=subnet_tao_pool,
             subnet_mechs=subnet_mechs,
+            subnet_tempo=subnet_tempo,
             subnet_validator_activity_cutoff=subnet_validator_activity_cutoff,
             num_total_validators=num_total_validators,
             num_valid_validators=num_valid_validators,
+            rizzo_emission=rizzo_emission,
             rizzo_last_update=rizzo_last_update,
             rizzo_vtrust=rizzo_vtrust,
             rt21_vtrust=rt21_vtrust,
