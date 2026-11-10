@@ -76,6 +76,9 @@ OWNED_SUBNETS = (45,)
 
 RIZZO_CHK_HOTKEY = "5FtBncJvGhxjBs4aFn2pid6aur9tBUuo9QR7sHe5DkoRizzo"
 
+# The coldkeys whose stake counts as our own when calculating income.
+RIZZO_OWNED_COLDKEYS = [COLDKEYS["Rizzo"]]
+
 # These are only used as a fallback when we're not registered on
 # the subnet and the hotkey can't be obtained via our coldkey.
 RIZZO_HOTKEYS = {

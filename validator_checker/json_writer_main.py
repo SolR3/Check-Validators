@@ -70,7 +70,9 @@ class JsonWriterMain(JsonWriterBase):
         json_file_main = os.path.join(self._tempdir_main, DATA_FILE_NAME)
 
         logger.info(f"Writing main data to file: {json_file_main}")
-        self._write_json_with_timestamp(validator_data_main, json_file_main)
+        self._write_json_with_timestamp(
+            validator_data_main, json_file_main, **subnet_data.global_data
+        )
 
         # If the --json-intervals-folder was specified then gather the intervals from
         # the existing json files and add interval blocks as necessary.

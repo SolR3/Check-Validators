@@ -83,11 +83,12 @@ class JsonWriterBase:
         raise NotImplementedError
 
     @staticmethod
-    def _write_json_with_timestamp(data, json_file):
+    def _write_json_with_timestamp(data, json_file, **top_level_data):
         timestamp = int(time.time())
         json_contents = {
             "data": data,
             "timestamp": timestamp,
+            **top_level_data,
         }
         with open(json_file, "w") as fp:
             json.dump(json_contents, fp, indent=4)
