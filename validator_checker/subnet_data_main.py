@@ -86,6 +86,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         rizzo_hotkey_alpha_dividends: float | None
         rizzo_hotkey_root_dividends: float | None
         rizzo_hotkey_child_data: list[SubnetDataMain.ChildHotkeyData] | None
+        rizzo_chk_hotkey_children: list[SubnetDataMain.ChkChildData]
 
     @dataclass
     class ChildHotkeyData:
@@ -102,6 +103,13 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         children_fraction: float | None = None
         parents: list[SubnetDataMain.ParentHotkeyData] | None = None
         on_root: bool | None = None
+
+    @dataclass
+    class ChkChildData:
+        hotkey: str
+        proportion: float
+        registered: bool
+        is_rizzo: bool
 
     @dataclass
     class ParentHotkeyData:
@@ -370,9 +378,44 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             (root_dividends or 0) / bittensor.settings.RAO_PER_TAO,
         )
 
+    async def _get_chk_hotkey_children(self, subtensor, netuid):
+        # Unlike self._children, this is the full on-chain list including our swap hotkey.
+        children = await subtensor.delegation.children(self._get_chk_hotkey(), netuid)
+        uids, owners = await asyncio.gather(
+            asyncio.gather(
+                *[
+                    subtensor.query(
+                        bittensor.storage.SubtensorModule.Uids,
+                        params=[netuid, child_hotkey]
+                    )
+                    for _, child_hotkey in children
+                ]
+            ),
+            asyncio.gather(
+                *[
+                    subtensor.query(
+                        bittensor.storage.SubtensorModule.Owner,
+                        params=[child_hotkey]
+                    )
+                    for _, child_hotkey in children
+                ]
+            ),
+        )
+        return [
+            self.ChkChildData(
+                hotkey=child_hotkey,
+                proportion=proportion / (2**64 - 1),
+                registered=uids[i] is not None,
+                is_rizzo=str(owners[i]) in RIZZO_OWNED_COLDKEYS,
+            )
+            for i, (proportion, child_hotkey) in enumerate(children)
+        ]
+
     async def _get_chk_hotkey_income_data(self, subtensor, netuid, own_alpha_rao):
+        chk_hotkey_children = await self._get_chk_hotkey_children(subtensor, netuid)
         if self._other_coldkey:
             return {
+                "rizzo_chk_hotkey_children": chk_hotkey_children,
                 "rizzo_chk_hotkey_total_alpha": None,
                 "rizzo_chk_hotkey_own_alpha": None,
                 "rizzo_chk_hotkey_own_root_stake": None,
@@ -401,6 +444,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             "rizzo_chk_hotkey_on_root": on_root,
             "rizzo_chk_hotkey_alpha_dividends": alpha_dividends,
             "rizzo_chk_hotkey_root_dividends": root_dividends,
+            "rizzo_chk_hotkey_children": chk_hotkey_children,
         }
 
     @staticmethod
