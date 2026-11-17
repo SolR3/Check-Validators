@@ -119,7 +119,7 @@ class JsonWriterPrice(JsonWriterBase):
 
     # Courtesy of gregbeard, thanks Greg!
     def _get_price_from_url(self):
-        url = "https://api.taostats.io/api/price/latest/v1?asset=tao"
+        url = "https://api.taostats.io/v1/price?asset=tao"
 
         response = self._query_url(url)
         if response.status_code != 200:
