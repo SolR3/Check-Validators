@@ -101,6 +101,10 @@ class RichPrinterBase:
             return [None] * num_mechs
         return updated_list
 
+    @staticmethod
+    def _get_null_consensus_str(null_consensus_value):
+        return str(null_consensus_value) if null_consensus_value else ""
+
 
 class TablePrinterBase(RichPrinterBase):
     reverse_sort = True

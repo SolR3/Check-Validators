@@ -88,6 +88,7 @@ class TablePrinter(TablePrinterBase):
             "Emission",
             "Tao Pool",
             "Alpha",
+            "Null",
             "# Valis",
             "CHK vT",
             "CHK ?",
@@ -117,6 +118,7 @@ class TablePrinter(TablePrinterBase):
 
         num_mechs = len(validator_data.subnet_mechs)
         activity_cutoff = validator_data.subnet_validator_activity_cutoff
+        null_consensus = self._get_null_consensus_str(validator_data.subnet_null_consensus)
 
         chk_updated_list = self._get_updated_list(validator_data.chk_updated, num_mechs)
         rizzo_updated_list = self._get_updated_list(validator_data.rizzo_updated, num_mechs)
@@ -235,6 +237,7 @@ class TablePrinter(TablePrinterBase):
             Text(f"{validator_data.subnet_emission:.2f}%"),
             Text(f"{validator_data.subnet_tao_pool:,}{TAO}"),
             Text(f"{validator_data.subnet_alpha_price:.4f}{TAO}"),
+            Text(f"{null_consensus}"),
             Text(
                 f"{validator_data.num_valid_validators:>2}  "
                 f"({validator_data.num_total_validators})"

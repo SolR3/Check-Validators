@@ -31,6 +31,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         block: int
         netuid: int
         is_owned_subnet: bool
+        subnet_null_consensus: bool
         subnet_emission: float
         subnet_alpha_price: float
         subnet_tao_pool: int
@@ -153,7 +154,13 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         # Get a snapshot at the current block so everything is in sync
         snapshot = await subtensor.at(block)
 
-        # Get mechanisms forfor all subnets.
+        # Get consensus mode (Null vs. Yuma) for all subnets. Store as a bool that is True
+        # when when Null consensus is enabled and False when Yuma consensus is enabled.
+        self._subnet_null_consensuses = await asyncio.gather(
+            *[self._get_null_consensus(snapshot, netuid) for netuid in netuids]
+        )
+
+        # Get mechanisms for all subnets.
         self._mech_splits = await asyncio.gather(
             *[self._get_mech_split(snapshot, netuid) for netuid in netuids]
         )
@@ -629,6 +636,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
 
     def _populate_validator_data_for_subnet(self, netuid_index, netuid, current_block):
         is_owned_subnet = netuid in OWNED_SUBNETS
+        subnet_null_consensus = self._subnet_null_consensuses[netuid_index]
         subnet_emission = self._subnet_emissions[netuid_index]
         subnet_mechs = self._mech_splits[netuid_index]
         subnet_validator_activity_cutoff = self._subnet_validator_activity_cutoffs[netuid_index]
@@ -846,6 +854,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             block=current_block,
             netuid=netuid,
             is_owned_subnet=is_owned_subnet,
+            subnet_null_consensus=subnet_null_consensus,
             subnet_emission=subnet_emission,
             subnet_alpha_price=subnet_alpha_price,
             subnet_tao_pool=subnet_tao_pool,

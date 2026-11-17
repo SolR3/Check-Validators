@@ -145,6 +145,12 @@ class SubnetDataFromSubtensor(SubnetDataBase):
         return int(round(cutoff_factor * tempo / 1000))
 
     @staticmethod
+    async def _get_null_consensus(subtensor, netuid):
+        hyperparameters = await subtensor.subnets.subnet_hyperparameters(netuid=netuid)
+        epoch_consensus = hyperparameters["epoch_consensus"]
+        return (epoch_consensus == 1)
+
+    @staticmethod
     async def _get_metagraph(subtensor, netuid):
         metagraph = await subtensor.subnets.metagraph(netuid, commitments=False)
         return metagraph

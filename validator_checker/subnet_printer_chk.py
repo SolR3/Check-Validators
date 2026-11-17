@@ -62,6 +62,7 @@ class TablePrinter(TablePrinterBase):
             "Emission",
             "Tao Pool",
             "Alpha",
+            "Null",
             "CHK %",
             "Take %",
             "vTrust",
@@ -82,6 +83,7 @@ class TablePrinter(TablePrinterBase):
 
         num_mechs = len(validator_data.subnet_mechs)
         activity_cutoff = validator_data.subnet_validator_activity_cutoff
+        null_consensus = self._get_null_consensus_str(validator_data.subnet_null_consensus)
         avg_updated_list = self._get_updated_list(validator_data.avg_updated, num_mechs)
         child_hotkey_data = getattr(validator_data, self._child_hotkey_attr)
 
@@ -185,6 +187,7 @@ class TablePrinter(TablePrinterBase):
             Text(f"{validator_data.subnet_emission:.2f}%"),
             Text(f"{validator_data.subnet_tao_pool:,}{TAO}"),
             Text(f"{validator_data.subnet_alpha_price:.4f}{TAO}"),
+            Text(f"{null_consensus}"),
             Text.assemble(*chk_percents),
             Text.assemble(*chk_takes),
             Text.assemble(*chk_vtrusts),
