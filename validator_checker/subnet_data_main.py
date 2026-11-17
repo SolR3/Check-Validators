@@ -67,27 +67,27 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         validator_hotkeys: SubnetDataMain.ValidatorHotkeys
         rizzo_expected_hotkey: str | None
         rizzo_hotkey_chk_take: float
-        rizzo_delegate_take: float | None
-        rizzo_hotkey: str | None
-        rizzo_hotkey_total_alpha: float | None
-        rizzo_own_alpha: float | None
-        rizzo_parents: list[SubnetDataMain.ParentHotkeyData] | None
-        rizzo_emission_block: int | None
-        rizzo_hotkey_root_stake: float | None
-        rizzo_chk_hotkey_total_alpha: float | None
-        rizzo_chk_hotkey_own_alpha: float | None
-        rizzo_own_root_stake: float | None
-        rizzo_chk_hotkey_own_root_stake: float | None
-        rizzo_hotkey_children_fraction: float | None
-        rizzo_chk_hotkey_delegate_take: float | None
-        rizzo_chk_hotkey_on_root: bool | None
-        rizzo_chk_hotkey_alpha_dividends: float | None
-        rizzo_chk_hotkey_root_dividends: float | None
-        rizzo_hotkey_on_root: bool | None
-        rizzo_hotkey_alpha_dividends: float | None
-        rizzo_hotkey_root_dividends: float | None
-        rizzo_hotkey_child_data: list[SubnetDataMain.ChildHotkeyData] | None
-        rizzo_chk_hotkey_children: list[SubnetDataMain.ChkChildData]
+        rizzo_delegate_take: float | None = None
+        rizzo_hotkey: str | None = None
+        rizzo_hotkey_total_alpha: float | None = None
+        rizzo_own_alpha: float | None = None
+        rizzo_parents: list[SubnetDataMain.ParentHotkeyData] | None = None
+        rizzo_emission_block: int | None = None
+        rizzo_hotkey_root_stake: float | None = None
+        rizzo_chk_hotkey_total_alpha: float | None = None
+        rizzo_chk_hotkey_own_alpha: float | None = None
+        rizzo_own_root_stake: float | None = None
+        rizzo_chk_hotkey_own_root_stake: float | None = None
+        rizzo_hotkey_children_fraction: float | None = None
+        rizzo_chk_hotkey_delegate_take: float | None = None
+        rizzo_chk_hotkey_on_root: bool | None = None
+        rizzo_chk_hotkey_alpha_dividends: float | None = None
+        rizzo_chk_hotkey_root_dividends: float | None = None
+        rizzo_hotkey_on_root: bool | None = None
+        rizzo_hotkey_alpha_dividends: float | None = None
+        rizzo_hotkey_root_dividends: float | None = None
+        rizzo_hotkey_child_data: list[SubnetDataMain.ChildHotkeyData] | None = None
+        rizzo_chk_hotkey_children: list[SubnetDataMain.ChkChildData] | None = None
 
     @dataclass
     class ChildHotkeyData:
@@ -124,11 +124,15 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         "ValidatorHotkeys", [(k, str) for k in COLDKEYS]
     )
 
-    def __init__(self, network, netuids=None, chunk_size=0, other_coldkey=None):
+    def __init__(
+            self, network, netuids=None, chunk_size=0,
+            other_coldkey=None, calculate_income=False,
+        ):
         self._netuids = netuids
         self._network = network
         self._chunk_size = chunk_size
         self._other_coldkey = self._get_other_coldkey(other_coldkey)
+        self._calculate_income = calculate_income
 
         self._global_data = {}
 
@@ -253,46 +257,53 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             t / bittensor.settings.U16_MAX for t in rizzo_hotkey_chk_takes_result
         ]
 
-        # Get the network wide values used to calculate income.
-        ck_burn, tao_weight = await asyncio.gather(
-            snapshot.query(bittensor.storage.SubtensorModule.CKBurn),
-            snapshot.query(bittensor.storage.SubtensorModule.TaoWeight),
-        )
-        self._global_data = {
-            "ck_burn": ck_burn / (2**64 - 1),
-            "tao_weight": tao_weight / (2**64 - 1),
-        }
+        if self._calculate_income:
+            # Get the network wide values used to calculate income.
+            ck_burn, tao_weight = await asyncio.gather(
+                snapshot.query(bittensor.storage.SubtensorModule.CKBurn),
+                snapshot.query(bittensor.storage.SubtensorModule.TaoWeight),
+            )
+            self._global_data = {
+                "ck_burn": ck_burn / (2**64 - 1),
+                "tao_weight": tao_weight / (2**64 - 1),
+            }
 
-        # Get the alpha staked by our own coldkeys on each hotkey and netuid.
-        own_coldkeys = [self._other_coldkey] if self._other_coldkey else RIZZO_OWNED_COLDKEYS
-        stake_positions = await snapshot.staking.stake_for_coldkeys(own_coldkeys)
-        own_alpha_rao = defaultdict(int)
-        for positions in stake_positions.values():
-            for position in positions:
-                own_alpha_rao[(position.hotkey, position.netuid)] += position.stake.rao
+            # Get the alpha staked by our own coldkeys on each hotkey and netuid.
+            own_coldkeys = [self._other_coldkey] if self._other_coldkey else RIZZO_OWNED_COLDKEYS
+            stake_positions = await snapshot.staking.stake_for_coldkeys(own_coldkeys)
+            own_alpha_rao = defaultdict(int)
+            for positions in stake_positions.values():
+                for position in positions:
+                    own_alpha_rao[(position.hotkey, position.netuid)] += position.stake.rao
 
-        # Get the data needed to calculate what we keep of rizzo_emission.
-        self._rizzo_income_data = await asyncio.gather(
-            *[
-                self._get_rizzo_income_data(
-                    snapshot, metagraph, own_alpha_rao, self._vtrusts[i], block
-                )
-                for i, metagraph in enumerate(self._metagraphs)
+            # Get the data needed to calculate what we keep of rizzo_emission.
+            self._rizzo_income_data = await asyncio.gather(
+                *[
+                    self._get_rizzo_income_data(
+                        snapshot, metagraph, own_alpha_rao, self._vtrusts[i], block
+                    )
+                    for i, metagraph in enumerate(self._metagraphs)
+                ]
+            )
+
+            # Get the data needed to calculate what we earn as a parent of each child hotkey.
+            self._child_income_data = await asyncio.gather(
+                *[
+                    asyncio.gather(
+                        *[
+                            self._get_child_income_data(snapshot, child_hotkey, netuid)
+                            for _, child_hotkey in self._children[i]
+                        ]
+                    )
+                    for i, netuid in enumerate(netuids)
+                ]
+            )
+        else:
+            self._rizzo_income_data = [{} for _ in netuids]
+            self._child_income_data = [
+                [{} for _ in self._children[i]]
+                for i in range(len(netuids))
             ]
-        )
-
-        # Get the data needed to calculate what we earn as a parent of each child hotkey.
-        self._child_income_data = await asyncio.gather(
-            *[
-                asyncio.gather(
-                    *[
-                        self._get_child_income_data(snapshot, child_hotkey, netuid)
-                        for _, child_hotkey in self._children[i]
-                    ]
-                )
-                for i, netuid in enumerate(netuids)
-            ]
-        )
 
         # Get all of the rest of the data from the metagraph.
         for ni, netuid in enumerate(netuids):

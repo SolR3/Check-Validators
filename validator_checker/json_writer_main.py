@@ -57,6 +57,7 @@ class JsonWriterMain(JsonWriterBase):
             subnet_data = SubnetDataMain(
                 self._lite_network,
                 chunk_size=self._chunk_size,
+                calculate_income=True,
             )
         except Exception as err:
             logger.error(f"Subtensor connection failed on '{self._lite_network}'")
