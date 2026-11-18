@@ -83,6 +83,13 @@ def _parse_args():
     )
 
     parser.add_argument(
+        "-e", "--sort-by-emission",
+        action="store_true",
+        help="When specified then sort the subnets by emission %. "
+        "When not specified then sort the subnets by netuid."
+    )
+
+    parser.add_argument(
         "-v", "--verbose",
         action="store_true",
         help="Print verbose output."
@@ -101,7 +108,7 @@ def main():
         options.local_lite_subtensor,
         skip_datacenter_subtensor=options.skip_datacenter_subtensor
     )
-    sort_subnets = not bool(options.netuids)
+
     print_total_emission = not (
         options.chk_only or options.missing_chk
         or options.null_consensus or bool(options.netuids)
@@ -113,7 +120,7 @@ def main():
     )
     subnet_data_printer = SubnetDataPrinter(
         subnet_data.validator_data, subnet_data.netuids, options.chk_only, options.missing_chk,
-        options.null_consensus, sort_subnets, print_total_emission, options.coldkey
+        options.null_consensus, options.sort_by_emission, print_total_emission, options.coldkey
     )
     total_time = round(time.time() - start_time)
 

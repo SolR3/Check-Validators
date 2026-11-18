@@ -118,7 +118,6 @@ class RichPrinterBase:
 
 
 class TablePrinterBase(RichPrinterBase):
-    reverse_sort = True
     _table_title_suffix = None  # This is defined in subclassess
 
     def __init__(self, vali_name):

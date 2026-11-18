@@ -13,13 +13,13 @@ from .subnet_printer_base import TablePrinterBase
 class SubnetDataPrinter:
     def __init__(
             self, validator_data, netuids, chk_only, missing_chk,
-            null_consensus, sort_subnets, print_total_emission, coldkey,
+            null_consensus, sort_by_emission, print_total_emission, coldkey,
         ):
         self._netuids = netuids
         self._chk_only = chk_only
         self._missing_chk = missing_chk
         self._null_consensus = null_consensus
-        self._sort_subnets = sort_subnets
+        self._sort_by_emission = sort_by_emission
         self._print_total_emission = print_total_emission
         self._validator_data = validator_data
         self._vali_name = self._get_vali_name(coldkey)
@@ -38,10 +38,7 @@ class SubnetDataPrinter:
         printer = TablePrinter(self._vali_name)
 
         def sort_key(netuid):
-            sort_key = self._validator_data[netuid].subnet_emission
-            if printer.reverse_sort:
-                sort_key *= -1
-            return sort_key
+            return self._validator_data[netuid].subnet_emission * -1
 
         missing_data = []
 
@@ -50,12 +47,14 @@ class SubnetDataPrinter:
         if self._netuids:
             netuids = (
                 sorted(self._netuids, key=sort_key)
-                if self._sort_subnets else self._netuids
+                if self._sort_by_emission
+                else self._netuids
             )
         else:
             netuids = (
                 sorted(self._validator_data, key=sort_key)
-                if self._sort_subnets else self._validator_data.keys()
+                if self._sort_by_emission
+                else list(self._validator_data)
             )
 
         for netuid in netuids:
