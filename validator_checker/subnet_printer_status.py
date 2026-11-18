@@ -13,11 +13,12 @@ from .subnet_printer_base import TablePrinterBase
 class SubnetDataPrinter:
     def __init__(
             self, validator_data, netuids, chk_only, missing_chk,
-            sort_subnets, print_total_emission, coldkey,
+            null_consensus, sort_subnets, print_total_emission, coldkey,
         ):
         self._netuids = netuids
         self._chk_only = chk_only
         self._missing_chk = missing_chk
+        self._null_consensus = null_consensus
         self._sort_subnets = sort_subnets
         self._print_total_emission = print_total_emission
         self._validator_data = validator_data
@@ -68,6 +69,9 @@ class SubnetDataPrinter:
                 continue
 
             if self._missing_chk and validator_data.missing_chk <= EPSILON:
+                continue
+
+            if self._null_consensus and not validator_data.subnet_null_consensus:
                 continue
 
             printer.update_printout(validator_data)
