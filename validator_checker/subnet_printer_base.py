@@ -49,11 +49,15 @@ class RichPrinterBase:
         return str(value)
 
     @staticmethod
-    def _get_vtrust_status(vtrust, avg_vtrust):
-        if avg_vtrust is None:
+    def _get_vtrust_status(vtrust, avg_vtrust, null_consensus):
+        if avg_vtrust is None and not null_consensus:
             return 1
         if vtrust is None:
             return 2
+
+        if null_consensus:
+            return 0
+
         if (avg_vtrust - vtrust) > VTRUST_ERROR_THRESHOLD:
             return 2
         if (avg_vtrust - vtrust) > VTRUST_WARNING_THRESHOLD:
@@ -61,11 +65,15 @@ class RichPrinterBase:
         return 0
     
     @staticmethod
-    def _get_chk_vtrust_status(vtrust, avg_vtrust):
-        if avg_vtrust is None:
+    def _get_chk_vtrust_status(vtrust, avg_vtrust, null_consensus):
+        if avg_vtrust is None and not null_consensus:
             return 1
         if vtrust is None:
             return 2
+
+        if null_consensus:
+             return 0
+
         if vtrust < 0.9:
             return 2
         if vtrust < 0.95:
@@ -83,11 +91,14 @@ class RichPrinterBase:
         return 0
 
     @staticmethod
-    def _get_updated_status(updated, avg_updated, activity_cutoff):
+    def _get_updated_status(updated, avg_updated, activity_cutoff, null_consensus):
         if updated is None:
             if avg_updated is None:
                 return 1
             return 2
+
+        if null_consensus:
+            return 0
 
         if updated > activity_cutoff:
             return 2

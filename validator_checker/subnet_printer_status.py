@@ -117,7 +117,6 @@ class TablePrinter(TablePrinterBase):
         mechs = []
 
         num_mechs = len(validator_data.subnet_mechs)
-        activity_cutoff = validator_data.subnet_validator_activity_cutoff
         null_consensus = self._get_null_consensus_str(validator_data.subnet_null_consensus)
 
         chk_updated_list = self._get_updated_list(validator_data.chk_updated, num_mechs)
@@ -127,21 +126,27 @@ class TablePrinter(TablePrinterBase):
         max_updated_list = self._get_updated_list(validator_data.max_updated, num_mechs)
 
         rizzo_vtrust_status = self._get_vtrust_status(
-            validator_data.rizzo_vtrust, validator_data.avg_vtrust
+            validator_data.rizzo_vtrust, validator_data.avg_vtrust,
+            validator_data.subnet_null_consensus,
         )
         rizzo_updated_statuses = [
             self._get_updated_status(
-                rizzo_updated_list[i], avg_updated_list[i], activity_cutoff
+                rizzo_updated_list[i], avg_updated_list[i],
+                validator_data.subnet_validator_activity_cutoff,
+                validator_data.subnet_null_consensus,
             )
             for i in range(num_mechs)
         ]
 
         chk_vtrust_status = self._get_chk_vtrust_status(
-            validator_data.chk_vtrust, validator_data.avg_vtrust
+            validator_data.chk_vtrust, validator_data.avg_vtrust,
+            validator_data.subnet_null_consensus,
         )
         chk_updated_statuses = [
             self._get_updated_status(
-                chk_updated_list[i], avg_updated_list[i], activity_cutoff
+                chk_updated_list[i], avg_updated_list[i],
+                validator_data.subnet_validator_activity_cutoff,
+                validator_data.subnet_null_consensus,
             )
             for i in range(num_mechs)
         ]
