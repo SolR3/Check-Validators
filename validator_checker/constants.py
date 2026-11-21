@@ -68,6 +68,24 @@ COLDKEYS = {
     "TAO_com": "5DXiV1gqHRQKop5RZA5ywvcZ9bW1p7CmwuSAT8R6143jXUWg",
 }
 
+LEGIT_VALI_COLDKEYS = {v: k.replace("_", ".") for k, v in COLDKEYS.items()}
+
+WEIGHT_COPIER_COLDKEYS = {
+    "5EJAqczgzCMvWcmXhKMZH4vMS5gPy8BjeuHjz5o5yN6RYzX2": "tao5",
+    "5GsbTgfvgCH4xdqSkiPb7EaBBFLHjWH5vfEALhJaewSFpZX9": "tao.bot",
+    "5Ek8i6wDRakJfJPM9wpJLYDE9G9uaqHLdARoewtTiLtbt33f": "1T1B.AI",
+    "5GP1VN5DcMNW5XL6cAFEzneN9fTfWMytNibZX8YMS7BgJBG6": "Kooltek68",
+    "5Eq8b9p6zJMjEXyH9sX4DRMYspnUyorEKq3Zmha1WN6AC4sf": "Crucible Labs",
+    "5HiFDVNX4ivCJFt9RvgRCtQKmAPgAXGX8BRgX3XKqfY9fFve": "TAO.app",
+    "5DkwfxC9mZTTCsRUt6nrnwQEWVrhsmY13SBRparj6cpAVxVY": "Datura",
+    "5F4XcaiEBkE3ARx2kG29KJ8e94nFfUZQYC4c7zfticastxiD": "Weight Copier",
+    "5DyMLUKuc6T3QFAXKd3w6dTcxmcH1WBZ1gDrRwJAnPf7N28w": "Weight Copier",
+    "5EnXts8HKLv1o3qhFBGPaoZt1CjMd2g4RtKDpnp3A44xFCGK": "Weight Copier",  # 5FLoWC...SeRv8m
+    "5CqsgERpW6dJn4AtTkfckcUd7Ab6JNVa2Hb2MhyjApYVXMUV": "Kusanagi (MUV)",
+    "5DywxdtESjskgPZrDXL86qV44SpPgJuqs9X6noyJJwX9PaSD": "General Tensor",
+    "5EBuUXD6eXSSWVaT1NqaUQoAACUkAmEogzAfPQvDXTEQZ8Ff": "OTF",
+}
+
 # This is a fix to handle the subnets on which our coldkeys is
 # registered on multiple uids.
 MULTI_UID_HOTKEYS = (20, 70,)

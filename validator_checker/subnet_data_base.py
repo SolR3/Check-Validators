@@ -4,6 +4,7 @@ from __future__ import annotations
 # standart imports
 import asyncio
 from dataclasses import asdict
+import time
 
 # bittensor import
 import bittensor
@@ -172,6 +173,10 @@ class SubnetDataFromSubtensor(SubnetDataBase):
         )
         return [vt / bittensor.settings.U16_MAX for vt in vtrust]
 
+    @staticmethod
+    async def _get_weights(subtensor, netuid, mechid):
+        return await subtensor.weights.weights(netuid=netuid, mechid=mechid)
+
     async def _get_children(self, subtensor, netuid):
         children = await subtensor.delegation.children(self._get_chk_hotkey(), netuid)
         return [(c[0] / (2**64 - 1), c[1]) for c in children]
@@ -180,6 +185,9 @@ class SubnetDataFromSubtensor(SubnetDataBase):
         pending_children = await subtensor.delegation.pending_children(self._get_chk_hotkey(), netuid)
         pending_children["children"] = [(c[0] / (2**64 - 1), c[1]) for c in pending_children["children"]]
         return pending_children
+
+    def _get_subnet_data(self):
+        asyncio.run(self._async_get_subnet_data())
 
     async def _async_get_subnet_data(self):
         def get_chunks():
@@ -215,7 +223,15 @@ class SubnetDataFromSubtensor(SubnetDataBase):
             for netuids in get_chunks():
                 for attempt in range(1, max_attempts+1):
                     logger.info(f"Attempt {attempt} of {max_attempts}")
+                    logger.info(f"Obtaining data for subnets: {netuids}")
+                    start_time = time.time()
+
                     await self._get_validator_data(subtensor, block, netuids)
+
+                    total_time = time.time() - start_time
+                    logger.info(
+                        f"Data gathered in {int(total_time)} seconds."
+                    )
 
                     # Get netuids missing data
                     # I don't think this is needed anymore but keeping it around

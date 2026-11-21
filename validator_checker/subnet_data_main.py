@@ -6,7 +6,6 @@ import asyncio
 from collections import defaultdict
 from dataclasses import dataclass, make_dataclass
 import numpy
-import time
 
 # bittensor import
 import bittensor
@@ -20,6 +19,8 @@ from .constants import (
     RIZZO_CHK_HOTKEY,
     RIZZO_HOTKEYS,
     RIZZO_OWNED_COLDKEYS,
+    LEGIT_VALI_COLDKEYS,
+    WEIGHT_COPIER_COLDKEYS,
 )
 from .subnet_data_base import SubnetDataFromSubtensor
 from .utils import logger
@@ -65,6 +66,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         child_hotkey_data: list[SubnetDataMain.ChildHotkeyData]
         pending_child_hotkey_data: list[SubnetDataMain.ChildHotkeyData]
         validator_hotkeys: SubnetDataMain.ValidatorHotkeys
+        validator_weights: list[SubnetDataMain.WeightsData]
         rizzo_expected_hotkey: str | None
         rizzo_hotkey_chk_take: float
         rizzo_delegate_take: float | None = None
@@ -124,6 +126,18 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         "ValidatorHotkeys", [(k, str) for k in COLDKEYS]
     )
 
+    @dataclass
+    class WeightsData:
+        uid: int
+        hotkey: str
+        coldkey: str
+        vali_name: str
+        vali_type: int  # 0=Rizzo, 1=owner, 2=legit vali, 3=weight copier, 4=unknown
+        vtrust: float
+        updated: list[int]
+        weights: list[dict[int, float]]
+
+
     def __init__(
             self, network, netuids=None, chunk_size=0,
             other_coldkey=None, calculate_income=False,
@@ -145,15 +159,9 @@ class SubnetDataMain(SubnetDataFromSubtensor):
     def _get_chk_hotkey(self):
         return RIZZO_CHK_HOTKEY
 
-    def _get_subnet_data(self):
-        asyncio.run(self._async_get_subnet_data())
-
     async def _get_validator_data(self, subtensor, block, netuids):
         if type(netuids) != list:
             netuids = [netuids]
-
-        start_time = time.time()
-        logger.info(f"Obtaining data for subnets: {netuids}")
 
         # Get a snapshot at the current block so everything is in sync
         snapshot = await subtensor.at(block)
@@ -182,6 +190,31 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             *[self._get_metagraph(snapshot, netuid) for netuid in netuids]
         )
 
+        def convert_to_dict_of_mechid_lists(data_results):
+            # Converts a flattened list of data into a dictionary where the keys are
+            # netuids and the values are lists of data where each item in the list
+            # corresponds to a mechid for that netuid.
+            data_dict = {}
+            ri = 0
+            for ni, netuid in enumerate(netuids):
+                data_list = []
+                for _ in range(len(self._mech_splits[ni])):
+                    data_list.append(data_results[ri])
+                    ri += 1
+                data_dict[netuid] = data_list
+            return data_dict
+
+        # Get the weights values for all mechids on all subnets.
+        weights_results = await asyncio.gather(
+            *[
+                self._get_weights(snapshot, netuid, mechid)
+                for i, netuid in enumerate(netuids) for mechid in range(len(self._mech_splits[i]))
+            ]
+        )
+        # Store the weights in a dictionary where the keys are the netuids and the values
+        # are the weights for each mechid.
+        self._weights_dict = convert_to_dict_of_mechid_lists(weights_results)
+
         # Get the last updated values for all mechids on all subnets.
         last_updates_results = await asyncio.gather(
             *[
@@ -191,14 +224,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         )
         # Store the last_updates in a dictionary where the keys are the netuids and the values
         # are a list of last_updates for each mechid.
-        self._last_updates_dict = {}
-        ri = 0
-        for ni, netuid in enumerate(netuids):
-            last_updates_for_netuid = []
-            for _ in range(len(self._mech_splits[ni])):
-                last_updates_for_netuid.append(last_updates_results[ri])
-                ri += 1
-            self._last_updates_dict[netuid] = last_updates_for_netuid
+        self._last_updates_dict = convert_to_dict_of_mechid_lists(last_updates_results)
 
         # Get the vtrust values for all subnets.
         self._vtrusts = await asyncio.gather(
@@ -308,11 +334,6 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         # Get all of the rest of the data from the metagraph.
         for ni, netuid in enumerate(netuids):
             self._populate_validator_data_for_subnet(ni, netuid, block)
-
-        total_time = time.time() - start_time
-        logger.info(
-            f"Data gathered in {int(total_time)} seconds for subnets: {netuids}."
-        )
 
     def _filter_swap_hotkeys(self):
         swap_child_hotkeys = {}
@@ -661,6 +682,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         chk_pending_block = children_pending["cooldown_block"]
         child_takes_pending = self._chk_takes_pending_dict.get(netuid, [])
         rizzo_hotkey_chk_take = self._rizzo_hotkey_chk_takes[netuid_index]
+        weights = self._weights_dict[netuid]
         last_updates = self._last_updates_dict[netuid]
         vtrust = self._vtrusts[netuid_index]
         subnet_alpha_price = metagraph.price
@@ -860,6 +882,50 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             avg_updated = [int(numpy.round(numpy.average(u))) if u else None for u in updateds]
             max_updated = [int(numpy.max(u)) if u else None for u in updateds]
 
+        def get_validator_name(validator):
+            coldkey = validator.coldkey
+            name = (validator.identity or {}).get("name") or None
+            if not name:
+                if coldkey in LEGIT_VALI_COLDKEYS:
+                    name = LEGIT_VALI_COLDKEYS[coldkey]
+                elif coldkey in WEIGHT_COPIER_COLDKEYS:
+                    name = WEIGHT_COPIER_COLDKEYS[coldkey]
+            if validator.coldkey == metagraph.owner_coldkey:
+                name = f"Owner - {name}" if name else "Owner"
+            return name
+
+        def get_validator_type(validator):
+            if validator.coldkey == COLDKEYS["Rizzo"]:
+                return 0
+            if validator.coldkey == metagraph.owner_coldkey:
+                return 1
+            if validator.coldkey in LEGIT_VALI_COLDKEYS:
+                return 2
+            if validator.coldkey in WEIGHT_COPIER_COLDKEYS:
+                return 3
+            return 4
+
+        # Get validator weights
+        weights_dict = {}
+        for validator in metagraph.validators:
+            weights_dict[validator.uid] = self.WeightsData(
+                uid=validator.uid,
+                hotkey=validator.hotkey,
+                coldkey=validator.coldkey,
+                vali_name=get_validator_name(validator),
+                vali_type=get_validator_type(validator),
+                vtrust=vtrust[validator.uid],
+                updated=[
+                    int(current_block - last_update[validator.uid])
+                    for last_update in last_updates
+                ],
+                weights=[],
+            )
+        for mechid_weights in weights:
+            for uid in weights_dict:
+                weights_dict[uid].weights.append(mechid_weights.get(uid, {}))
+        validator_weights = list(weights_dict.values())
+
         # Store the data.
         self._validator_data[netuid] = self.ValidatorData(
             block=current_block,
@@ -899,6 +965,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             child_hotkey_data=child_hotkey_data,
             pending_child_hotkey_data=pending_child_hotkey_data,
             validator_hotkeys=validator_hotkeys,
+            validator_weights=validator_weights,
             rizzo_expected_hotkey=rizzo_expected_hotkey,
             rizzo_hotkey_chk_take=rizzo_hotkey_chk_take,
             **self._rizzo_income_data[netuid_index],

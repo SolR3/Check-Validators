@@ -8,7 +8,6 @@ import json
 import numpy
 import os
 import re
-import time
 
 # Local imports
 from .constants import (
@@ -18,7 +17,6 @@ from .constants import (
 )
 from .subnet_data_base import SubnetDataBase, SubnetDataFromSubtensor
 from .utils import (
-    get_formatted_time,
     get_json_file_name_for_netuid,
     logger,
 )
@@ -61,7 +59,7 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
 
     def _get_subnet_data(self):
         self._get_existing_subnet_data_from_json()
-        asyncio.run(self._async_get_subnet_data())
+        super()._get_subnet_data()
 
     def _get_existing_subnet_data_from_json(self):
         if self._existing_json_data_folder:
@@ -72,9 +70,6 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
             self._existing_data = {}
 
     async def _get_validator_data(self, subtensor, block, all_netuids):
-        start_time = time.time()
-        logger.info(f"Obtaining data for subnets: {all_netuids}")
-
         # Get a snapshot at the current block
         snapshot = await subtensor.at(block)
 
@@ -130,11 +125,6 @@ class SubnetDataIntervals(SubnetDataFromSubtensor, SubnetDataIntervalsBase):
             netuids = mechid_data["netuids"]
             metagraphs = mechid_data["metagraphs"]
             await self._get_validator_data_for_mechid(subtensor, snapshot, mechid, netuids, metagraphs)
-
-        total_time = round(time.time() - start_time)
-        logger.info(
-            f"Subnet data gathered in {get_formatted_time(total_time)}."
-        )
 
     async def _get_validator_data_for_mechid(self, subtensor, snapshot, mechid, all_netuids, metagraphs):
         last_updates = await asyncio.gather(
