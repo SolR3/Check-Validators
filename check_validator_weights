@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+
+# Standard imports
+import argparse
+import logging
+import os
+import sys
+import time
+
+# Add local validator_checker module path
+sys.path = [os.path.dirname(__file__)] + sys.path
+
+# local imports
+from validator_checker.subnet_data_main import SubnetDataMain
+from validator_checker.subnet_printer_weights import RichPrinter
+from validator_checker.utils import (
+    get_formatted_time,
+    get_lite_subtensor_network,
+    logger,
+)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "-s",
+        dest="netuid",
+        type=int,
+        required=True,
+        help="The uid of the subnet.")
+
+    parser.add_argument(
+        "--mechid",
+        type=int,
+        default=0,
+        help="The mechanism to check. Defaults to mechid 0.")
+
+    parser.add_argument(
+        "--target-uids",
+        nargs="+",
+        type=int,
+        help="When specified, only display the weights for the specified target uids."
+    )
+
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.0,
+        help="The weight threshold above which to print the value. Defaults to 0.")
+    
+    parser.add_argument(
+        "--diff",
+        nargs=2,
+        help="Diff the weights of two uids, hotkeys, or validator names rather than "
+             "printing out all weights.")
+
+    parser.add_argument(
+        "--no-weights",
+        action="store_false",
+        dest="print_weights",
+        help="If specified then don't print the actual weight values.")
+
+    parser.add_argument(
+        "-l", "--local-subtensor",
+        dest="local_lite_subtensor",
+        nargs="?",
+        default=False,
+        help="Use the specified local subtensor (i.e. la, cali, titan, etc.). "
+                "When not specified, use the 'finney' network subtensor."
+    )
+
+    parser.add_argument(
+        "-d", "--skip-datacenter-subtensor",
+        action="store_true",
+        help="When specified, ignore the datacenter01 subtensor when randomly selecting "
+                "a local subtensor."
+    )
+
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Print debug output."
+    )
+
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+
+    if args.verbose:
+        logger.setLevel(logging.INFO)
+
+    network = get_lite_subtensor_network(
+        args.local_lite_subtensor,
+        skip_datacenter_subtensor=args.skip_datacenter_subtensor
+    )
+
+    start_time = time.time()
+    subnet_data = SubnetDataMain(network, netuids=[args.netuid])
+    RichPrinter(
+        subnet_data.validator_data, args.mechid, args.diff,
+        args.print_weights, args.target_uids, args.threshold,
+    )
+    total_time = round(time.time() - start_time)
+    print(f"\nWeights gathering took {get_formatted_time(total_time)}.\n")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt as exc:
+        import traceback
+        exc_list = traceback.format_exception_only(exc)
+        exc_text = "\n" + "".join(exc_list).strip("\n")
+        print(exc_text)

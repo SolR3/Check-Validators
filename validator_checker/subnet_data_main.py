@@ -32,6 +32,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         block: int
         netuid: int
         is_owned_subnet: bool
+        subnet_owner: SubnetDataMain.SubnetOwner
         subnet_null_consensus: bool
         subnet_emission: float
         subnet_alpha_price: float
@@ -92,6 +93,12 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         rizzo_chk_hotkey_children: list[SubnetDataMain.ChkChildData] | None = None
 
     @dataclass
+    class SubnetOwner:
+        uid: int
+        hotkey: str
+        coldkey: str
+
+    @dataclass
     class ChildHotkeyData:
         fraction: float
         hotkey: str
@@ -136,7 +143,6 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         vtrust: float
         updated: list[int]
         weights: list[dict[int, float]]
-
 
     def __init__(
             self, network, netuids=None, chunk_size=0,
@@ -689,6 +695,21 @@ class SubnetDataMain(SubnetDataFromSubtensor):
         subnet_tao_pool = round(metagraph.raw["tao_in"] / bittensor.settings.RAO_PER_TAO)
         subnet_tempo = metagraph.tempo
 
+        owner_uid = (
+            metagraph.hotkeys.index(metagraph.owner_hotkey)
+            if metagraph.owner_hotkey in metagraph.hotkeys
+            else (
+                metagraph.coldkeys.index(metagraph.owner_coldkey)
+                if metagraph.owner_coldkey in metagraph.coldkeys
+                else None
+            )
+        )
+        subnet_owner = self.SubnetOwner(
+            uid=owner_uid,
+            hotkey=metagraph.owner_hotkey,
+            coldkey=metagraph.owner_coldkey,
+        )
+
         # Get the hotkeys that we care about (Rizzo, Rt21, etc.)
         vali_hotkeys = {}
         rizzo_expected_hotkey = None
@@ -931,6 +952,7 @@ class SubnetDataMain(SubnetDataFromSubtensor):
             block=current_block,
             netuid=netuid,
             is_owned_subnet=is_owned_subnet,
+            subnet_owner=subnet_owner,
             subnet_null_consensus=subnet_null_consensus,
             subnet_emission=subnet_emission,
             subnet_alpha_price=subnet_alpha_price,
